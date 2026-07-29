@@ -30,32 +30,11 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ai_workspa
 const mockDb = {
   dualLlmConfig: {
     enabled: true,
-    openAiKey: 'sk-proj-openai-live-key-2026',
-    claudeKey: 'sk-ant-api03-claude-3-5-sonnet-key',
+    openAiKey: process.env.OPENAI_API_KEY || '',
+    claudeKey: process.env.CLAUDE_API_KEY || '',
     status: 'ACTIVE_DUAL_ENSEMBLE'
   },
-  schedules: [
-    {
-      id: 'sch-1',
-      title: 'Daily Billz POS Sales Summary',
-      prompt: 'Billzdagi kunlik savdoni chiqar va Telegramga yubor',
-      frequency: 'DAILY',
-      scheduledTime: '19:00',
-      targetChannel: 'TELEGRAM',
-      isEnabled: true,
-      createdAt: new Date()
-    },
-    {
-      id: 'sch-2',
-      title: 'Morning Meeting & Agenda Briefing',
-      prompt: 'Google Calendar ertangi meeting va Notion tasklarni eslat',
-      frequency: 'DAILY',
-      scheduledTime: '08:30',
-      targetChannel: 'CHAT',
-      isEnabled: true,
-      createdAt: new Date()
-    }
-  ],
+  schedules: [],
   integrations: [
     { type: 'TELEGRAM', name: 'Telegram Bot', status: 'CONNECTED', toolsCount: 2, updatedAt: new Date() },
     { type: 'BILLZ', name: 'Billz Retail POS', status: 'CONNECTED', toolsCount: 3, updatedAt: new Date() },
@@ -70,30 +49,45 @@ const mockDb = {
     { id: 'm1', provider: 'openai', modelName: 'gpt-4o', displayName: 'OpenAI GPT-4o (Single)', isDefault: false, temperature: 0.7 },
     { id: 'm2', provider: 'claude', modelName: 'claude-3-5-sonnet', displayName: 'Claude 3.5 Sonnet (Single)', isDefault: false, temperature: 0.7 }
   ],
-  conversations: [
-    { id: 'conv-1', title: 'Daily Sales & Operations', isPinned: true, updatedAt: new Date() },
-    { id: 'conv-2', title: 'Meeting Schedule & Notion', isPinned: false, updatedAt: new Date(Date.now() - 3600000) }
-  ],
-  messages: {
-    'conv-1': [
-      { id: 'm-1', role: 'user', content: 'Billzdagi bugungi savdoni chiqar.' },
-      { id: 'm-2', role: 'assistant', content: "Bugungi Billz POS savdosi 12 450 000 so'm." }
-    ]
-  },
+  conversations: [],
+  messages: {},
   auditLogs: []
 };
 
 // Try connecting to MongoDB asynchronously
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
-  .then(() => console.log('🍃 MongoDB connected successfully via Mongoose'))
+  .then(async () => {
+    console.log('🍃 MongoDB connected successfully via Mongoose');
+    try {
+      await Promise.all([
+        Conversation.deleteMany({ title: { $in: ['Daily Sales & Operations', 'Meeting Schedule & Notion', 'Test Chat'] } }),
+        Schedule.deleteMany({ title: { $in: ['Daily Billz POS Sales Summary', 'Morning Meeting & Agenda Briefing'] } })
+      ]);
+    } catch (e) {}
+  })
   .catch(() => console.log('ℹ️ MongoDB URI offline - Operating with high-performance In-Memory DB Store'));
 
 // --- AUTOMATED SCHEDULES ENDPOINTS ---
-app.get('/api/schedules', (req, res) => {
+app.get('/api/schedules', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const dbSchedules = await Schedule.find().sort({ createdAt: -1 });
+      return res.json(dbSchedules.map(s => ({
+        id: s._id.toString(),
+        title: s.title,
+        prompt: s.prompt,
+        frequency: s.frequency,
+        scheduledTime: s.scheduledTime,
+        targetChannel: s.targetChannel,
+        isEnabled: s.isEnabled,
+        createdAt: s.createdAt
+      })));
+    }
+  } catch (e) {}
   res.json(mockDb.schedules);
 });
 
-app.post('/api/schedules', (req, res) => {
+app.post('/api/schedules', async (req, res) => {
   const { title, prompt, frequency, scheduledTime, targetChannel } = req.body;
   const newSch = {
     id: `sch-${Date.now()}`,
@@ -105,22 +99,62 @@ app.post('/api/schedules', (req, res) => {
     isEnabled: true,
     createdAt: new Date()
   };
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const created = await Schedule.create({
+        title: newSch.title,
+        prompt: newSch.prompt,
+        frequency: newSch.frequency,
+        scheduledTime: newSch.scheduledTime,
+        targetChannel: newSch.targetChannel,
+        isEnabled: true
+      });
+      newSch.id = created._id.toString();
+    }
+  } catch (e) {}
+
   mockDb.schedules.unshift(newSch);
   res.json(newSch);
 });
 
-app.post('/api/schedules/:id/toggle', (req, res) => {
+app.post('/api/schedules/:id/toggle', async (req, res) => {
   const { id } = req.params;
-  const item = mockDb.schedules.find(s => s.id === id);
+  let item = mockDb.schedules.find(s => s.id === id);
   if (item) {
     item.isEnabled = !item.isEnabled;
   }
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const dbItem = await Schedule.findById(id).catch(() => null);
+      if (dbItem) {
+        dbItem.isEnabled = !dbItem.isEnabled;
+        await dbItem.save();
+        item = {
+          id: dbItem._id.toString(),
+          title: dbItem.title,
+          prompt: dbItem.prompt,
+          frequency: dbItem.frequency,
+          scheduledTime: dbItem.scheduledTime,
+          targetChannel: dbItem.targetChannel,
+          isEnabled: dbItem.isEnabled
+        };
+      }
+    }
+  } catch (e) {}
+
   res.json({ success: true, item });
 });
 
-app.delete('/api/schedules/:id', (req, res) => {
+app.delete('/api/schedules/:id', async (req, res) => {
   const { id } = req.params;
   mockDb.schedules = mockDb.schedules.filter(s => s.id !== id);
+  try {
+    if (mongoose.connection.readyState === 1) {
+      await Schedule.deleteOne({ _id: id }).catch(() => null);
+    }
+  } catch (e) {}
+
   res.json({ success: true, message: 'Schedule deleted' });
 });
 
