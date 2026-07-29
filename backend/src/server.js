@@ -211,24 +211,121 @@ app.get('/api/admin/logs', (req, res) => {
 });
 
 // --- USER CHAT & VOICE ENDPOINTS ---
-app.get('/api/chat/conversations', (req, res) => {
+async function saveMessageRecord(convId, userContent, aiResult) {
+  let conv = mockDb.conversations.find(c => c.id === convId);
+  const cleanUserStr = userContent.replace(/^🎙️ Ovozli:\s*"/, '').replace(/"$/, '');
+  const smartTitle = cleanUserStr.length > 28 ? cleanUserStr.slice(0, 28) + '...' : cleanUserStr;
+
+  if (!conv) {
+    conv = {
+      id: convId,
+      title: smartTitle,
+      isPinned: false,
+      updatedAt: new Date()
+    };
+    mockDb.conversations.unshift(conv);
+  } else if (conv.title === 'New AI Conversation' || conv.title === 'Yangi AI Muloqot' || conv.title === 'New Chat') {
+    conv.title = smartTitle;
+    conv.updatedAt = new Date();
+  } else {
+    conv.updatedAt = new Date();
+  }
+
+  mockDb.conversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  if (!mockDb.messages[convId]) mockDb.messages[convId] = [];
+  const userMsg = { id: `m-${Date.now()}`, role: 'user', content: userContent };
+  const aiMsg = {
+    id: `m-${Date.now() + 1}`,
+    role: 'assistant',
+    content: aiResult.responseText,
+    toolCalls: JSON.stringify(aiResult.executedTools || [])
+  };
+
+  mockDb.messages[convId].push(userMsg);
+  mockDb.messages[convId].push(aiMsg);
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      let dbConv = await Conversation.findOne({ _id: convId }).catch(() => null);
+      if (!dbConv) {
+        dbConv = await Conversation.create({ title: smartTitle, isPinned: false });
+      } else if (dbConv.title === 'New Chat' || dbConv.title === 'New AI Conversation' || dbConv.title === 'Yangi AI Muloqot') {
+        dbConv.title = smartTitle;
+        dbConv.updatedAt = new Date();
+        await dbConv.save();
+      }
+
+      await Message.create({
+        conversationId: dbConv ? dbConv._id.toString() : convId,
+        role: 'user',
+        content: userContent
+      });
+      await Message.create({
+        conversationId: dbConv ? dbConv._id.toString() : convId,
+        role: 'assistant',
+        content: aiResult.responseText,
+        toolCalls: JSON.stringify(aiResult.executedTools || [])
+      });
+    }
+  } catch (e) {}
+}
+
+app.get('/api/chat/conversations', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const dbConvs = await Conversation.find().sort({ updatedAt: -1 });
+      if (dbConvs.length > 0) {
+        return res.json(dbConvs.map(c => ({
+          id: c._id.toString(),
+          title: c.title,
+          isPinned: c.isPinned,
+          updatedAt: c.updatedAt
+        })));
+      }
+    }
+  } catch (e) {}
   res.json(mockDb.conversations);
 });
 
-app.get('/api/chat/conversations/:id/messages', (req, res) => {
+app.get('/api/chat/conversations/:id/messages', async (req, res) => {
   const { id } = req.params;
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const dbMsgs = await Message.find({ conversationId: id }).sort({ createdAt: 1 });
+      if (dbMsgs.length > 0) {
+        return res.json(dbMsgs.map(m => ({
+          id: m._id.toString(),
+          role: m.role,
+          content: m.content,
+          toolCalls: m.toolCalls
+        })));
+      }
+    }
+  } catch (e) {}
   res.json(mockDb.messages[id] || []);
 });
 
-app.post('/api/chat/conversations', (req, res) => {
+app.post('/api/chat/conversations', async (req, res) => {
+  const title = req.body.title || 'Yangi AI Muloqot';
+  const newId = `conv-${Date.now()}`;
   const newConv = {
-    id: `conv-${Date.now()}`,
-    title: req.body.title || 'New AI Conversation',
+    id: newId,
+    title,
     isPinned: false,
     updatedAt: new Date()
   };
   mockDb.conversations.unshift(newConv);
-  mockDb.messages[newConv.id] = [];
+  mockDb.messages[newId] = [];
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const dbConv = await Conversation.create({ title, isPinned: false });
+      newConv.id = dbConv._id.toString();
+      mockDb.messages[newConv.id] = [];
+    }
+  } catch (e) {}
+
   res.json(newConv);
 });
 
@@ -253,17 +350,8 @@ app.post('/api/chat/voice-message', async (req, res) => {
     });
   }
 
-  // Pass mockDb into processVoiceMemo so new schedule is registered in database
   const aiResult = await aiEngine.processVoiceMemo(spokenText, mockDb);
-
-  if (!mockDb.messages[convId]) mockDb.messages[convId] = [];
-  mockDb.messages[convId].push({ id: `m-${Date.now()}`, role: 'user', content: `🎙️ Jonli Ovozli Xabar: "${spokenText}"` });
-  mockDb.messages[convId].push({
-    id: `m-${Date.now() + 1}`,
-    role: 'assistant',
-    content: aiResult.responseText,
-    toolCalls: JSON.stringify(aiResult.executedTools)
-  });
+  await saveMessageRecord(convId, spokenText, aiResult);
 
   res.json({
     conversationId: convId,
@@ -278,20 +366,9 @@ app.post('/api/chat/message', async (req, res) => {
   const { conversationId, content } = req.body;
   const convId = conversationId || 'conv-1';
 
-  // Pass mockDb into processUserMessage so new schedule is registered in database
   const aiResult = await aiEngine.processUserMessage(content, mockDb);
+  await saveMessageRecord(convId, content, aiResult);
 
-  // Save messages
-  if (!mockDb.messages[convId]) mockDb.messages[convId] = [];
-  mockDb.messages[convId].push({ id: `m-${Date.now()}`, role: 'user', content });
-  mockDb.messages[convId].push({
-    id: `m-${Date.now() + 1}`,
-    role: 'assistant',
-    content: aiResult.responseText,
-    toolCalls: JSON.stringify(aiResult.executedTools)
-  });
-
-  // Log execution
   aiResult.executedTools.forEach(et => {
     mockDb.auditLogs.unshift({
       id: `log-${Date.now()}-${Math.random()}`,
