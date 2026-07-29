@@ -572,6 +572,12 @@ export default {
     },
     async sendVoiceRecording() {
       let textToSend = this.liveSpokenText.trim();
+      textToSend = textToSend
+        .replace(/^hello my friends?\s*/i, '')
+        .replace(/^how are you\s*/i, '')
+        .replace(/^hori you\s*/i, '')
+        .trim();
+
       if (!textToSend) {
         textToSend = "Har kuni soat 19:00 da Store Hadiya savdosini va Rolex soati narxini telegramga yubor.";
       }

@@ -42,7 +42,7 @@ export class SpeechService {
       this.speechRecognition = new SpeechRecognitionClass();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
-      // Multi-Language Support: Prefer uz-UZ for Uzbek spoken voice inputs
+      // Force Uzbek language for Web Speech API recognition
       this.speechRecognition.lang = 'uz-UZ';
 
       this.speechRecognition.onstart = () => {
@@ -64,15 +64,24 @@ export class SpeechService {
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const result = event.results[i];
+          let text = result[0].transcript || '';
+
+          // Filter out English hallucinated prefixes if user speaks Uzbek
+          text = text.replace(/^hello my friends?\s*/i, '')
+                     .replace(/^how are you\s*/i, '')
+                     .replace(/^hori you\s*/i, '');
+
           if (result.isFinal) {
-            this.buffer.commitFinal(result[0].transcript);
+            if (text.trim()) {
+              this.buffer.commitFinal(text.trim());
+            }
           } else {
-            interim += result[0].transcript;
+            interim += text;
           }
         }
 
-        if (interim) {
-          this.buffer.updatePartial(interim);
+        if (interim.trim()) {
+          this.buffer.updatePartial(interim.trim());
         }
       };
 
