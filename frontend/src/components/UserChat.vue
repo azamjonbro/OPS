@@ -163,21 +163,7 @@
             </p>
           </div>
 
-          <!-- Status Metrics Strip -->
-          <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-[11px] font-mono text-gray-400">
-            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              7 ta Integratsiya Ulangan
-            </span>
-            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
-              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-              1,152 Mahsulot Bazasi
-            </span>
-            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
-              <span class="w-2 h-2 rounded-full bg-purple-400"></span>
-              GPT-4o + Claude Dual LLM
-            </span>
-          </div>
+
 
           <!-- Quick Actions Grid -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-xl text-left pt-2">
@@ -595,6 +581,10 @@ export default {
       inputQuery: '',
       isLoading: false,
 
+      // Image Lightbox Preview States
+      isPreviewImageOpen: false,
+      previewImageSrc: null,
+
       // File Drag & Drop & Attachment States
       isDraggingFile: false,
       attachedFile: null,
@@ -644,6 +634,11 @@ export default {
     }
   },
   methods: {
+    openImagePreview(src) {
+      if (!src) return;
+      this.previewImageSrc = src;
+      this.isPreviewImageOpen = true;
+    },
     scrollToBottom() {
       nextTick(() => {
         const container = this.$refs.chatContainer;
