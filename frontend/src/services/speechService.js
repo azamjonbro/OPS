@@ -42,7 +42,8 @@ export class SpeechService {
       this.speechRecognition = new SpeechRecognitionClass();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
-      this.speechRecognition.lang = 'en-US';
+      // Multi-Language Support: Prefer uz-UZ for Uzbek spoken voice inputs
+      this.speechRecognition.lang = 'uz-UZ';
 
       this.speechRecognition.onstart = () => {
         this.isListening = true;
@@ -76,9 +77,13 @@ export class SpeechService {
       };
 
       this.speechRecognition.onerror = (e) => {
-        if (e.error !== 'no-speech') {
-          console.warn('Speech recognition notice:', e.error);
+        if (e.error === 'language-not-supported' || e.error === 'no-speech') {
+          // Fallback to en-US if uz-UZ speech model not installed on device
+          try {
+            this.speechRecognition.lang = 'en-US';
+          } catch (err) {}
         }
+        console.warn('Speech recognition notice:', e.error);
       };
 
       this.speechRecognition.onend = () => {

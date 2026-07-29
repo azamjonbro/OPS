@@ -225,6 +225,7 @@
 <script>
 import axios from 'axios';
 import ConnectionModal from './ConnectionModal.vue';
+import { API_BASE } from '../services/api';
 
 export default {
   components: { ConnectionModal },
@@ -255,37 +256,37 @@ export default {
   methods: {
     async fetchDashboard() {
       try {
-        const res = await axios.get('http://localhost:4000/api/admin/dashboard');
+        const res = await axios.get(`${API_BASE}/api/admin/dashboard`);
         this.stats = res.data;
       } catch (e) {}
     },
     async fetchIntegrations() {
       try {
-        const res = await axios.get('http://localhost:4000/api/admin/integrations');
+        const res = await axios.get(`${API_BASE}/api/admin/integrations`);
         this.integrations = res.data;
       } catch (e) {}
     },
     async fetchModels() {
       try {
-        const res = await axios.get('http://localhost:4000/api/admin/models');
+        const res = await axios.get(`${API_BASE}/api/admin/models`);
         this.models = res.data;
       } catch (e) {}
     },
     async fetchLogs() {
       try {
-        const res = await axios.get('http://localhost:4000/api/admin/logs');
+        const res = await axios.get(`${API_BASE}/api/admin/logs`);
         this.logs = res.data;
       } catch (e) {}
     },
     async fetchDualConfig() {
       try {
-        const res = await axios.get('http://localhost:4000/api/admin/llm/dual-config');
+        const res = await axios.get(`${API_BASE}/api/admin/llm/dual-config`);
         this.dualConfig = res.data;
       } catch (e) {}
     },
     async saveDualConfig() {
       try {
-        await axios.post('http://localhost:4000/api/admin/llm/dual-config', this.dualConfig);
+        await axios.post(`${API_BASE}/api/admin/llm/dual-config`, this.dualConfig);
         alert('OpenAI + Claude Dual LLM Connection Saved Successfully!');
       } catch (e) {
         alert('Dual LLM Connection Saved!');
@@ -293,13 +294,13 @@ export default {
     },
     async setDefaultModel(id) {
       try {
-        await axios.post(`http://localhost:4000/api/admin/models/${id}/default`);
+        await axios.post(`${API_BASE}/api/admin/models/${id}/default`);
         this.fetchModels();
       } catch (e) {}
     },
     async testHealth(type) {
       try {
-        const res = await axios.post(`http://localhost:4000/api/admin/integrations/${type}/test`);
+        const res = await axios.post(`${API_BASE}/api/admin/integrations/${type}/test`);
         alert(`Health Test Result for ${type}:\nStatus: ${res.data.isHealthy ? 'HEALTHY ✅' : 'FAILED ❌'}\nMessage: ${res.data.message}`);
       } catch (e) {
         alert('Test triggered. Status: CONNECTED');
@@ -311,7 +312,7 @@ export default {
     },
     async handleSaveCredentials(payload) {
       try {
-        await axios.post(`http://localhost:4000/api/admin/integrations/${payload.type}`, payload);
+        await axios.post(`${API_BASE}/api/admin/integrations/${payload.type}`, payload);
         alert(`${payload.type} credentials saved successfully!`);
         this.isModalOpen = false;
         this.fetchIntegrations();

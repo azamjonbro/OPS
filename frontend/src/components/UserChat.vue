@@ -427,6 +427,7 @@
 import axios from 'axios';
 import { nextTick } from 'vue';
 import { VoiceController, RECORDING_STATE } from '../services/voiceController';
+import { API_BASE } from '../services/api';
 
 export default {
   data() {
@@ -487,21 +488,21 @@ export default {
     },
     async fetchConversations() {
       try {
-        const res = await axios.get('http://localhost:4000/api/chat/conversations');
+        const res = await axios.get(`${API_BASE}/api/chat/conversations`);
         this.conversations = res.data;
       } catch (e) {}
     },
     async fetchMessages(convId) {
       this.activeConvId = convId;
       try {
-        const res = await axios.get(`http://localhost:4000/api/chat/conversations/${convId}/messages`);
+        const res = await axios.get(`${API_BASE}/api/chat/conversations/${convId}/messages`);
         this.messages = res.data;
         this.scrollToBottom();
       } catch (e) {}
     },
     async fetchSchedules() {
       try {
-        const res = await axios.get('http://localhost:4000/api/schedules');
+        const res = await axios.get(`${API_BASE}/api/schedules`);
         this.schedules = res.data;
       } catch (e) {}
     },
@@ -590,7 +591,7 @@ export default {
       this.scrollToBottom();
 
       try {
-        const res = await axios.post('http://localhost:4000/api/chat/voice-message', {
+        const res = await axios.post(`${API_BASE}/api/chat/voice-message`, {
           conversationId: this.activeConvId,
           EnglishTranscription: textToSend
         });
@@ -620,7 +621,7 @@ export default {
     async createSchedule() {
       if (!this.newSchedule.title || !this.newSchedule.prompt) return;
       try {
-        await axios.post('http://localhost:4000/api/schedules', this.newSchedule);
+        await axios.post(`${API_BASE}/api/schedules`, this.newSchedule);
         this.newSchedule.title = '';
         this.newSchedule.prompt = '';
         this.fetchSchedules();
@@ -628,13 +629,13 @@ export default {
     },
     async toggleSchedule(id) {
       try {
-        await axios.post(`http://localhost:4000/api/schedules/${id}/toggle`);
+        await axios.post(`${API_BASE}/api/schedules/${id}/toggle`);
         this.fetchSchedules();
       } catch (e) {}
     },
     async deleteSchedule(id) {
       try {
-        await axios.delete(`http://localhost:4000/api/schedules/${id}`);
+        await axios.delete(`${API_BASE}/api/schedules/${id}`);
         this.fetchSchedules();
       } catch (e) {}
     },
@@ -666,7 +667,7 @@ export default {
       this.isLoading = true;
 
       try {
-        const res = await axios.post('http://localhost:4000/api/chat/message', {
+        const res = await axios.post(`${API_BASE}/api/chat/message`, {
           conversationId: this.activeConvId,
           content: text
         });
