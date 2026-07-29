@@ -77,7 +77,7 @@
               <span class="truncate font-medium">{{ conv.title }}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 rounded-lg hover:bg-[#252834] transition opacity-70 group-hover:opacity-100" title="Chatni o'chirish">
+              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 rounded-lg hover:bg-[#252834] opacity-0 group-hover:opacity-100 transition-opacity duration-200" title="Chatni o'chirish">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
               <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,9 +338,9 @@
           </div>
 
           <!-- GEMINI STYLE IDLE INPUT PILL -->
-          <div v-else class="flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[28px] px-4 py-2.5 shadow-xl focus-within:border-indigo-500/50 transition-all">
+          <div v-else class="min-h-[56px] flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[28px] px-4 py-2 shadow-xl focus-within:border-indigo-500/50 transition-all">
             <!-- Left: Attachment (+) Button -->
-            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
+            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0 my-auto" title="Attach file or image">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </button>
 
@@ -350,13 +350,13 @@
               @keydown.enter.exact.prevent="sendMessage" 
               rows="1"
               placeholder="Спросить Gemini yoki Store Hadiya bo'yicha savol bering..." 
-              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-relaxed py-1 font-sans"
+              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-normal py-0 font-sans my-auto"
             ></textarea>
 
             <!-- Right Controls: Model Pill + Voice Action Button -->
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-2 shrink-0 my-auto">
               <!-- Model Selector Badge (Gemini Flash style) -->
-              <div class="bg-[#2A2B32] text-[11px] text-gray-300 font-medium px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1 hidden md:flex">
+              <div class="bg-[#2A2B32] text-[11px] text-gray-300 font-medium px-3 py-1 rounded-full border border-white/5 flex items-center gap-1 hidden md:flex">
                 <span>GPT-4o</span>
                 <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </div>
@@ -364,9 +364,9 @@
               <!-- Microphone Button -->
               <button 
                 @click="openVoiceModal()" 
-                class="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-md transition shrink-0"
+                class="w-8 h-8 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-sm transition shrink-0 my-auto"
               >
-                <svg class="w-4.5 h-4.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </button>
