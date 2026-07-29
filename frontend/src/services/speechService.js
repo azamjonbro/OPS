@@ -49,6 +49,7 @@ export class SpeechService {
     }
 
     try {
+      this.shouldBeListening = true;
       this.speechRecognition = new SpeechRecognitionClass();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
@@ -97,25 +98,28 @@ export class SpeechService {
 
       this.speechRecognition.onerror = (e) => {
         if (e.error === 'language-not-supported' || e.error === 'no-speech') {
-          // Fallback to en-US if uz-UZ speech model not installed on device
           try {
             this.speechRecognition.lang = 'en-US';
           } catch (err) {}
         }
-        console.warn('Speech recognition notice:', e.error);
       };
 
       this.speechRecognition.onend = () => {
         this.isListening = false;
-        // Auto-restart if active
-        if (this.speechRecognition && this.status !== VOICE_STATUS.PAUSED) {
-          try { this.speechRecognition.start(); } catch (err) {}
+        if (this.shouldBeListening) {
+          setTimeout(() => {
+            try {
+              if (this.shouldBeListening && this.speechRecognition) {
+                this.speechRecognition.start();
+              }
+            } catch (err) {}
+          }, 200);
         }
       };
 
       this.speechRecognition.start();
-    } catch (err) {
-      console.warn('Speech recognition init error:', err);
+    } catch (e) {
+      console.warn('SpeechRecognition start notice:', e);
     }
   }
 
@@ -129,6 +133,7 @@ export class SpeechService {
   }
 
   stop() {
+    this.shouldBeListening = false;
     if (this.speechRecognition) {
       try {
         this.speechRecognition.onend = null;

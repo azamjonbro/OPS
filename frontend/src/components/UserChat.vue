@@ -171,10 +171,16 @@
       <!-- ChatGPT / Gemini Style Sleek Inline Voice Input Pill Bar -->
       <footer class="p-4 sm:p-6 border-t border-white/5 bg-[#090B0E]">
         <div class="max-w-3xl w-full mx-auto">
-          <!-- INLINE RECORDING ACTIVE STATE (Image 2 style) -->
+          <!-- INLINE RECORDING ACTIVE STATE (Image 2 style with Live Timer) -->
           <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181F] border border-indigo-500/50 rounded-full px-5 py-3 shadow-2xl transition-all duration-300">
             <!-- Left: Plus Attachment Button -->
             <button class="text-gray-400 hover:text-white text-lg font-bold pr-2 transition">+</button>
+
+            <!-- Live Recording Duration Timer Badge (User Request: "necha sekunt yozgani qani") -->
+            <span class="px-2.5 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full font-mono text-xs font-bold flex items-center gap-1.5 shrink-0 animate-pulse">
+              <span class="w-2 h-2 rounded-full bg-red-500"></span>
+              ⏱️ 00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }}s
+            </span>
 
             <!-- Center: Live Web Audio SVG Frequency Waveform Spectrum -->
             <div class="flex-1 flex items-center justify-center px-4 h-6 overflow-hidden">
@@ -190,6 +196,11 @@
               </svg>
             </div>
 
+            <!-- Real-time Spoken Text Hint Preview -->
+            <span v-if="liveSpokenText" class="text-xs text-purple-300 italic truncate max-w-[140px] px-2 hidden sm:inline">
+              "{{ liveSpokenText }}"
+            </span>
+
             <!-- Right: Discard (✕) and Submit (✓) Action Buttons -->
             <div class="flex items-center gap-2 pl-2">
               <!-- Cancel / Discard Recording -->
@@ -201,11 +212,11 @@
                 ✕
               </button>
 
-              <!-- Submit / Finish & Send Voice Briefing -->
+              <!-- Submit / Finish & Confirm Voice Briefing to Textarea -->
               <button 
                 @click="sendVoiceRecording" 
                 class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white flex items-center justify-center text-sm font-bold shadow-glow transition"
-                title="Send Voice Briefing"
+                title="Transcribe & Confirm to Textarea"
               >
                 ✓
               </button>
