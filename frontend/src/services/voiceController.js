@@ -152,6 +152,12 @@ export class VoiceController {
     this.setState(RECORDING_STATE.IDLE);
   }
 
+  setLanguage(newLang) {
+    if (this.speechService) {
+      this.speechService.setLanguage(newLang);
+    }
+  }
+
   // --- INTERNAL AUDIO STREAM ENGINE ---
   async _initMediaStream() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
