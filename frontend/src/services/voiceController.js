@@ -64,12 +64,12 @@ export class VoiceController {
     try {
       this.transcriptBuffer.clear();
       this.seconds = 0;
+      this.setState(RECORDING_STATE.RECORDING);
 
       await this._initMediaStream();
       this.speechService.start();
       this._startTimer();
 
-      this.setState(RECORDING_STATE.RECORDING);
       this.onVoiceStatusUpdate(VOICE_STATUS.LISTENING);
     } catch (err) {
       this.onError(err.message || 'Microphone access denied');
@@ -94,13 +94,13 @@ export class VoiceController {
     }
 
     try {
+      this.setState(RECORDING_STATE.RECORDING);
       if (!this.mediaStream || !this.mediaStream.active) {
         await this._initMediaStream();
       }
       this.speechService.resume();
       this._startTimer();
 
-      this.setState(RECORDING_STATE.RECORDING);
       this.onVoiceStatusUpdate(VOICE_STATUS.LISTENING);
     } catch (err) {
       this.onError('Failed to resume recording stream');
@@ -186,9 +186,13 @@ export class VoiceController {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (AudioContextClass) {
       this.audioContext = new AudioContextClass();
+      if (this.audioContext.state === 'suspended') {
+        try { await this.audioContext.resume(); } catch (e) {}
+      }
       const source = this.audioContext.createMediaStreamSource(this.mediaStream);
       this.analyserNode = this.audioContext.createAnalyser();
       this.analyserNode.fftSize = 64;
+      this.analyserNode.smoothingTimeConstant = 0.5;
       source.connect(this.analyserNode);
 
       this._renderWaveformLoop();
@@ -196,26 +200,28 @@ export class VoiceController {
   }
 
   _renderWaveformLoop() {
-    if (!this.analyserNode || (this.state !== RECORDING_STATE.RECORDING && this.state !== RECORDING_STATE.IDLE)) {
-      if (this.state === RECORDING_STATE.PAUSED || this.state === RECORDING_STATE.STOPPED) {
-        return;
+    if (this.state !== RECORDING_STATE.RECORDING) return;
+
+    if (this.analyserNode) {
+      const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+      this.analyserNode.getByteFrequencyData(dataArray);
+
+      const time = Date.now() / 120;
+      const bars = [];
+
+      for (let i = 0; i < 25; i++) {
+        const val = dataArray[i % dataArray.length] || 0;
+        const micBoost = val > 4 ? (val / 3.2) : 0;
+        const wave = Math.abs(Math.sin(time + i * 0.45)) * 12;
+        const height = Math.max(6, Math.min(38, Math.floor(6 + wave + micBoost)));
+        bars.push(height);
       }
+
+      this.frequencyBars = bars;
+      this.onFrequencyUpdate(this.frequencyBars);
     }
 
-    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
-    this.analyserNode.getByteFrequencyData(dataArray);
-
-    const bars = [];
-    for (let i = 0; i < 25; i++) {
-      const val = dataArray[i % dataArray.length] || 0;
-      bars.push(Math.max(6, Math.min(56, Math.floor(val / 4.2))));
-    }
-    this.frequencyBars = bars;
-    this.onFrequencyUpdate(this.frequencyBars);
-
-    if (this.state === RECORDING_STATE.RECORDING) {
-      this.animationFrameId = requestAnimationFrame(() => this._renderWaveformLoop());
-    }
+    this.animationFrameId = requestAnimationFrame(() => this._renderWaveformLoop());
   }
 
   _startTimer() {
