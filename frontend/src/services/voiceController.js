@@ -23,12 +23,6 @@ export class VoiceController {
       }
     });
 
-  setLanguage(newLang) {
-    if (this.speechService) {
-      this.speechService.setLanguage(newLang);
-    }
-  }
-
     // Web Audio API
     this.mediaStream = null;
     this.audioContext = null;
