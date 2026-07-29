@@ -514,11 +514,18 @@ export default {
     },
 
     // --- CHATGPT VOICE WORKFLOW CONTROLLER ---
+    changeVoiceLang(lang) {
+      this.selectedVoiceLang = lang;
+      if (this.voiceController) {
+        this.voiceController.setLanguage(lang);
+      }
+    },
     openVoiceModal() {
       this.isVoiceRecordingActive = true;
       this.liveSpokenText = '';
 
       this.voiceController = new VoiceController({
+        lang: this.selectedVoiceLang,
         onStateChange: (state) => {
           this.recordingState = state;
         },
