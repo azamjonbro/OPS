@@ -1,0 +1,24 @@
+{
+  "name": "Jarvis AI Executive Workspace - Store Hadiya",
+  "short_name": "Jarvis AI",
+  "description": "Enterprise AI Assistant & POS Operating System for Store Hadiya",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F19",
+  "theme_color": "#6366F1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
