@@ -371,12 +371,26 @@
               class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-normal py-0 font-sans my-auto"
             ></textarea>
 
-            <!-- Right Controls: Voice Action Button -->
+            <!-- Right Controls: Send Button (if text or file attached) OR Microphone Button (if input empty) -->
             <div class="flex items-center gap-2 shrink-0 my-auto">
-              <!-- Microphone Button -->
+              <!-- Send Button (when input has text or attached file) -->
               <button 
+                v-if="inputQuery.trim() || attachedFile"
+                @click="sendMessage" 
+                class="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center font-bold shadow-md transition shrink-0 my-auto"
+                title="Jo'natish (Send)"
+              >
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                </svg>
+              </button>
+
+              <!-- Microphone Button (when input is empty) -->
+              <button 
+                v-else
                 @click="openVoiceModal()" 
                 class="w-8 h-8 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-sm transition shrink-0 my-auto"
+                title="Ovozli Yozish (Voice Mode)"
               >
                 <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
