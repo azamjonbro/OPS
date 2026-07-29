@@ -486,15 +486,37 @@ export default {
         .replace(/^hori you\s*/i, '')
         .trim();
 
+      let audioBlob = null;
+      if (this.voiceController) {
+        audioBlob = this.voiceController.getAudioBlob();
+        this.voiceController.finish();
+      }
+
+      this.isVoiceRecordingActive = false;
+      this.isLoading = true;
+
+      // If speech recognition didn't capture text, transcribe physical audio blob via backend
+      if (!textToSend && audioBlob) {
+        try {
+          const reader = new FileReader();
+          const base64Audio = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(audioBlob);
+          });
+
+          const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
+            audioBase64: base64Audio
+          });
+
+          if (trRes.data && trRes.data.transcribedText) {
+            textToSend = trRes.data.transcribedText;
+          }
+        } catch (err) {}
+      }
+
       if (!textToSend) {
         textToSend = "Har kuni soat 19:00 da Store Hadiya savdosini va Rolex soati narxini telegramga yubor.";
       }
-
-      if (this.voiceController) {
-        this.voiceController.finish();
-      }
-      this.isVoiceRecordingActive = false;
-      this.isLoading = true;
 
       this.messages.push({
         id: `voice-${Date.now()}`,
