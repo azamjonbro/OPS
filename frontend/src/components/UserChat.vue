@@ -241,7 +241,13 @@
           <div v-if="msg.role === 'user'" class="flex justify-end">
             <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2.5">
               <div v-if="msg.attachedFile" class="p-2.5 rounded-xl bg-black/30 border border-white/15 flex items-center gap-3">
-                <img v-if="msg.attachedFile.isImage" :src="msg.attachedFile.dataUrl" class="w-16 h-16 rounded-lg object-cover border border-white/20 shrink-0" />
+                <img 
+                  v-if="msg.attachedFile.isImage" 
+                  :src="msg.attachedFile.dataUrl" 
+                  @click="openImagePreview(msg.attachedFile.dataUrl)" 
+                  class="w-16 h-16 rounded-lg object-cover border border-white/20 shrink-0 cursor-zoom-in hover:opacity-90 transition transform hover:scale-105 shadow" 
+                  title="Kattalashtirib ko'rish uchun bosing" 
+                />
                 <div v-else class="w-10 h-10 rounded-lg bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center text-indigo-200 shrink-0">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
@@ -557,6 +563,16 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- FULLSCREEN IMAGE LIGHTBOX MODAL -->
+    <div v-if="isPreviewImageOpen" @click="isPreviewImageOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out">
+      <div class="relative max-w-5xl max-h-[90vh] flex flex-col items-center justify-center" @click.stop>
+        <button @click="isPreviewImageOpen = false" class="absolute -top-12 right-0 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full backdrop-blur transition" title="Yopish (Esc)">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <img :src="previewImageSrc" class="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl border border-white/10" />
       </div>
     </div>
   </div>
