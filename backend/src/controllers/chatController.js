@@ -4,7 +4,7 @@ const Message = require('../models/Message');
 const mockDb = require('../store');
 const aiEngine = require('../aiEngine');
 
-async function saveMessageRecord(convId, userContent, aiResult) {
+async function saveMessageRecord(convId, userContent, aiResult, attachedFile = null) {
   let conv = mockDb.conversations.find(c => c.id === convId);
   const cleanUserStr = userContent.replace(/^🎙️ Ovozli:\s*"/, '').replace(/"$/, '');
   const smartTitle = cleanUserStr.length > 28 ? cleanUserStr.slice(0, 28) + '...' : cleanUserStr;
@@ -26,8 +26,10 @@ async function saveMessageRecord(convId, userContent, aiResult) {
 
   mockDb.conversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
+  const attachedFileStr = attachedFile ? JSON.stringify(attachedFile) : null;
+
   if (!mockDb.messages[convId]) mockDb.messages[convId] = [];
-  const userMsg = { id: `m-${Date.now()}`, role: 'user', content: userContent };
+  const userMsg = { id: `m-${Date.now()}`, role: 'user', content: userContent, attachedFile: attachedFileStr };
   const aiMsg = {
     id: `m-${Date.now() + 1}`,
     role: 'assistant',
@@ -53,7 +55,8 @@ async function saveMessageRecord(convId, userContent, aiResult) {
       await Message.create({
         conversationId: targetConvId,
         role: 'user',
-        content: userContent
+        content: userContent,
+        attachedFile: attachedFileStr
       });
       await Message.create({
         conversationId: targetConvId,
@@ -90,12 +93,17 @@ const getMessages = async (req, res) => {
           id: m._id.toString(),
           role: m.role,
           content: m.content,
+          attachedFile: m.attachedFile ? (typeof m.attachedFile === 'string' ? JSON.parse(m.attachedFile) : m.attachedFile) : null,
           toolCalls: m.toolCalls
         })));
       }
     }
   } catch (e) {}
-  res.json(mockDb.messages[id] || []);
+  const rawMsgs = mockDb.messages[id] || [];
+  res.json(rawMsgs.map(m => ({
+    ...m,
+    attachedFile: m.attachedFile ? (typeof m.attachedFile === 'string' ? JSON.parse(m.attachedFile) : m.attachedFile) : null
+  })));
 };
 
 const createConversation = async (req, res) => {
@@ -154,13 +162,14 @@ const sendMessage = async (req, res) => {
   const { conversationId, content, attachedFile } = req.body;
   const convId = conversationId || 'conv-1';
 
-  let effectiveContent = (content || '').trim();
+  const rawContent = (content || '').trim();
+  let aiPromptContent = rawContent;
   if (attachedFile && attachedFile.name) {
-    const fileNotice = `[Fayl biriktirildi: ${attachedFile.name} (${attachedFile.formattedSize || 'N/A'})]`;
-    effectiveContent = effectiveContent ? `${effectiveContent}\n${fileNotice}` : fileNotice;
+    const fileNotice = `[Fayl biriktirildi: ${attachedFile.name}]`;
+    aiPromptContent = aiPromptContent ? `${aiPromptContent}\n${fileNotice}` : fileNotice;
   }
 
-  const aiResult = await aiEngine.processUserMessage(effectiveContent, mockDb);
+  const aiResult = await aiEngine.processUserMessage(aiPromptContent, mockDb);
 
   if (attachedFile && attachedFile.name) {
     if (attachedFile.isImage) {
@@ -170,7 +179,7 @@ const sendMessage = async (req, res) => {
     }
   }
 
-  await saveMessageRecord(convId, effectiveContent, aiResult);
+  await saveMessageRecord(convId, rawContent, aiResult, attachedFile);
 
   if (aiResult.executedTools) {
     aiResult.executedTools.forEach(et => {

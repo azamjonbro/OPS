@@ -157,9 +157,9 @@
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
               <span>Assalomu alaykum, Azamjon! 👋</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Store Hadiya Executive POS AI</h1>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Jarvis AI Executive Assistant</h1>
             <p class="text-xs sm:text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-              Billz POS tizimidagi 1,152 ta mahsulot, kunlik savdo hisobotlari va avtomatik Telegram eslatmalarini boshqaring.
+              Biznes integratsiyalaringiz, savdo hisobotlari, mahsulotlar bazasi va avtomatlashtirilgan eslatmalarni boshqaring.
             </p>
           </div>
 
@@ -167,15 +167,15 @@
           <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-[11px] font-mono text-gray-400">
             <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              1,152 Mahsulot
+              7 ta Integratsiya Ulangan
             </span>
             <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
               <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-              BILLZ POS Connected
+              1,152 Mahsulot Bazasi
             </span>
             <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
               <span class="w-2 h-2 rounded-full bg-purple-400"></span>
-              GPT-4o + Claude Dual Mode
+              GPT-4o + Claude Dual LLM
             </span>
           </div>
 
@@ -191,36 +191,36 @@
                 </span>
                 <span class="text-purple-300 font-mono text-[9px] bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-400/30 font-bold">LIVE MIC</span>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">Mikrofon orqali tezkor ovozli buyruq bering...</p>
+              <p class="text-[11px] text-gray-400 mt-2">Mikrofon orqali ovozli topshiriq bering...</p>
             </div>
 
-            <div @click="sendQuick('Hadiya do\'konida Rolex soati narxi necha pul va do\'konda bormi?')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
+            <div @click="sendQuick('Do\'kondagi Rolex soatlari narxi va qoldig\'i haqida ma\'lumot ber.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                   </svg>
-                  Rolex Swiss Copy Narxi
+                  Mahsulotlar Qoldig'i & Narxi
                 </span>
                 <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">"Rolex Swiss copy soati narxi va qoldig'ini tekshir."</p>
+              <p class="text-[11px] text-gray-400 mt-2">"Do'kondagi mahsulotlar narxi va qoldig'ini tekshir."</p>
             </div>
 
-            <div @click="sendQuick('Billz Hadiya do\'konidagi bugungi kunlik savdo hisobotini chiqar.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
+            <div @click="sendQuick('Bugungi kunlik biznes va savdo hisobotini chiqar.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                   </svg>
-                  Billz Kunlik Savdosi
+                  Kunlik Savdo Hisoboti
                 </span>
                 <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">"Billz Hadiya do'konidagi bugungi tushumni chiqar."</p>
+              <p class="text-[11px] text-gray-400 mt-2">"Bugungi jami savdo va tushumlarni chiqar."</p>
             </div>
 
-            <div @click="sendQuick('Har kuni soat 19:00 da Store Hadiya savdosini telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
+            <div @click="sendQuick('Har kuni soat 19:00 da kunlik hisobotni Telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
