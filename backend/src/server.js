@@ -396,12 +396,57 @@ app.post('/api/chat/voice-message', async (req, res) => {
   });
 });
 
+app.delete('/api/chat/conversations/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    mockDb.conversations = mockDb.conversations.filter(c => c.id !== id);
+    delete mockDb.messages[id];
+
+    if (mongoose.connection.readyState === 1) {
+      await Conversation.deleteOne({ _id: id }).catch(() => null);
+      await Message.deleteMany({ conversationId: id }).catch(() => null);
+    }
+  } catch (e) {}
+
+  res.json({ success: true, message: 'Chat muvaffaqiyatli o\'chirildi' });
+});
+
+app.delete('/api/chat/conversations', async (req, res) => {
+  try {
+    mockDb.conversations = [];
+    mockDb.messages = {};
+
+    if (mongoose.connection.readyState === 1) {
+      await Conversation.deleteMany({}).catch(() => null);
+      await Message.deleteMany({}).catch(() => null);
+    }
+  } catch (e) {}
+
+  res.json({ success: true, message: 'Barcha chatlar tozalandi' });
+});
+
 app.post('/api/chat/message', async (req, res) => {
-  const { conversationId, content } = req.body;
+  const { conversationId, content, attachedFile } = req.body;
   const convId = conversationId || 'conv-1';
 
-  const aiResult = await aiEngine.processUserMessage(content, mockDb);
-  await saveMessageRecord(convId, content, aiResult);
+  let effectiveContent = (content || '').trim();
+  if (attachedFile && attachedFile.name) {
+    const fileNotice = `[Fayl biriktirildi: ${attachedFile.name} (${attachedFile.formattedSize || 'N/A'})]`;
+    effectiveContent = effectiveContent ? `${effectiveContent}\n${fileNotice}` : fileNotice;
+  }
+
+  const aiResult = await aiEngine.processUserMessage(effectiveContent, mockDb);
+
+  // If file was attached, augment response to acknowledge the document/image
+  if (attachedFile && attachedFile.name) {
+    if (attachedFile.isImage) {
+      aiResult.responseText = `📷 **Rasm tahlil qilindi:** \`${attachedFile.name}\`\n\n${aiResult.responseText}`;
+    } else {
+      aiResult.responseText = `📄 **Hujjat biriktirildi va tahlil qilindi:** \`${attachedFile.name}\` (${attachedFile.formattedSize})\n\n${aiResult.responseText}`;
+    }
+  }
+
+  await saveMessageRecord(convId, effectiveContent, aiResult);
 
   aiResult.executedTools.forEach(et => {
     mockDb.auditLogs.unshift({
@@ -416,7 +461,7 @@ app.post('/api/chat/message', async (req, res) => {
 
   res.json({
     conversationId: convId,
-    userMessage: content,
+    userMessage: effectiveContent,
     assistantResponse: aiResult.responseText,
     executedTools: aiResult.executedTools,
     modelMetadataBadge: aiResult.modelMetadataBadge

@@ -1,5 +1,25 @@
 <template>
-  <div class="flex h-screen bg-[#0B0C0E] text-gray-100 font-sans overflow-hidden">
+  <div 
+    class="flex h-screen bg-[#0B0C0E] text-gray-100 font-sans overflow-hidden relative"
+    @dragover.prevent="onDragOver"
+    @dragenter.prevent="onDragEnter"
+    @dragleave.prevent="onDragLeave"
+    @drop.prevent="onDropFile"
+  >
+    <!-- FULL-SCREEN DRAG & DROP OVERLAY -->
+    <div v-if="isDraggingFile" class="fixed inset-0 z-50 bg-[#0B0C0E]/90 flex flex-col items-center justify-center p-6 border-4 border-dashed border-indigo-500 rounded-3xl backdrop-blur-sm transition-all duration-300 pointer-events-none">
+      <div class="w-20 h-20 rounded-3xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 mb-4 animate-bounce">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+      </div>
+      <h2 class="text-2xl font-bold text-white tracking-tight">Faylni shu yerga tashlang (Drop File Here)</h2>
+      <p class="text-sm text-gray-400 mt-2">Rasm, PDF, Excel, CSV va hisobotlarni tahlil qilish uchun yuklang</p>
+    </div>
+
+    <!-- Hidden File Input -->
+    <input type="file" ref="fileInput" @change="onFileInputChange" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.xml" />
+
     <!-- Mobile Navigation Drawer Overlay -->
     <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 z-40 bg-black/60 md:hidden"></div>
 
@@ -35,17 +55,25 @@
 
         <!-- Conversation History -->
         <div class="space-y-1">
-          <div class="text-[10px] font-bold tracking-widest text-gray-500 uppercase px-2 mb-2">Mavjud Chatlar</div>
+          <div class="flex items-center justify-between px-2 mb-2">
+            <span class="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Mavjud Chatlar</span>
+            <button v-if="conversations.length > 0" @click="clearAllConversations" class="text-[10px] text-gray-500 hover:text-red-400 transition font-medium">Tozalash</button>
+          </div>
           <div 
             v-for="conv in conversations" 
             :key="conv.id"
             @click="selectConversation(conv.id)"
-            :class="['flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition-all border', activeConvId === conv.id ? 'bg-[#1D212C] text-white font-semibold border-indigo-500/40' : 'text-gray-400 border-transparent hover:bg-[#161820] hover:text-gray-200']"
+            :class="['flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition-all border group', activeConvId === conv.id ? 'bg-[#1D212C] text-white font-semibold border-indigo-500/40' : 'text-gray-400 border-transparent hover:bg-[#161820] hover:text-gray-200']"
           >
             <span class="truncate">{{ conv.title }}</span>
-            <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-            </svg>
+            <div class="flex items-center gap-1">
+              <button @click.stop="deleteConversation(conv.id)" class="text-gray-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition" title="Chatni o'chirish">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+              <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+              </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -54,10 +82,10 @@
       <div class="border-t border-[#1F222A] pt-4 flex items-center justify-between px-2">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-[#1D212C] border border-[#2D3242] flex items-center justify-center font-bold text-indigo-400 text-xs">
-            H
+            A
           </div>
           <div>
-            <div class="text-xs font-semibold text-white">Bahodir (Store Hadiya)</div>
+            <div class="text-xs font-semibold text-white">Azamjon (Store Hadiya)</div>
             <div class="text-[10px] text-emerald-400 font-mono">BILLZ POS Admin</div>
           </div>
         </div>
@@ -120,7 +148,7 @@
                   <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                   </svg>
-                  Ovozli Murojaat (Microphone)
+                  Ovozli Murojaat (English Voice Mode)
                 </span>
                 <span class="text-purple-300 font-mono text-[9px] bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-400/30">LIVE MIC</span>
               </div>
@@ -172,8 +200,16 @@
         <div v-else v-for="msg in messages" :key="msg.id" class="space-y-3">
           <!-- User Bubble -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
-            <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm">
-              {{ msg.content }}
+            <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2">
+              <div v-if="msg.attachedFile" class="p-2 rounded-xl bg-black/20 border border-white/10 flex items-center gap-2 text-xs">
+                <img v-if="msg.attachedFile.isImage" :src="msg.attachedFile.dataUrl" class="w-8 h-8 rounded object-cover" />
+                <svg v-else class="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <div class="truncate">
+                  <div class="font-bold">{{ msg.attachedFile.name }}</div>
+                  <div class="text-[10px] opacity-80">{{ msg.attachedFile.formattedSize }}</div>
+                </div>
+              </div>
+              <div>{{ msg.content }}</div>
             </div>
           </div>
 
@@ -205,36 +241,50 @@
           </div>
         </div>
 
-        <!-- Loading Indicator -->
-        <div v-if="isLoading" class="flex gap-3">
-          <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-xs shrink-0 animate-pulse">
+        <!-- Gemini-style Interpreting Loading Indicator -->
+        <div v-if="isLoading" class="flex items-center gap-3 pt-2">
+          <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-xs shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
           </div>
-          <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl p-4 text-xs text-indigo-400 flex items-center gap-2">
-            <div class="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            <span>OpenAI Whisper + Dual LLM is processing voice intents...</span>
+          <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl px-4 py-2.5 text-xs text-indigo-300 flex items-center gap-2.5">
+            <span class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+            </span>
+            <span class="font-medium tracking-wide">Interpreting User Input...</span>
           </div>
         </div>
       </div>
 
-      <!-- Footer Inline Voice & Input Bar -->
-      <footer class="p-4 sm:p-6 border-t border-[#1F222A] bg-[#0B0C0E]">
-        <div class="max-w-3xl w-full mx-auto">
-          <!-- INLINE RECORDING ACTIVE STATE -->
-          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#14161F] border border-indigo-500/40 rounded-full px-4 py-2.5 shadow-lg transition-all duration-300 gap-2">
-            <!-- Left: Plus Button -->
-            <button class="text-gray-400 hover:text-white p-1 transition">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            </button>
+      <!-- Gemini Style Floating Input Pill Footer -->
+      <footer class="p-4 sm:p-6 bg-[#0B0C0E]">
+        <div class="max-w-3xl w-full mx-auto space-y-2">
 
-            <!-- Language Selector Pills (UZ / RU / EN) -->
-            <div class="flex items-center gap-1 bg-[#1C1F2B] p-1 rounded-full text-[10px] shrink-0 border border-[#2B3042]">
-              <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">UZ</button>
-              <button @click="changeVoiceLang('ru-RU')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'ru-RU' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">RU</button>
-              <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">EN</button>
+          <!-- ATTACHED FILE PREVIEW CARD -->
+          <div v-if="attachedFile" class="flex items-center justify-between bg-[#1E1F24] border border-indigo-500/40 px-3.5 py-2 rounded-2xl w-fit shadow-lg mb-2">
+            <div class="flex items-center gap-2.5">
+              <img v-if="attachedFile.isImage" :src="attachedFile.dataUrl" class="w-9 h-9 rounded-lg object-cover border border-white/10" />
+              <div v-else class="w-9 h-9 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div class="text-xs">
+                <div class="font-semibold text-white truncate max-w-[220px]">{{ attachedFile.name }}</div>
+                <div class="text-[10px] text-gray-400 font-mono">{{ attachedFile.formattedSize }}</div>
+              </div>
             </div>
+            <button @click="removeAttachedFile" class="p-1 ml-3 text-gray-400 hover:text-red-400 transition" title="Remove File">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <!-- INLINE RECORDING ACTIVE STATE (Gemini Live Mode) -->
+          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#1E1F24] border border-indigo-500/50 rounded-[28px] px-4 py-3 shadow-2xl transition-all duration-300 gap-3">
+            <!-- Left: Plus Attachment Button -->
+            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </button>
 
             <!-- Live Recording Duration Timer Badge -->
             <span class="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-mono text-xs font-bold flex items-center gap-1.5 shrink-0 animate-pulse">
@@ -256,16 +306,16 @@
               </svg>
             </div>
 
-            <!-- Real-time Spoken Text Hint Preview -->
+            <!-- Real-time Spoken Text Preview -->
             <span v-if="liveSpokenText" class="text-xs text-purple-300 italic truncate max-w-[160px] px-2 hidden sm:inline font-medium">
               "{{ liveSpokenText }}"
             </span>
 
             <!-- Right: Action Buttons -->
-            <div class="flex items-center gap-2 pl-1">
+            <div class="flex items-center gap-2 pl-1 shrink-0">
               <button 
                 @click="cancelVoiceRecording" 
-                class="w-8 h-8 rounded-full bg-[#232736] hover:bg-red-500/20 text-gray-300 hover:text-red-400 flex items-center justify-center transition"
+                class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-red-500/20 text-gray-300 hover:text-red-400 flex items-center justify-center transition"
                 title="Discard Recording"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -281,51 +331,47 @@
             </div>
           </div>
 
-          <div v-else class="flex items-center gap-3 bg-[#14161C] border border-[#1F222A] rounded-2xl px-4 py-2.5 focus-within:border-indigo-500/50 shadow-sm transition-all">
-            <!-- Left: Plus Icon -->
-            <button class="text-gray-400 hover:text-white p-1 transition self-end pb-1">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <!-- GEMINI STYLE IDLE INPUT PILL -->
+          <div v-else class="flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[28px] px-4 py-2.5 shadow-xl focus-within:border-indigo-500/50 transition-all">
+            <!-- Left: Attachment (+) Button -->
+            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </button>
-
-            <!-- Language Selector Pills (UZ / RU / EN) -->
-            <div class="flex items-center gap-1 bg-[#1C1F2B] p-1 rounded-full text-[10px] shrink-0 border border-[#2B3042]">
-              <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">UZ</button>
-              <button @click="changeVoiceLang('ru-RU')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'ru-RU' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">RU</button>
-              <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200']">EN</button>
-            </div>
 
             <!-- Center: Textarea Input Query -->
             <textarea 
               v-model="inputQuery" 
               @keydown.enter.exact.prevent="sendMessage" 
               rows="1"
-              placeholder="Store Hadiya bo'yicha savol bering yoki gapiring..." 
-              class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-2 resize-none max-h-36 overflow-y-auto leading-relaxed py-1 font-sans"
+              placeholder="Спросить Gemini yoki Store Hadiya bo'yicha savol bering..." 
+              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-relaxed py-1 font-sans"
             ></textarea>
 
-            <!-- Right: Mic Icon & Waveform Button -->
-            <div class="flex items-center gap-2">
-              <button 
-                @click="openVoiceModal()" 
-                class="text-gray-400 hover:text-white p-1.5 rounded-xl hover:bg-[#1E222D] transition"
-                title="Speak to Assistant"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </button>
+            <!-- Right Controls: Model Pill + Voice Action Button -->
+            <div class="flex items-center gap-2 shrink-0">
+              <!-- Model Selector Badge (Gemini Flash style) -->
+              <div class="bg-[#2A2B32] text-[11px] text-gray-300 font-medium px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1 hidden md:flex">
+                <span>GPT-4o</span>
+                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
 
+              <!-- Microphone Button -->
               <button 
                 @click="openVoiceModal()" 
-                class="w-8 h-8 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow transition"
-                title="Live Voice Mode"
+                class="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-md transition"
+                title="Live Voice Mode (Gemini Voice)"
               >
-                <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728M12 12h.01"/>
+                <svg class="w-4.5 h-4.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </button>
             </div>
           </div>
+
+          <!-- Bottom Gemini Disclaimer Text -->
+          <p class="text-[11px] text-gray-500 text-center font-sans">
+            Store Hadiya AI POS Assistant - sun'iy intellekt xato qilishi mumkin. Muhim ma'lumotlarni tekshiring.
+          </p>
         </div>
       </footer>
     </main>

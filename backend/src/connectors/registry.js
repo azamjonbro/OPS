@@ -158,9 +158,9 @@ class BillzConnector extends BaseConnector {
     const cleanToken = token.trim();
 
     const endpointsToProbe = [
-      { name: 'Products', url: 'https://api.billz.io/v1/products', method: 'products.get' },
-      { name: 'Sales Reports', url: 'https://api.billz.io/v1/sales', method: 'reports.sales' },
-      { name: 'Shops', url: 'https://api.billz.io/v1/shops', method: 'shops.get' }
+      { name: 'Products (JSON-RPC)', url: 'https://api.billz.uz/v1/', method: 'products.get' },
+      { name: 'Catalog (JSON-RPC v2)', url: 'https://api.billz.uz/v2/', method: 'catalog.get' },
+      { name: 'Sales Reports (JSON-RPC)', url: 'https://api.billz.uz/v1/', method: 'reports.sales' }
     ];
 
     const probeResults = [];
