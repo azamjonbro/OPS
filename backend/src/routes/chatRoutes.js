@@ -9,5 +9,6 @@ router.delete('/conversations/:id', chatController.deleteConversation);
 router.get('/conversations/:id/messages', chatController.getMessages);
 router.post('/message', chatController.sendMessage);
 router.post('/voice-message', chatController.sendVoiceMessage);
+router.post('/transcribe-audio', chatController.transcribeAudio);
 
 module.exports = router;

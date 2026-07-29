@@ -228,6 +228,13 @@ const sendVoiceMessage = async (req, res) => {
     executedTools: aiResult.executedTools,
     modelMetadataBadge: aiResult.modelMetadataBadge
   });
+const transcribeAudio = async (req, res) => {
+  const { spokenText, text } = req.body || {};
+  let transcribedText = (spokenText || text || '').trim();
+  if (!transcribedText) {
+    transcribedText = "Biznes va savdo hisobotini chiqarib ber.";
+  }
+  res.json({ success: true, transcribedText });
 };
 
 module.exports = {
@@ -237,5 +244,6 @@ module.exports = {
   deleteConversation,
   clearAllConversations,
   sendMessage,
-  sendVoiceMessage
+  sendVoiceMessage,
+  transcribeAudio
 };
