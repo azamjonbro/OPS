@@ -181,6 +181,54 @@
             <button @click="savePrompt" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition">Save System Prompt</button>
           </div>
         </div>
+
+        <!-- System Language & Voice Settings -->
+        <div class="bg-[#14161B] border border-white/10 rounded-2xl p-6 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-white">Tizim Tili va Ovozli Murojaat Sozlamalari (System Language)</h2>
+              <p class="text-xs text-gray-400 mt-0.5">Ovozli muloqot va AI muloqot tilini sozlang</p>
+            </div>
+            <span class="text-xs font-mono bg-indigo-500/10 text-indigo-300 px-2.5 py-1 rounded-full border border-indigo-500/20 font-bold">
+              Hozirgi: {{ defaultLanguage === 'en-US' ? 'English (en-US)' : defaultLanguage === 'uz-UZ' ? 'O\'zbek (uz-UZ)' : 'Русский (ru-RU)' }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+            <div 
+              @click="setLanguage('en-US')" 
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'en-US' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm text-white">English (US)</span>
+                <span v-if="defaultLanguage === 'en-US'" class="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-bold">ACTIVE</span>
+              </div>
+              <p class="text-xs text-gray-400">Default voice recognition & output language</p>
+            </div>
+
+            <div 
+              @click="setLanguage('uz-UZ')" 
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'uz-UZ' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm text-white">O'zbekcha (UZ)</span>
+                <span v-if="defaultLanguage === 'uz-UZ'" class="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-bold">ACTIVE</span>
+              </div>
+              <p class="text-xs text-gray-400">O'zbek tili ovozli tanib olish rejimi</p>
+            </div>
+
+            <div 
+              @click="setLanguage('ru-RU')" 
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'ru-RU' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm text-white">Русский (RU)</span>
+                <span v-if="defaultLanguage === 'ru-RU'" class="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-bold">ACTIVE</span>
+              </div>
+              <p class="text-xs text-gray-400">Режим распознавания на русском языке</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TAB 3: AUDIT LOGS -->
@@ -245,6 +293,7 @@ export default {
         claudeKey: 'sk-ant-api03-claude-3-5-sonnet-key'
       },
       systemPrompt: 'You are an executive AI Assistant capable of invoking Telegram, Billz, Notion, Google Calendar, and Email connectors.',
+      defaultLanguage: localStorage.getItem('jarvis_lang') || 'en-US',
       isModalOpen: false,
       selectedIntegration: null
     };
@@ -257,6 +306,11 @@ export default {
     this.fetchDualConfig();
   },
   methods: {
+    setLanguage(lang) {
+      this.defaultLanguage = lang;
+      localStorage.setItem('jarvis_lang', lang);
+      alert(`Tizim tili muvaffaqiyatli o'zgartirildi: ${lang}`);
+    },
     async fetchDashboard() {
       try {
         const res = await axios.get(`${API_BASE}/api/admin/dashboard`);

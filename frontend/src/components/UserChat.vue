@@ -57,7 +57,7 @@
         <div class="space-y-1">
           <div class="flex items-center justify-between px-2 mb-2">
             <span class="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Mavjud Chatlar</span>
-            <button v-if="conversations.length > 0" @click="clearAllConversations" class="text-[10px] text-gray-500 hover:text-red-400 transition font-medium">Tozalash</button>
+            <button v-if="conversations.length > 0" @click="promptClearAllChats" class="text-[10px] text-gray-500 hover:text-red-400 transition font-medium">Tozalash</button>
           </div>
           <div 
             v-for="conv in conversations" 
@@ -67,7 +67,7 @@
           >
             <span class="truncate">{{ conv.title }}</span>
             <div class="flex items-center gap-1">
-              <button @click.stop="deleteConversation(conv.id)" class="text-gray-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition" title="Chatni o'chirish">
+              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition" title="Chatni o'chirish">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
               <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,6 +89,9 @@
             <div class="text-[10px] text-emerald-400 font-mono">BILLZ POS Admin</div>
           </div>
         </div>
+        <button @click="$emit('logout')" class="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-[#1A1D26] transition" title="Tizimdan Chiqish (Logout)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </button>
       </div>
     </aside>
 
@@ -280,51 +283,42 @@
           </div>
 
           <!-- INLINE RECORDING ACTIVE STATE (Gemini Live Mode) -->
-          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#1E1F24] border border-indigo-500/50 rounded-[28px] px-4 py-3 shadow-2xl transition-all duration-300 gap-3">
+          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181D] border border-white/10 rounded-[28px] px-4 py-2.5 shadow-2xl transition-all duration-300 gap-3">
             <!-- Left: Plus Attachment Button -->
-            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
+            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#22252E] hover:bg-[#2C303B] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </button>
 
             <!-- Live Recording Duration Timer Badge -->
-            <span class="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-mono text-xs font-bold flex items-center gap-1.5 shrink-0 animate-pulse">
-              <span class="w-2 h-2 rounded-full bg-red-500"></span>
-              00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }}s
-            </span>
+            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full shrink-0">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <span class="font-mono text-xs font-bold text-red-400">00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }}</span>
+            </div>
 
-            <!-- Center: Frequency Waveform -->
-            <div class="flex-1 flex items-center justify-center px-2 h-6 overflow-hidden">
-              <svg class="w-full h-6" viewBox="0 0 200 40" preserveAspectRatio="none">
-                <rect v-for="(bar, i) in frequencyBars" :key="i" :x="i * 8" :y="40 - bar" width="4" :height="bar" rx="2" fill="url(#inlineWaveGrad)" />
-                <defs>
-                  <linearGradient id="inlineWaveGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stop-color="#8B5CF6" />
-                    <stop offset="50%" stop-color="#EC4899" />
-                    <stop offset="100%" stop-color="#3B82F6" />
-                  </linearGradient>
-                </defs>
+            <!-- Center: Minimalist Waveform Spectrum -->
+            <div class="flex-1 flex items-center justify-center px-2 h-5 overflow-hidden">
+              <svg class="w-full h-5" viewBox="0 0 200 30" preserveAspectRatio="none">
+                <rect v-for="(bar, i) in frequencyBars" :key="i" :x="i * 8" :y="15 - bar/2" width="3" :height="Math.max(4, bar)" rx="1.5" fill="#818CF8" />
               </svg>
             </div>
 
             <!-- Real-time Spoken Text Preview -->
-            <span v-if="liveSpokenText" class="text-xs text-purple-300 italic truncate max-w-[160px] px-2 hidden sm:inline font-medium">
+            <span v-if="liveSpokenText" class="text-xs text-indigo-300 italic truncate max-w-[160px] px-1 hidden sm:inline font-medium">
               "{{ liveSpokenText }}"
             </span>
 
             <!-- Right: Action Buttons -->
-            <div class="flex items-center gap-2 pl-1 shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
               <button 
                 @click="cancelVoiceRecording" 
-                class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-red-500/20 text-gray-300 hover:text-red-400 flex items-center justify-center transition"
-                title="Discard Recording"
+                class="w-8 h-8 rounded-full bg-[#22252E] hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center transition"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
 
               <button 
                 @click="sendVoiceRecording" 
-                class="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center font-bold transition"
-                title="Transcribe & Submit"
+                class="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center font-bold transition shadow-sm"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
               </button>
@@ -358,8 +352,7 @@
               <!-- Microphone Button -->
               <button 
                 @click="openVoiceModal()" 
-                class="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-md transition"
-                title="Live Voice Mode (Gemini Voice)"
+                class="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-md transition shrink-0"
               >
                 <svg class="w-4.5 h-4.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -377,70 +370,72 @@
     </main>
 
     <!-- SCHEDULE AUTOMATIONS MODAL -->
-    <div v-if="isScheduleOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-      <div class="w-full max-w-lg bg-[#14161C] border border-[#1F222A] rounded-2xl p-6 shadow-2xl space-y-5">
+    <div v-if="isScheduleOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div class="w-full max-w-lg bg-[#111317] border border-[#1F222A] rounded-3xl p-6 shadow-2xl space-y-5">
         <div class="flex items-center justify-between border-b border-[#1F222A] pb-4">
-          <div>
-            <h3 class="text-base font-semibold text-white flex items-center gap-2">
-              <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
-              Scheduled Automations & Reminders
-            </h3>
-            <p class="text-xs text-gray-400 mt-0.5">Automate daily reports, meeting reminders, and Telegram dispatches</p>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white tracking-tight">Avtomatlashtirish & Eslatmalar</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Kunlik hisobotlar va Telegram xabarnomalarini sozlang</p>
+            </div>
           </div>
-          <button @click="isScheduleOpen = false" class="text-gray-400 hover:text-white transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button @click="isScheduleOpen = false" class="w-8 h-8 rounded-full bg-[#1A1D26] text-gray-400 hover:text-white flex items-center justify-center transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         <!-- Add New Schedule Form -->
-        <div class="bg-[#0B0C0E] border border-[#1F222A] rounded-xl p-4 space-y-3">
-          <div class="text-xs font-semibold text-white">Create New Schedule</div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <input v-model="newSchedule.title" type="text" placeholder="Title (e.g. Daily Sales Report)" class="w-full bg-[#14161C] border border-[#1F222A] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
-            <input v-model="newSchedule.scheduledTime" type="text" placeholder="Time (e.g. 19:00)" class="w-full bg-[#14161C] border border-[#1F222A] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
+        <div class="bg-[#161820] border border-[#222632] rounded-2xl p-4 space-y-3">
+          <div class="text-xs font-bold text-gray-300">Yangi Avtomatlashtirish Qo'shish</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <input v-model="newSchedule.title" type="text" placeholder="Sarlavha (masalan: Kunlik Savdo Hisoboti)" class="w-full bg-[#0E1015] border border-[#222632] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition" />
+            <input v-model="newSchedule.scheduledTime" type="text" placeholder="Vaqti (masalan: 19:00)" class="w-full bg-[#0E1015] border border-[#222632] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition" />
           </div>
-          <input v-model="newSchedule.prompt" type="text" placeholder="Prompt Query (e.g. Billzdagi kunlik savdoni chiqar)" class="w-full bg-[#14161C] border border-[#1F222A] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="newSchedule.prompt" type="text" placeholder="Topshiriq (masalan: Billzdagi bugungi savdoni chiqar)" class="w-full bg-[#0E1015] border border-[#222632] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition" />
           <div class="flex items-center justify-between pt-1">
             <div class="flex items-center gap-2">
-              <select v-model="newSchedule.frequency" class="bg-[#14161C] border border-[#1F222A] rounded-lg px-2 py-1.5 text-xs text-gray-300">
+              <select v-model="newSchedule.frequency" class="bg-[#0E1015] border border-[#222632] rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-indigo-500">
                 <option value="DAILY">Har kuni (Daily)</option>
                 <option value="WEEKLY">Haftalik (Weekly)</option>
                 <option value="ONCE">Bir martalik (Once)</option>
               </select>
-              <select v-model="newSchedule.targetChannel" class="bg-[#14161C] border border-[#1F222A] rounded-lg px-2 py-1.5 text-xs text-gray-300">
+              <select v-model="newSchedule.targetChannel" class="bg-[#0E1015] border border-[#222632] rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-indigo-500">
                 <option value="TELEGRAM">Telegram Bot</option>
                 <option value="CHAT">Chat Panel</option>
                 <option value="EMAIL">Email Dispatch</option>
               </select>
             </div>
-            <button @click="createSchedule" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1">
+            <button @click="createSchedule" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-sm">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              Add Schedule
+              Qo'shish
             </button>
           </div>
         </div>
 
         <!-- Active Schedules List -->
         <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-          <div class="text-xs font-semibold text-gray-400">Active Schedules ({{ schedules.length }})</div>
-          <div v-for="s in schedules" :key="s.id" class="p-3 rounded-xl bg-[#0B0C0E] border border-[#1F222A] flex items-center justify-between">
-            <div class="space-y-0.5">
-              <div class="text-xs font-semibold text-white flex items-center gap-2">
+          <div class="text-xs font-bold text-gray-400">Faol Eslatmalar ({{ schedules.length }})</div>
+          <div v-for="s in schedules" :key="s.id" class="p-3.5 rounded-2xl bg-[#161820] border border-[#222632] flex items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="text-xs font-bold text-white flex items-center gap-2">
                 <span>{{ s.title }}</span>
-                <span class="text-[9px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span class="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
                   <svg class="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   {{ s.scheduledTime }} ({{ s.frequency }})
                 </span>
               </div>
-              <p class="text-[11px] text-gray-400">Target: {{ s.targetChannel }} | Query: "{{ s.prompt }}"</p>
+              <p class="text-[11px] text-gray-400">Kanal: {{ s.targetChannel }} | Topshiriq: "{{ s.prompt }}"</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 shrink-0">
               <button @click="toggleSchedule(s.id)" :class="['px-2.5 py-1 text-[10px] font-bold rounded-lg border transition', s.isEnabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-400 border-gray-700']">
-                {{ s.isEnabled ? 'ON' : 'OFF' }}
+                {{ s.isEnabled ? 'YOQILGAN' : 'O\'CHIRILGAN' }}
               </button>
-              <button @click="deleteSchedule(s.id)" class="p-1 text-gray-400 hover:text-red-400 transition" title="Delete Schedule">
+              <button @click="deleteSchedule(s.id)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-[#22252E] transition" title="O'chirish">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </div>
@@ -448,7 +443,36 @@
         </div>
 
         <div class="flex justify-end border-t border-[#1F222A] pt-4">
-          <button @click="isScheduleOpen = false" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition">Done</button>
+          <button @click="isScheduleOpen = false" class="px-5 py-2 bg-[#1A1D26] hover:bg-[#252936] text-gray-300 text-xs font-semibold rounded-xl border border-[#2D3242] transition">
+            Yopish
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div v-if="isDeleteModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div class="w-full max-w-sm bg-[#14161C] border border-[#1F222A] rounded-2xl p-6 shadow-2xl space-y-4 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">
+            {{ isDeletingAll ? 'Barcha Chatlarni O\'chirish' : 'Chatni O\'chirish' }}
+          </h3>
+          <p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
+            {{ isDeletingAll ? 'Barcha muloqot va xabarlar tarixi butunlay o\'chiriladi.' : 'Ushbu chat va undagi barcha xabarlar o\'chiriladi.' }} Bu amalni qaytarib bo'lmaydi.
+          </p>
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+          <button @click="isDeleteModalOpen = false" class="flex-1 py-2 bg-[#1A1D26] hover:bg-[#252936] text-gray-300 text-xs font-semibold rounded-xl transition">
+            Bekor qilish
+          </button>
+          <button @click="confirmDelete" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow transition">
+            Ha, O'chirilsin
+          </button>
         </div>
       </div>
     </div>
@@ -472,9 +496,18 @@ export default {
       inputQuery: '',
       isLoading: false,
 
+      // File Drag & Drop & Attachment States
+      isDraggingFile: false,
+      attachedFile: null,
+
+      // Delete Modal Confirmation States
+      isDeleteModalOpen: false,
+      pendingDeleteId: null,
+      isDeletingAll: false,
+
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
-      selectedVoiceLang: 'uz-UZ',
+      selectedVoiceLang: 'en-US',
       recordingState: RECORDING_STATE.IDLE,
       voiceStatusBadge: '🎤 Listening...',
       recordingSeconds: 0,
@@ -757,6 +790,91 @@ export default {
         return typeof toolCalls === 'string' ? JSON.parse(toolCalls) : toolCalls;
       } catch {
         return [];
+      }
+    },
+
+    // --- DRAG & DROP AND FILE ATTACHMENT HANDLERS ---
+    onDragOver(e) {
+      this.isDraggingFile = true;
+    },
+    onDragEnter(e) {
+      this.isDraggingFile = true;
+    },
+    onDragLeave(e) {
+      if (e.clientX === 0 || e.clientY === 0 || e.target === document.documentElement) {
+        this.isDraggingFile = false;
+      }
+    },
+    onDropFile(e) {
+      this.isDraggingFile = false;
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        this.processFile(e.dataTransfer.files[0]);
+      }
+    },
+    triggerFileInput() {
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.click();
+      }
+    },
+    onFileInputChange(e) {
+      if (e.target.files && e.target.files[0]) {
+        this.processFile(e.target.files[0]);
+      }
+    },
+    processFile(file) {
+      const isImage = file.type.startsWith('image/');
+      const formattedSize = file.size > 1024 * 1024 
+        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB' 
+        : Math.round(file.size / 1024) + ' KB';
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        this.attachedFile = {
+          name: file.name,
+          size: file.size,
+          formattedSize,
+          type: file.type,
+          isImage,
+          dataUrl: evt.target.result
+        };
+      };
+      reader.readAsDataURL(file);
+    },
+    removeAttachedFile() {
+      this.attachedFile = null;
+    },
+
+    // --- DELETE CHAT CONFIRMATION HANDLERS ---
+    promptDeleteChat(id) {
+      this.pendingDeleteId = id;
+      this.isDeletingAll = false;
+      this.isDeleteModalOpen = true;
+    },
+    promptClearAllChats() {
+      this.pendingDeleteId = null;
+      this.isDeletingAll = true;
+      this.isDeleteModalOpen = true;
+    },
+    async confirmDelete() {
+      this.isDeleteModalOpen = false;
+      if (this.isDeletingAll) {
+        try {
+          await axios.delete(`${API_BASE}/api/chat/conversations`);
+        } catch (e) {}
+        this.conversations = [];
+        this.messages = [];
+        this.activeConvId = null;
+      } else if (this.pendingDeleteId) {
+        const id = this.pendingDeleteId;
+        try {
+          await axios.delete(`${API_BASE}/api/chat/conversations/${id}`);
+        } catch (e) {}
+        this.conversations = this.conversations.filter(c => c.id !== id);
+        if (this.activeConvId === id) {
+          this.activeConvId = null;
+          this.messages = [];
+        }
+        this.pendingDeleteId = null;
       }
     }
   }
