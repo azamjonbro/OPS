@@ -17,7 +17,7 @@ export class VoiceController {
     // Services
     this.transcriptBuffer = new TranscriptBuffer();
     this.speechService = new SpeechService(this.transcriptBuffer, {
-      lang: options.lang || 'en-US',
+      lang: options.lang || 'uz-UZ',
       onStatusChange: (status) => {
         this.onVoiceStatusUpdate(status);
       }
@@ -153,6 +153,7 @@ export class VoiceController {
   }
 
   setLanguage(newLang) {
+    this.options.lang = newLang;
     if (this.speechService) {
       this.speechService.setLanguage(newLang);
     }

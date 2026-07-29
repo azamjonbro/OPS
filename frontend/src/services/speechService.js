@@ -21,7 +21,7 @@ export class SpeechService {
     this.options = options;
     this.speechRecognition = null;
     this.isListening = false;
-    this.lang = options.lang || 'en-US';
+    this.lang = options.lang || 'uz-UZ';
     this.status = VOICE_STATUS.LISTENING;
     this.onStatusChange = options.onStatusChange || (() => {});
   }
@@ -53,8 +53,8 @@ export class SpeechService {
       this.speechRecognition = new SpeechRecognitionClass();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
-      // Default to English (en-US) for clean English speech recognition
-      this.speechRecognition.lang = this.lang || 'en-US';
+      // Default to Uzbek (uz-UZ) for clean native speech recognition
+      this.speechRecognition.lang = this.lang || 'uz-UZ';
 
       this.speechRecognition.onstart = () => {
         this.isListening = true;
@@ -77,11 +77,6 @@ export class SpeechService {
           const result = event.results[i];
           let text = result[0].transcript || '';
 
-          // Filter out English hallucinated prefixes if user speaks Uzbek
-          text = text.replace(/^hello my friends?\s*/i, '')
-                     .replace(/^how are you\s*/i, '')
-                     .replace(/^hori you\s*/i, '');
-
           if (result.isFinal) {
             if (text.trim()) {
               this.buffer.commitFinal(text.trim());
@@ -97,8 +92,10 @@ export class SpeechService {
       };
 
       this.speechRecognition.onerror = (e) => {
-        if (e.error === 'language-not-supported' || e.error === 'no-speech') {
+        console.warn('Speech recognition notice:', e.error);
+        if (e.error === 'language-not-supported') {
           try {
+            this.lang = 'en-US';
             this.speechRecognition.lang = 'en-US';
           } catch (err) {}
         }

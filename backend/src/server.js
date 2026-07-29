@@ -239,9 +239,19 @@ app.post('/api/chat/transcribe-audio', async (req, res) => {
 });
 
 app.post('/api/chat/voice-message', async (req, res) => {
-  const { conversationId, EnglishTranscription } = req.body;
+  const { conversationId, EnglishTranscription, spokenText: rawSpoken, text } = req.body || {};
   const convId = conversationId || 'conv-1';
-  const spokenText = EnglishTranscription || "Mikrofondan yozilgan ovozli xabar qabul qilindi.";
+  const spokenText = (rawSpoken || EnglishTranscription || text || '').trim();
+
+  if (!spokenText) {
+    return res.json({
+      conversationId: convId,
+      userMessage: '',
+      assistantResponse: "🎙️ Ovozingizni eshita olmadim. Iltimos, mikrofonga qaytadan gapiring.",
+      executedTools: [],
+      modelMetadataBadge: "🎙️ Voice Input"
+    });
+  }
 
   // Pass mockDb into processVoiceMemo so new schedule is registered in database
   const aiResult = await aiEngine.processVoiceMemo(spokenText, mockDb);

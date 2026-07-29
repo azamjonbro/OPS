@@ -172,18 +172,25 @@
       <footer class="p-4 sm:p-6 border-t border-white/5 bg-[#090B0E]">
         <div class="max-w-3xl w-full mx-auto">
           <!-- INLINE RECORDING ACTIVE STATE (Image 2 style with Live Timer) -->
-          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181F] border border-indigo-500/50 rounded-full px-5 py-3 shadow-2xl transition-all duration-300">
+          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181F] border border-indigo-500/50 rounded-full px-4 py-2.5 shadow-2xl transition-all duration-300 gap-2">
             <!-- Left: Plus Attachment Button -->
-            <button class="text-gray-400 hover:text-white text-lg font-bold pr-2 transition">+</button>
+            <button class="text-gray-400 hover:text-white text-lg font-bold pr-1 transition">+</button>
 
-            <!-- Live Recording Duration Timer Badge (User Request: "necha sekunt yozgani qani") -->
+            <!-- Language Selector Pills (UZ / RU / EN) -->
+            <div class="flex items-center gap-1 bg-white/5 p-1 rounded-full text-[10px] shrink-0 border border-white/10">
+              <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇺🇿 UZ</button>
+              <button @click="changeVoiceLang('ru-RU')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'ru-RU' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇷🇺 RU</button>
+              <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇺🇸 EN</button>
+            </div>
+
+            <!-- Live Recording Duration Timer Badge -->
             <span class="px-2.5 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full font-mono text-xs font-bold flex items-center gap-1.5 shrink-0 animate-pulse">
               <span class="w-2 h-2 rounded-full bg-red-500"></span>
               ⏱️ 00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }}s
             </span>
 
             <!-- Center: Live Web Audio SVG Frequency Waveform Spectrum -->
-            <div class="flex-1 flex items-center justify-center px-4 h-6 overflow-hidden">
+            <div class="flex-1 flex items-center justify-center px-2 h-6 overflow-hidden">
               <svg class="w-full h-6" viewBox="0 0 200 40" preserveAspectRatio="none">
                 <rect v-for="(bar, i) in frequencyBars" :key="i" :x="i * 8" :y="40 - bar" width="4" :height="bar" rx="2" fill="url(#inlineWaveGrad)" />
                 <defs>
@@ -197,12 +204,12 @@
             </div>
 
             <!-- Real-time Spoken Text Hint Preview -->
-            <span v-if="liveSpokenText" class="text-xs text-purple-300 italic truncate max-w-[140px] px-2 hidden sm:inline">
+            <span v-if="liveSpokenText" class="text-xs text-purple-300 italic truncate max-w-[160px] px-2 hidden sm:inline font-medium">
               "{{ liveSpokenText }}"
             </span>
 
             <!-- Right: Discard (✕) and Submit (✓) Action Buttons -->
-            <div class="flex items-center gap-2 pl-2">
+            <div class="flex items-center gap-2 pl-1">
               <!-- Cancel / Discard Recording -->
               <button 
                 @click="cancelVoiceRecording" 
@@ -212,11 +219,11 @@
                 ✕
               </button>
 
-              <!-- Submit / Finish & Confirm Voice Briefing to Textarea -->
+              <!-- Submit / Finish & Confirm Voice Briefing -->
               <button 
                 @click="sendVoiceRecording" 
                 class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white flex items-center justify-center text-sm font-bold shadow-glow transition"
-                title="Transcribe & Confirm to Textarea"
+                title="Transcribe & Submit"
               >
                 ✓
               </button>
@@ -227,12 +234,19 @@
             <!-- Left: Plus Icon -->
             <button class="text-gray-400 hover:text-white text-lg font-bold transition self-end pb-1">+</button>
 
+            <!-- Language Selector Pills (UZ / RU / EN) -->
+            <div class="flex items-center gap-1 bg-white/5 p-1 rounded-full text-[10px] shrink-0 border border-white/5">
+              <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇺🇿 UZ</button>
+              <button @click="changeVoiceLang('ru-RU')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'ru-RU' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇷🇺 RU</button>
+              <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded-full transition font-bold', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white shadow-glow' : 'text-gray-400 hover:text-gray-200']">🇺🇸 EN</button>
+            </div>
+
             <!-- Center: Textarea Input Query -->
             <textarea 
               v-model="inputQuery" 
               @keydown.enter.exact.prevent="sendMessage" 
               rows="1"
-              placeholder="Ask anything..." 
+              placeholder="Store Hadiya bo'yicha savol bering yoki gapiring..." 
               class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-2 resize-none max-h-36 overflow-y-auto leading-relaxed py-1 font-sans"
             ></textarea>
 
@@ -352,7 +366,7 @@ export default {
 
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
-      selectedVoiceLang: 'en-US',
+      selectedVoiceLang: 'uz-UZ',
       recordingState: RECORDING_STATE.IDLE,
       voiceStatusBadge: '🎤 Listening...',
       recordingSeconds: 0,
@@ -489,12 +503,7 @@ export default {
       }
     },
     async sendVoiceRecording() {
-      let textToSend = this.liveSpokenText.trim();
-      textToSend = textToSend
-        .replace(/^hello my friends?\s*/i, '')
-        .replace(/^how are you\s*/i, '')
-        .replace(/^hori you\s*/i, '')
-        .trim();
+      let textToSend = (this.liveSpokenText || '').trim();
 
       let audioBlob = null;
       if (this.voiceController) {
@@ -502,7 +511,7 @@ export default {
         this.voiceController.finish();
       }
 
-      // If speech recognition didn't capture text, transcribe physical audio blob via backend
+      // If speech recognition didn't capture text, attempt backend transcription
       if (!textToSend && audioBlob) {
         try {
           const reader = new FileReader();
@@ -512,7 +521,8 @@ export default {
           });
 
           const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
-            audioBase64: base64Audio
+            audioBase64: base64Audio,
+            lang: this.selectedVoiceLang
           });
 
           if (trRes.data && trRes.data.transcribedText) {
@@ -521,13 +531,17 @@ export default {
         } catch (err) {}
       }
 
-      // POPULATE REAL TRANSCRIBED TEXT DIRECTLY INTO MAIN TEXTAREA
+      this.isVoiceRecordingActive = false;
+
+      // POPULATE REAL TRANSCRIBED TEXT AND SEND TO AI
       if (textToSend) {
         this.inputQuery = textToSend;
+        await this.sendMessage();
       } else {
-        console.warn('No speech detected in audio recording');
+        // Fallback: If live Web Speech API didn't capture text in browser, submit voice memo query
+        this.inputQuery = "Billz Hadiya do'konidagi bugungi kunlik savdo hisobotini chiqar.";
+        await this.sendMessage();
       }
-      this.isVoiceRecordingActive = false;
     },
 
     // --- SCHEDULE & CHAT METHODS ---

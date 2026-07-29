@@ -41,11 +41,10 @@ export class TranscriptBuffer {
     if (!finalChunk || !finalChunk.trim()) return;
     const cleanChunk = finalChunk.trim();
     
-    // Avoid appending exact duplicate sentences
-    if (!this.finalTranscript.endsWith(cleanChunk)) {
-      this.finalTranscript = this.finalTranscript 
-        ? `${this.finalTranscript.trim()} ${cleanChunk}` 
-        : cleanChunk;
+    if (!this.finalTranscript) {
+      this.finalTranscript = cleanChunk;
+    } else if (!this.finalTranscript.includes(cleanChunk)) {
+      this.finalTranscript = `${this.finalTranscript.trim()} ${cleanChunk}`;
     }
     
     this.partialTranscript = '';
