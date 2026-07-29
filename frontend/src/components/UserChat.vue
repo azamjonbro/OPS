@@ -54,20 +54,30 @@
         </div>
 
         <!-- Conversation History -->
-        <div class="space-y-1">
+        <div class="space-y-1.5">
           <div class="flex items-center justify-between px-2 mb-2">
             <span class="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Mavjud Chatlar</span>
-            <button v-if="conversations.length > 0" @click="promptClearAllChats" class="text-[10px] text-gray-500 hover:text-red-400 transition font-medium">Tozalash</button>
+            <button v-if="conversations.length > 0" @click="promptClearAllChats" class="text-[10px] text-gray-400 hover:text-red-400 transition font-medium">Tozalash</button>
           </div>
           <div 
             v-for="conv in conversations" 
             :key="conv.id"
             @click="selectConversation(conv.id)"
-            :class="['flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition-all border group', activeConvId === conv.id ? 'bg-[#1D212C] text-white font-semibold border-indigo-500/40' : 'text-gray-400 border-transparent hover:bg-[#161820] hover:text-gray-200']"
+            :class="[
+              'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition-all border group gap-2', 
+              activeConvId === conv.id 
+                ? 'bg-[#1D212C] text-white font-semibold border-indigo-500/50 shadow-sm' 
+                : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+            ]"
           >
-            <span class="truncate">{{ conv.title }}</span>
-            <div class="flex items-center gap-1">
-              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition" title="Chatni o'chirish">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+              </svg>
+              <span class="truncate font-medium">{{ conv.title }}</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 rounded-lg hover:bg-[#252834] transition opacity-70 group-hover:opacity-100" title="Chatni o'chirish">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
               <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,16 +213,18 @@
         <div v-else v-for="msg in messages" :key="msg.id" class="space-y-3">
           <!-- User Bubble -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
-            <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2">
-              <div v-if="msg.attachedFile" class="p-2 rounded-xl bg-black/20 border border-white/10 flex items-center gap-2 text-xs">
-                <img v-if="msg.attachedFile.isImage" :src="msg.attachedFile.dataUrl" class="w-8 h-8 rounded object-cover" />
-                <svg v-else class="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <div class="truncate">
-                  <div class="font-bold">{{ msg.attachedFile.name }}</div>
-                  <div class="text-[10px] opacity-80">{{ msg.attachedFile.formattedSize }}</div>
+            <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2.5">
+              <div v-if="msg.attachedFile" class="p-2.5 rounded-xl bg-black/30 border border-white/15 flex items-center gap-3">
+                <img v-if="msg.attachedFile.isImage" :src="msg.attachedFile.dataUrl" class="w-16 h-16 rounded-lg object-cover border border-white/20 shrink-0" />
+                <div v-else class="w-10 h-10 rounded-lg bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center text-indigo-200 shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="truncate text-xs">
+                  <div class="font-bold text-white truncate max-w-[220px]">{{ msg.attachedFile.name }}</div>
+                  <div class="text-[10px] opacity-80 font-mono">{{ msg.attachedFile.formattedSize }}</div>
                 </div>
               </div>
-              <div>{{ msg.content }}</div>
+              <div v-if="msg.content">{{ msg.content }}</div>
             </div>
           </div>
 
@@ -732,14 +744,16 @@ export default {
       this.sendMessage();
     },
     async sendMessage() {
-      if (!this.inputQuery.trim() || this.isLoading) return;
+      if ((!this.inputQuery.trim() && !this.attachedFile) || this.isLoading) return;
       const text = this.inputQuery.trim();
+      const fileToSend = this.attachedFile;
       this.inputQuery = '';
+      this.attachedFile = null;
 
       if (!this.activeConvId) {
         try {
           const res = await axios.post(`${API_BASE}/api/chat/conversations`, {
-            title: 'Yangi AI Muloqot'
+            title: fileToSend ? `[Fayl] ${fileToSend.name}` : (text || 'Yangi AI Muloqot')
           });
           this.activeConvId = res.data.id;
           this.conversations.unshift(res.data);
@@ -751,7 +765,8 @@ export default {
       this.messages.push({
         id: `user-${Date.now()}`,
         role: 'user',
-        content: text
+        content: text,
+        attachedFile: fileToSend
       });
 
       this.scrollToBottom();
@@ -760,7 +775,8 @@ export default {
       try {
         const res = await axios.post(`${API_BASE}/api/chat/message`, {
           conversationId: this.activeConvId,
-          content: text
+          content: text,
+          attachedFile: fileToSend
         });
 
         this.messages.push({
