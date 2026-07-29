@@ -112,17 +112,35 @@ export class VoiceController {
     this.setState(RECORDING_STATE.STOPPED);
     this._pauseTimer();
     this.speechService.stop();
+    
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try { this.mediaRecorder.stop(); } catch (err) {}
+    }
+
     this._stopAudioContext();
     this.onVoiceStatusUpdate(VOICE_STATUS.READY_TO_SEND);
+  }
+
+  getAudioBlob() {
+    if (this.audioChunks && this.audioChunks.length > 0) {
+      return new Blob(this.audioChunks, { type: 'audio/webm' });
+    }
+    return null;
   }
 
   cancel() {
     this._pauseTimer();
     this.speechService.stop();
+
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try { this.mediaRecorder.stop(); } catch (err) {}
+    }
+
     this._destroyMediaStream();
     this._stopAudioContext();
 
     this.seconds = 0;
+    this.audioChunks = [];
     this.transcriptBuffer.clear();
     this.frequencyBars = new Array(25).fill(12);
 
@@ -140,6 +158,22 @@ export class VoiceController {
     }
 
     this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.audioChunks = [];
+
+    // MediaRecorder API (Records Raw Audio Binary Blob for OpenAI Whisper)
+    if (window.MediaRecorder) {
+      try {
+        this.mediaRecorder = new MediaRecorder(this.mediaStream);
+        this.mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            this.audioChunks.push(event.data);
+          }
+        };
+        this.mediaRecorder.start(100);
+      } catch (err) {
+        console.warn('MediaRecorder init notice:', err);
+      }
+    }
     
     // Web Audio API
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
