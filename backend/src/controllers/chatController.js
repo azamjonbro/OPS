@@ -228,6 +228,8 @@ const sendVoiceMessage = async (req, res) => {
     executedTools: aiResult.executedTools,
     modelMetadataBadge: aiResult.modelMetadataBadge
   });
+};
+
 const transcribeAudio = async (req, res) => {
   const { spokenText, text } = req.body || {};
   let transcribedText = (spokenText || text || '').trim();
