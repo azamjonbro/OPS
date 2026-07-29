@@ -17,10 +17,17 @@ export class VoiceController {
     // Services
     this.transcriptBuffer = new TranscriptBuffer();
     this.speechService = new SpeechService(this.transcriptBuffer, {
+      lang: options.lang || 'en-US',
       onStatusChange: (status) => {
         this.onVoiceStatusUpdate(status);
       }
     });
+
+  setLanguage(newLang) {
+    if (this.speechService) {
+      this.speechService.setLanguage(newLang);
+    }
+  }
 
     // Web Audio API
     this.mediaStream = null;

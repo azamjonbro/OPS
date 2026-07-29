@@ -21,8 +21,18 @@ export class SpeechService {
     this.options = options;
     this.speechRecognition = null;
     this.isListening = false;
+    this.lang = options.lang || 'en-US';
     this.status = VOICE_STATUS.LISTENING;
     this.onStatusChange = options.onStatusChange || (() => {});
+  }
+
+  setLanguage(newLang) {
+    this.lang = newLang;
+    if (this.speechRecognition) {
+      try {
+        this.speechRecognition.lang = newLang;
+      } catch (e) {}
+    }
   }
 
   setStatus(newStatus) {
@@ -42,8 +52,8 @@ export class SpeechService {
       this.speechRecognition = new SpeechRecognitionClass();
       this.speechRecognition.continuous = true;
       this.speechRecognition.interimResults = true;
-      // Force Uzbek language for Web Speech API recognition
-      this.speechRecognition.lang = 'uz-UZ';
+      // Default to English (en-US) for clean English speech recognition
+      this.speechRecognition.lang = this.lang || 'en-US';
 
       this.speechRecognition.onstart = () => {
         this.isListening = true;

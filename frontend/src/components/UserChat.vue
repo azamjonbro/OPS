@@ -235,11 +235,16 @@
           <div class="bg-[#0E1013] border border-white/10 rounded-2xl p-4 space-y-2 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">DIV 1: REAL HARDWARE MIC TEXT</span>
-                <span class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  {{ voiceStatusBadge }}
-                </span>
+                <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">DIV 1: MIC TRANSCRIPT</span>
+                <div class="flex items-center gap-1.5">
+                  <!-- Language Selector Toggle Buttons -->
+                  <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded text-[10px] font-bold border transition', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white border-indigo-500 shadow-glow' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10']">
+                    🇺🇸 English
+                  </button>
+                  <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded text-[10px] font-bold border transition', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white border-indigo-500 shadow-glow' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10']">
+                    🇺🇿 O'zbekcha
+                  </button>
+                </div>
               </div>
 
               <!-- Editable Textarea with live voice sync -->
@@ -442,6 +447,7 @@ export default {
 
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
+      selectedVoiceLang: 'en-US',
       recordingState: RECORDING_STATE.IDLE,
       voiceStatusBadge: '🎤 Listening...',
       recordingSeconds: 0,
