@@ -356,7 +356,7 @@ import { API_BASE } from '../services/api';
 export default {
   data() {
     return {
-      activeConvId: 'conv-1',
+      activeConvId: null,
       isMobileMenuOpen: false,
       conversations: [],
       messages: [],
@@ -394,7 +394,8 @@ export default {
   },
   mounted() {
     this.fetchConversations();
-    this.fetchMessages('conv-1');
+    this.activeConvId = null;
+    this.messages = [];
     this.fetchSchedules();
   },
   beforeUnmount() {
@@ -566,11 +567,21 @@ export default {
         this.fetchSchedules();
       } catch (e) {}
     },
-    newChat() {
-      const newId = `conv-${Date.now()}`;
-      this.conversations.unshift({ id: newId, title: 'New AI Conversation', isPinned: false });
-      this.activeConvId = newId;
-      this.messages = [];
+    async newChat() {
+      try {
+        const res = await axios.post(`${API_BASE}/api/chat/conversations`, {
+          title: 'Yangi AI Muloqot'
+        });
+        const newConv = res.data;
+        this.conversations.unshift(newConv);
+        this.activeConvId = newConv.id;
+        this.messages = [];
+      } catch (err) {
+        const newId = `conv-${Date.now()}`;
+        this.conversations.unshift({ id: newId, title: 'Yangi AI Muloqot', isPinned: false });
+        this.activeConvId = newId;
+        this.messages = [];
+      }
     },
     selectConversation(id) {
       this.fetchMessages(id);
@@ -583,6 +594,18 @@ export default {
       if (!this.inputQuery.trim() || this.isLoading) return;
       const text = this.inputQuery.trim();
       this.inputQuery = '';
+
+      if (!this.activeConvId) {
+        try {
+          const res = await axios.post(`${API_BASE}/api/chat/conversations`, {
+            title: 'Yangi AI Muloqot'
+          });
+          this.activeConvId = res.data.id;
+          this.conversations.unshift(res.data);
+        } catch (e) {
+          this.activeConvId = `conv-${Date.now()}`;
+        }
+      }
 
       this.messages.push({
         id: `user-${Date.now()}`,
@@ -606,6 +629,7 @@ export default {
           toolCalls: JSON.stringify(res.data.executedTools || [])
         });
         
+        await this.fetchConversations();
         this.fetchSchedules();
         this.scrollToBottom();
       } catch (err) {
