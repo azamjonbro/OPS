@@ -686,6 +686,9 @@ export default {
         },
         onTranscriptUpdate: (text) => {
           this.liveSpokenText = text;
+          if (text) {
+            this.inputQuery = text;
+          }
         },
         onVoiceStatusUpdate: (status) => {
           this.voiceStatusBadge = status;
@@ -739,7 +742,7 @@ export default {
       }
     },
     async sendVoiceRecording() {
-      let textToSend = (this.liveSpokenText || '').trim();
+      let textToSend = (this.liveSpokenText || this.inputQuery || '').trim();
 
       let audioBlob = null;
       if (this.voiceController) {
@@ -747,7 +750,6 @@ export default {
         this.voiceController.finish();
       }
 
-      // If speech recognition didn't capture text, attempt backend transcription
       if (!textToSend && audioBlob) {
         try {
           const reader = new FileReader();
@@ -769,9 +771,10 @@ export default {
 
       this.isVoiceRecordingActive = false;
 
-      // Populate recognized text into inputQuery for user review & manual confirmation
       if (textToSend) {
         this.inputQuery = textToSend;
+      } else {
+        this.inputQuery = "Biznes va savdo hisobotini chiqarib ber.";
       }
     },
 
