@@ -232,13 +232,9 @@ app.post('/api/chat/conversations', (req, res) => {
   res.json(newConv);
 });
 
-app.post('/api/chat/transcribe-audio', (req, res) => {
-  const sampleTranscriptions = [
-    "Good morning! From today you will give me at 6:00 everyday information on the bills how many pieces of products were sold in my shop and how much money.",
-    "Billzdagi bugungi savdo hisobotini chiqar va telegramga yubor.",
-    "Har kuni 19:00 da Billz savdosini telegramga yuborib tur."
-  ];
-  const transcribedText = sampleTranscriptions[Math.floor(Math.random() * sampleTranscriptions.length)];
+app.post('/api/chat/transcribe-audio', async (req, res) => {
+  const { spokenText, text } = req.body || {};
+  const transcribedText = (spokenText || text || '').trim();
   res.json({ success: true, transcribedText });
 });
 

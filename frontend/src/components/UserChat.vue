@@ -521,12 +521,12 @@ export default {
         } catch (err) {}
       }
 
-      if (!textToSend) {
-        textToSend = "Billzdagi bugungi savdo hisobotini chiqar va telegramga yubor.";
+      // POPULATE REAL TRANSCRIBED TEXT DIRECTLY INTO MAIN TEXTAREA
+      if (textToSend) {
+        this.inputQuery = textToSend;
+      } else {
+        console.warn('No speech detected in audio recording');
       }
-
-      // POPULATE TRANSCRIBED TEXT DIRECTLY INTO MAIN INPUT BOX
-      this.inputQuery = textToSend;
       this.isVoiceRecordingActive = false;
     },
 
