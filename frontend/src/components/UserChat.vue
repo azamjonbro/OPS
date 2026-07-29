@@ -168,199 +168,94 @@
         </div>
       </div>
 
-      <!-- Floating Input Container -->
-      <div class="p-4 max-w-3xl w-full mx-auto">
-        <div class="relative bg-[#14161B] border border-white/10 rounded-2xl p-2 focus-within:border-indigo-500/50 shadow-2xl transition">
-          <textarea
-            v-model="inputQuery"
-            @keydown.enter.prevent="sendMessage"
-            rows="2"
-            placeholder="Type message or click Live Mic Record..."
-            class="w-full bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-3 py-1 resize-none"
-          ></textarea>
+      <!-- ChatGPT / Gemini Style Sleek Inline Voice Input Pill Bar -->
+      <footer class="p-4 sm:p-6 border-t border-white/5 bg-[#090B0E]">
+        <div class="max-w-3xl w-full mx-auto">
+          <!-- INLINE RECORDING ACTIVE STATE (Image 2 style) -->
+          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181F] border border-indigo-500/50 rounded-full px-5 py-3 shadow-2xl transition-all duration-300">
+            <!-- Left: Plus Attachment Button -->
+            <button class="text-gray-400 hover:text-white text-lg font-bold pr-2 transition">+</button>
 
-          <div class="flex items-center justify-between px-2 pt-1 border-t border-white/5">
-            <div class="flex items-center gap-3 text-gray-500 text-xs">
-              <span class="hover:text-gray-300 cursor-pointer">📎 Attach</span>
-              <button 
-                @click="openVoiceModal()" 
-                class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-glow"
-              >
-                <span>🎙️</span> Live Mic Record
-              </button>
-            </div>
-            <button 
-              @click="sendMessage" 
-              :disabled="!inputQuery.trim() || isLoading"
-              class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
-            >
-              <span>Send</span>
-              <span>↑</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <!-- CHATGPT / CLAUDE VOICE STYLE BRIEFING MODAL (SAME BRANDING & UI) -->
-    <div v-if="isVoiceRecordingActive" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" tabindex="0" @keydown="handleModalKeydown">
-      <div class="w-full max-w-2xl bg-[#16181D] border border-purple-500/40 rounded-3xl p-6 shadow-glow space-y-6">
-        <!-- Modal Top Header -->
-        <div class="flex items-center justify-between border-b border-white/10 pb-4">
-          <div class="flex items-center gap-3">
-            <div :class="['w-3.5 h-3.5 rounded-full', recordingState === 'RECORDING' ? 'bg-red-500 animate-ping' : recordingState === 'PAUSED' ? 'bg-amber-400' : 'bg-emerald-400']"></div>
-            <div>
-              <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <span>🎙️</span> Hardware Microphone Stream
-              </h3>
-              <p class="text-xs text-purple-300">Fizik mikrofonga gapiring... Ovoz apparatingizdan jonli tushadigan so'zlar yoziladi.</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <!-- Recording State Badge -->
-            <span class="px-2.5 py-0.5 bg-white/10 text-gray-300 border border-white/10 rounded-lg font-mono text-[11px] font-bold">
-              {{ recordingState }}
-            </span>
-            <!-- Timer Badge -->
-            <span :class="['px-3 py-1 rounded-full font-mono text-xs font-bold border', recordingState === 'RECORDING' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30']">
-              ⏱️ 00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }} s
-            </span>
-            <button @click="cancelVoiceRecording" class="text-gray-400 hover:text-white p-1" title="Close (Esc)">✕</button>
-          </div>
-        </div>
-
-        <!-- TWO COLUMN DIVS: Live Context & SVG Frequency Chart -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- DIV 1: Live Hardware Speech Context (Continuous Streaming Transcripts) -->
-          <div class="bg-[#0E1013] border border-white/10 rounded-2xl p-4 space-y-2 flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">DIV 1: MIC TRANSCRIPT</span>
-                <div class="flex items-center gap-1.5">
-                  <!-- Language Selector Toggle Buttons -->
-                  <button @click="changeVoiceLang('en-US')" :class="['px-2 py-0.5 rounded text-[10px] font-bold border transition', selectedVoiceLang === 'en-US' ? 'bg-indigo-600 text-white border-indigo-500 shadow-glow' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10']">
-                    🇺🇸 English
-                  </button>
-                  <button @click="changeVoiceLang('uz-UZ')" :class="['px-2 py-0.5 rounded text-[10px] font-bold border transition', selectedVoiceLang === 'uz-UZ' ? 'bg-indigo-600 text-white border-indigo-500 shadow-glow' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10']">
-                    🇺🇿 O'zbekcha
-                  </button>
-                </div>
-              </div>
-
-              <!-- Editable Textarea with live voice sync -->
-              <textarea 
-                v-model="liveSpokenText" 
-                rows="4" 
-                placeholder="Mikrofonga gapiring... Xabaringiz so'zma-so'z shu yerda paydo bo'ladi."
-                class="w-full bg-purple-950/30 text-xs text-white p-3 rounded-xl border border-purple-500/30 focus:outline-none focus:border-purple-400 font-sans italic resize-none leading-relaxed"
-              ></textarea>
-            </div>
-
-            <!-- Quick Preset Voice Prompts -->
-            <div class="space-y-1 pt-1">
-              <div class="text-[9px] text-gray-400 uppercase tracking-wider">Quick Sample Prompts:</div>
-              <div class="flex flex-wrap gap-1.5 text-[10px]">
-                <button @click="liveSpokenText = 'Har kuni 09:00 da Store Hadiya savdolarini va bugungi rejalarni tayyorla.'" class="bg-white/5 hover:bg-white/15 text-purple-300 px-2 py-1 rounded-lg border border-white/10 transition">
-                  🌅 Morning Briefing
-                </button>
-                <button @click="liveSpokenText = 'Billz Hadiya do\'konidagi bugungi kunlik savdo hisobotini chiqar.'" class="bg-white/5 hover:bg-white/15 text-emerald-300 px-2 py-1 rounded-lg border border-white/10 transition">
-                  📊 Billz Savdosi
-                </button>
-                <button @click="liveSpokenText = 'Har kuni soat 19:00 da Store Hadiya savdosini telegramga yubor.'" class="bg-white/5 hover:bg-white/15 text-indigo-300 px-2 py-1 rounded-lg border border-white/10 transition">
-                  ⏰ Kunlik Telegram Eslatma
-                </button>
-              </div>
-            </div>
-
-            <div class="pt-2 text-[10px] text-gray-500 flex items-center justify-between font-mono">
-              <span>Hardware Audio Stream: ACTIVE</span>
-              <span>Status: {{ voiceStatusBadge }}</span>
-            </div>
-          </div>
-
-          <!-- DIV 2: Live Real-Time SVG 60FPS Frequency Spectrum Chart -->
-          <div class="bg-[#0E1013] border border-white/10 rounded-2xl p-4 space-y-2 flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">DIV 2: REAL MIC FREQUENCY WAVEFORM</span>
-              <span class="text-[10px] text-purple-400 font-mono">Web Audio API | 44.1 kHz</span>
-            </div>
-
-            <!-- SVG Waveform Spectrum Bar Visualizer -->
-            <div class="h-[90px] w-full flex items-end justify-between gap-1 py-2 px-1 bg-[#14161B] rounded-xl border border-white/5 overflow-hidden">
-              <svg class="w-full h-full" viewBox="0 0 200 60" preserveAspectRatio="none">
-                <rect v-for="(bar, i) in frequencyBars" :key="i" :x="i * 8" :y="60 - bar" width="5" :height="bar" rx="2" fill="url(#waveGradient)" />
+            <!-- Center: Live Web Audio SVG Frequency Waveform Spectrum -->
+            <div class="flex-1 flex items-center justify-center px-4 h-6 overflow-hidden">
+              <svg class="w-full h-6" viewBox="0 0 200 40" preserveAspectRatio="none">
+                <rect v-for="(bar, i) in frequencyBars" :key="i" :x="i * 8" :y="40 - bar" width="4" :height="bar" rx="2" fill="url(#inlineWaveGrad)" />
                 <defs>
-                  <linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="inlineWaveGrad" x1="0" y1="0" x2="1" y2="0">
                     <stop offset="0%" stop-color="#8B5CF6" />
+                    <stop offset="50%" stop-color="#EC4899" />
                     <stop offset="100%" stop-color="#3B82F6" />
                   </linearGradient>
                 </defs>
               </svg>
             </div>
 
-            <div class="pt-1 text-[10px] text-gray-500 flex items-center justify-between font-mono">
-              <span>Live Mic Signal: CONNECTED</span>
-              <span>Sample Rate: 44.1kHz</span>
+            <!-- Right: Discard (✕) and Submit (✓) Action Buttons -->
+            <div class="flex items-center gap-2 pl-2">
+              <!-- Cancel / Discard Recording -->
+              <button 
+                @click="cancelVoiceRecording" 
+                class="w-8 h-8 rounded-full bg-white/10 hover:bg-red-500/20 text-gray-300 hover:text-red-400 flex items-center justify-center text-sm transition"
+                title="Discard Recording"
+              >
+                ✕
+              </button>
+
+              <!-- Submit / Finish & Send Voice Briefing -->
+              <button 
+                @click="sendVoiceRecording" 
+                class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white flex items-center justify-center text-sm font-bold shadow-glow transition"
+                title="Send Voice Briefing"
+              >
+                ✓
+              </button>
+            </div>
+          </div>
+
+          <!-- IDLE INPUT STATE (Image 3 style) -->
+          <div v-else class="flex items-center gap-3 bg-[#14161B] border border-white/10 rounded-full px-4 py-2.5 focus-within:border-indigo-500/50 shadow-2xl transition-all">
+            <!-- Left: Plus Icon -->
+            <button class="text-gray-400 hover:text-white text-lg font-bold transition">+</button>
+
+            <!-- Center: Input Query -->
+            <input 
+              v-model="inputQuery" 
+              @keydown.enter="sendMessage" 
+              type="text" 
+              placeholder="Ask anything..." 
+              class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-2"
+            />
+
+            <!-- Right: Mic Icon & Waveform Pill Button -->
+            <div class="flex items-center gap-2">
+              <!-- Microphone Button -->
+              <button 
+                @click="openVoiceModal()" 
+                class="text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-white/5 transition"
+                title="Speak to Assistant"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </button>
+
+              <!-- Waveform Pill Button (Image 3 style) -->
+              <button 
+                @click="openVoiceModal()" 
+                class="w-8 h-8 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow transition"
+                title="Live Voice Mode"
+              >
+                <span class="flex items-center gap-0.5">
+                  <span class="w-0.5 h-3 bg-black rounded-full animate-pulse"></span>
+                  <span class="w-0.5 h-4 bg-black rounded-full animate-pulse"></span>
+                  <span class="w-0.5 h-2 bg-black rounded-full animate-pulse"></span>
+                </span>
+              </button>
             </div>
           </div>
         </div>
-
-        <!-- Audio Quality Analysis & Decision Banner -->
-        <div class="bg-indigo-950/30 border border-indigo-500/30 rounded-2xl p-3.5 flex items-center justify-between text-xs">
-          <div class="flex items-center gap-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-            <div>
-              <span class="font-semibold text-white">Live Microphone Status: </span>
-              <span class="text-indigo-200">{{ voiceStatusBadge }} — Speak your prompt or type in DIV 1 and click Send.</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Control Action Decision Buttons: Cancel, Pause/Resume, Finish, Send -->
-        <div class="flex items-center justify-between border-t border-white/10 pt-4 flex-wrap gap-2">
-          <!-- Cancel Button -->
-          <button @click="cancelVoiceRecording" class="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5">
-            <span>🗑️</span> Yubormaslik (Discard & Cancel)
-          </button>
-
-          <div class="flex items-center gap-2">
-            <!-- Pause / Resume Button -->
-            <button 
-              v-if="recordingState === 'RECORDING'"
-              @click="pauseVoiceRecording" 
-              class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-            >
-              <span>⏸️</span> Pause (Space)
-            </button>
-
-            <button 
-              v-if="recordingState === 'PAUSED'"
-              @click="resumeVoiceRecording" 
-              class="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-            >
-              <span>▶️</span> Continue (Space)
-            </button>
-
-            <!-- Finish Recording Button (Freezes recording stream, leaves transcript editable) -->
-            <button 
-              v-if="recordingState === 'RECORDING' || recordingState === 'PAUSED'"
-              @click="finishVoiceRecording" 
-              class="px-4 py-2 bg-purple-600/30 hover:bg-purple-600/40 text-purple-200 border border-purple-500/40 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-            >
-              <span>⏹️</span> Finish Recording
-            </button>
-
-            <!-- Send Voice Briefing Button -->
-            <button 
-              @click="sendVoiceRecording" 
-              class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-xl shadow-glow transition flex items-center gap-2"
-            >
-              <span>🚀</span> Yuborish (Send Voice Briefing)
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      </footer>
+    </main>
 
     <!-- SCHEDULE AUTOMATIONS MODAL -->
     <div v-if="isScheduleOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
