@@ -212,19 +212,18 @@
             </div>
           </div>
 
-          <!-- IDLE INPUT STATE (Image 3 style) -->
-          <div v-else class="flex items-center gap-3 bg-[#14161B] border border-white/10 rounded-full px-4 py-2.5 focus-within:border-indigo-500/50 shadow-2xl transition-all">
+          <div v-else class="flex items-center gap-3 bg-[#14161B] border border-white/10 rounded-2xl px-4 py-2.5 focus-within:border-indigo-500/50 shadow-2xl transition-all">
             <!-- Left: Plus Icon -->
-            <button class="text-gray-400 hover:text-white text-lg font-bold transition">+</button>
+            <button class="text-gray-400 hover:text-white text-lg font-bold transition self-end pb-1">+</button>
 
-            <!-- Center: Input Query -->
-            <input 
+            <!-- Center: Textarea Input Query -->
+            <textarea 
               v-model="inputQuery" 
-              @keydown.enter="sendMessage" 
-              type="text" 
+              @keydown.enter.exact.prevent="sendMessage" 
+              rows="1"
               placeholder="Ask anything..." 
-              class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-2"
-            />
+              class="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none px-2 resize-none max-h-36 overflow-y-auto leading-relaxed py-1 font-sans"
+            ></textarea>
 
             <!-- Right: Mic Icon & Waveform Pill Button -->
             <div class="flex items-center gap-2">
@@ -492,9 +491,6 @@ export default {
         this.voiceController.finish();
       }
 
-      this.isVoiceRecordingActive = false;
-      this.isLoading = true;
-
       // If speech recognition didn't capture text, transcribe physical audio blob via backend
       if (!textToSend && audioBlob) {
         try {
@@ -515,42 +511,12 @@ export default {
       }
 
       if (!textToSend) {
-        textToSend = "Har kuni soat 19:00 da Store Hadiya savdosini va Rolex soati narxini telegramga yubor.";
+        textToSend = "Billzdagi bugungi savdo hisobotini chiqar va telegramga yubor.";
       }
 
-      this.messages.push({
-        id: `voice-${Date.now()}`,
-        role: 'user',
-        content: `🎙️ Voice Briefing (${this.recordingSeconds}s): "${textToSend}"`
-      });
-
-      this.scrollToBottom();
-
-      try {
-        const res = await axios.post(`${API_BASE}/api/chat/voice-message`, {
-          conversationId: this.activeConvId,
-          EnglishTranscription: textToSend
-        });
-
-        this.messages.push({
-          id: `ai-${Date.now()}`,
-          role: 'assistant',
-          content: res.data.assistantResponse,
-          toolCalls: JSON.stringify(res.data.executedTools || [])
-        });
-
-        this.fetchSchedules();
-        this.scrollToBottom();
-      } catch (e) {
-        this.messages.push({
-          id: `err-${Date.now()}`,
-          role: 'assistant',
-          content: 'Voice processing error.'
-        });
-      } finally {
-        this.isLoading = false;
-        this.scrollToBottom();
-      }
+      // POPULATE TRANSCRIBED TEXT DIRECTLY INTO MAIN INPUT BOX
+      this.inputQuery = textToSend;
+      this.isVoiceRecordingActive = false;
     },
 
     // --- SCHEDULE & CHAT METHODS ---
