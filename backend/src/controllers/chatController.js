@@ -231,9 +231,6 @@ const sendVoiceMessage = async (req, res) => {
 const transcribeAudio = async (req, res) => {
   const { spokenText, text } = req.body || {};
   let transcribedText = (spokenText || text || '').trim();
-  if (!transcribedText) {
-    transcribedText = "Biznes va savdo hisobotini chiqarib ber.";
-  }
   res.json({ success: true, transcribedText });
 };
 

@@ -773,8 +773,6 @@ export default {
 
       if (textToSend) {
         this.inputQuery = textToSend;
-      } else {
-        this.inputQuery = "Biznes va savdo hisobotini chiqarib ber.";
       }
     },
 
