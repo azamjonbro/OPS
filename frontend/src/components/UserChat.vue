@@ -235,21 +235,6 @@
           </div>
         </div>
 
-            <div @click="sendQuick('Har kuni soat 19:00 da Store Hadiya savdosini telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group">
-              <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
-                <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                  Kunlik Telegram Eslatma
-                </span>
-                <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-              </div>
-              <p class="text-[11px] text-gray-400 mt-1.5">"Har kuni 19:00 da Telegramga yubor."</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Chat Messages -->
         <div v-else v-for="msg in messages" :key="msg.id" class="space-y-3">
           <!-- User Bubble -->
@@ -520,6 +505,57 @@
           <button @click="confirmDelete" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow transition">
             Ha, O'chirilsin
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- USER SETTINGS MODAL -->
+    <div v-if="isUserSettingsOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div class="w-full max-w-md bg-[#111317] border border-[#1F222A] rounded-3xl p-6 shadow-2xl space-y-5">
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-[#1F222A] pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
+              A
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white tracking-tight">Azamjon (Store Hadiya)</h3>
+              <p class="text-xs text-emerald-400 font-mono">BILLZ POS Admin &bull; admin@hadiya.uz</p>
+            </div>
+          </div>
+          <button @click="isUserSettingsOpen = false" class="w-8 h-8 rounded-full bg-[#1A1D26] text-gray-400 hover:text-white flex items-center justify-center transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- User Preferences -->
+        <div class="space-y-4 text-xs">
+          <div>
+            <label class="block font-bold text-gray-300 mb-1.5">Ovozli Tanib Olish Tili (Speech Language)</label>
+            <select v-model="selectedVoiceLang" @change="saveUserLang" class="w-full bg-[#161820] border border-[#222632] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+              <option value="en-US">English (en-US) - Standard Voice Mode</option>
+              <option value="uz-UZ">O'zbekcha (uz-UZ) - O'zbek Tili</option>
+              <option value="ru-RU">Русский (ru-RU) - Русский Язык</option>
+            </select>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-[#161820] border border-[#222632] space-y-2">
+            <div class="font-bold text-white flex items-center justify-between">
+              <span>Do'kon Ulanishi Statusi</span>
+              <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono font-bold">ONLINE</span>
+            </div>
+            <p class="text-gray-400 text-[11px]">Store Hadiya POS - 1,152 ta mahsulot bazasi bilan sinxronlangan.</p>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between border-t border-[#1F222A]">
+            <button @click="$emit('logout')" class="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30 rounded-xl font-semibold transition flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              Tizimdan Chiqish
+            </button>
+            <button @click="isUserSettingsOpen = false" class="px-4 py-2 bg-[#1A1D26] hover:bg-[#252936] text-gray-300 font-semibold rounded-xl border border-[#2D3242] transition">
+              Yopish
+            </button>
+          </div>
         </div>
       </div>
     </div>
