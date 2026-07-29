@@ -769,14 +769,9 @@ export default {
 
       this.isVoiceRecordingActive = false;
 
-      // POPULATE REAL TRANSCRIBED TEXT AND SEND TO AI
+      // Populate recognized text into inputQuery for user review & manual confirmation
       if (textToSend) {
         this.inputQuery = textToSend;
-        await this.sendMessage();
-      } else {
-        // Fallback: If live Web Speech API didn't capture text in browser, submit voice memo query
-        this.inputQuery = "Billz Hadiya do'konidagi bugungi kunlik savdo hisobotini chiqar.";
-        await this.sendMessage();
       }
     },
 
