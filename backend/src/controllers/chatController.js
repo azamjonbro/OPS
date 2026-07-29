@@ -196,7 +196,7 @@ const sendMessage = async (req, res) => {
 
   res.json({
     conversationId: convId,
-    userMessage: effectiveContent,
+    userMessage: rawContent,
     assistantResponse: aiResult.responseText,
     executedTools: aiResult.executedTools,
     modelMetadataBadge: aiResult.modelMetadataBadge
