@@ -89,17 +89,17 @@
       </div>
 
       <!-- User Profile Card -->
-      <div class="border-t border-[#1F222A] pt-4 flex items-center justify-between px-2">
+      <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-4 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-2 rounded-2xl transition">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-[#1D212C] border border-[#2D3242] flex items-center justify-center font-bold text-indigo-400 text-xs">
+          <div class="w-9 h-9 rounded-xl bg-[#1D212C] border border-[#2D3242] group-hover:border-indigo-500/50 flex items-center justify-center font-bold text-indigo-400 text-xs">
             A
           </div>
           <div>
-            <div class="text-xs font-semibold text-white">Azamjon (Store Hadiya)</div>
+            <div class="text-xs font-semibold text-white group-hover:text-indigo-300">Azamjon (Store Hadiya)</div>
             <div class="text-[10px] text-emerald-400 font-mono">BILLZ POS Admin</div>
           </div>
         </div>
-        <button @click="$emit('logout')" class="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-[#1A1D26] transition" title="Tizimdan Chiqish (Logout)">
+        <button @click.stop="$emit('logout')" class="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-[#1A1D26] transition" title="Tizimdan Chiqish (Logout)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
         </button>
       </div>
@@ -142,57 +142,98 @@
       <!-- Message History Container -->
       <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
         <!-- Welcome Screen -->
-        <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center text-center my-auto space-y-6 pt-8 pb-12">
-          <div class="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-            </svg>
+        <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center text-center my-auto space-y-6 pt-6 pb-10">
+          <!-- Glowing AI Hexagon Badge -->
+          <div class="relative group">
+            <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-[#14161C] border border-white/10 flex items-center justify-center text-indigo-400 shadow-2xl">
+              <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+            </div>
           </div>
-          <div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Store Hadiya AI Assistant</h1>
-            <p class="text-xs sm:text-sm text-gray-400 mt-2 max-w-md">Store Hadiya bazangizdagi 1,152 ta mahsulot va Billz POS savdolarini boshqaring!</p>
+
+          <div class="space-y-2 max-w-lg">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
+              <span>Assalomu alaykum, Azamjon! 👋</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Store Hadiya Executive POS AI</h1>
+            <p class="text-xs sm:text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+              Billz POS tizimidagi 1,152 ta mahsulot, kunlik savdo hisobotlari va avtomatik Telegram eslatmalarini boshqaring.
+            </p>
+          </div>
+
+          <!-- Status Metrics Strip -->
+          <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-[11px] font-mono text-gray-400">
+            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              1,152 Mahsulot
+            </span>
+            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+              BILLZ POS Connected
+            </span>
+            <span class="flex items-center gap-1.5 bg-[#14161C] border border-[#1F222A] px-3 py-1.5 rounded-xl text-gray-300">
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+              GPT-4o + Claude Dual Mode
+            </span>
           </div>
 
           <!-- Quick Actions Grid -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl text-left pt-2">
-            <div @click="openVoiceModal()" class="p-4 rounded-2xl border border-purple-500/20 bg-[#161420] hover:bg-[#1D1B2A] hover:border-purple-500/40 cursor-pointer transition group">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-xl text-left pt-2">
+            <div @click="openVoiceModal()" class="p-4 rounded-2xl border border-purple-500/25 bg-[#161420] hover:bg-[#1D1B2A] hover:border-purple-500/50 cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-purple-200 group-hover:text-white flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                   </svg>
-                  Ovozli Murojaat (English Voice Mode)
+                  Ovozli Murojaat (Live Mic)
                 </span>
-                <span class="text-purple-300 font-mono text-[9px] bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-400/30">LIVE MIC</span>
+                <span class="text-purple-300 font-mono text-[9px] bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-400/30 font-bold">LIVE MIC</span>
               </div>
-              <p class="text-[11px] text-gray-400 mt-1.5">Mikrofoningiz orqali ovozli topshiriq bering...</p>
+              <p class="text-[11px] text-gray-400 mt-2">Mikrofon orqali tezkor ovozli buyruq bering...</p>
             </div>
 
-            <div @click="sendQuick('Hadiya do\'konida Rolex soati narxi necha pul va do\'konda bormi?')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group">
+            <div @click="sendQuick('Hadiya do\'konida Rolex soati narxi necha pul va do\'konda bormi?')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
-                  Rolex Soati Narxi
+                  Rolex Swiss Copy Narxi
                 </span>
                 <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-1.5">"Rolex Swiss copy soati narxi necha pul?"</p>
+              <p class="text-[11px] text-gray-400 mt-2">"Rolex Swiss copy soati narxi va qoldig'ini tekshir."</p>
             </div>
 
-            <div @click="sendQuick('Billz Hadiya do\'konidagi bugungi kunlik savdo hisobotini chiqar.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group">
+            <div @click="sendQuick('Billz Hadiya do\'konidagi bugungi kunlik savdo hisobotini chiqar.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
                 <span class="flex items-center gap-2">
                   <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                   </svg>
-                  Store Hadiya Savdosi
+                  Billz Kunlik Savdosi
                 </span>
                 <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-1.5">"Billz Hadiya do'konidagi savdoni chiqar."</p>
+              <p class="text-[11px] text-gray-400 mt-2">"Billz Hadiya do'konidagi bugungi tushumni chiqar."</p>
             </div>
+
+            <div @click="sendQuick('Har kuni soat 19:00 da Store Hadiya savdosini telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
+              <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  Kunlik Telegram Eslatma
+                </span>
+                <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              </div>
+              <p class="text-[11px] text-gray-400 mt-2">"Har kuni 19:00 da Telegramga savdoni yubor."</p>
+            </div>
+          </div>
+        </div>
 
             <div @click="sendQuick('Har kuni soat 19:00 da Store Hadiya savdosini telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group">
               <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
@@ -353,14 +394,8 @@
               class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-normal py-0 font-sans my-auto"
             ></textarea>
 
-            <!-- Right Controls: Model Pill + Voice Action Button -->
+            <!-- Right Controls: Voice Action Button -->
             <div class="flex items-center gap-2 shrink-0 my-auto">
-              <!-- Model Selector Badge (Gemini Flash style) -->
-              <div class="bg-[#2A2B32] text-[11px] text-gray-300 font-medium px-3 py-1 rounded-full border border-white/5 flex items-center gap-1 hidden md:flex">
-                <span>GPT-4o</span>
-                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-              </div>
-
               <!-- Microphone Button -->
               <button 
                 @click="openVoiceModal()" 
