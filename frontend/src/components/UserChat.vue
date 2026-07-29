@@ -750,24 +750,23 @@ export default {
         this.voiceController.finish();
       }
 
-      if (!textToSend && audioBlob) {
-        try {
-          const reader = new FileReader();
-          const base64Audio = await new Promise((resolve) => {
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(audioBlob);
-          });
+      try {
+        const reader = new FileReader();
+        const base64Audio = audioBlob ? await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(audioBlob);
+        }) : null;
 
-          const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
-            audioBase64: base64Audio,
-            lang: this.selectedVoiceLang
-          });
+        const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
+          spokenText: textToSend,
+          audioBase64: base64Audio,
+          lang: this.selectedVoiceLang
+        });
 
-          if (trRes.data && trRes.data.transcribedText) {
-            textToSend = trRes.data.transcribedText;
-          }
-        } catch (err) {}
-      }
+        if (trRes.data && trRes.data.transcribedText) {
+          textToSend = trRes.data.transcribedText;
+        }
+      } catch (err) {}
 
       this.isVoiceRecordingActive = false;
 
