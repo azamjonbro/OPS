@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const chatRoutes = require('./routes/chatRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 // Models (for startup cleanup if needed)
 const Conversation = require('./models/Conversation');
@@ -39,6 +40,7 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Node.js Express Backend (MVC Architecture) running on http://localhost:${PORT}`);

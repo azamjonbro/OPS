@@ -23,7 +23,63 @@ const mockDb = {
   ],
   conversations: [],
   messages: {},
-  auditLogs: []
+  auditLogs: [],
+  calendarEvents: [
+    {
+      id: 'evt-1',
+      title: 'Store Hadiya POS Inventory & Sales Audit',
+      description: 'Haftalik POS kassa va inventarizatsiya natijalarini Billz integratsiyasi orqali audit qilish.',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0],
+      startTime: '10:00',
+      endTime: '11:30',
+      priority: 'High',
+      category: 'Work',
+      status: 'In Progress',
+      createdBy: 'Azamjon (Store Hadiya)',
+      source: 'AI',
+      googleCalendarSynced: true,
+      reminders: [{ timeBeforeMinutes: 30, notified: false }],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'evt-2',
+      title: 'Client Presentation & SwissWatch Strategy',
+      description: 'Mijozlar bilan yangi sotuv va CRM strategiyasi bo\'yicha taqdimot va kelishuv.',
+      startDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      startTime: '14:00',
+      endTime: '15:30',
+      priority: 'Urgent',
+      category: 'Meeting',
+      status: 'Pending',
+      createdBy: 'Azamjon (Store Hadiya)',
+      source: 'AI',
+      googleCalendarSynced: true,
+      reminders: [{ timeBeforeMinutes: 60, notified: false }],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'evt-3',
+      title: 'Server Infra & Database Migration',
+      description: 'Backend MongoDB klasterini va Node.js server nusxalarini yangilash.',
+      startDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      startTime: '17:00',
+      endTime: '18:30',
+      priority: 'High',
+      category: 'Deadline',
+      status: 'Pending',
+      createdBy: 'Azamjon (Store Hadiya)',
+      source: 'AI',
+      googleCalendarSynced: false,
+      reminders: [{ timeBeforeMinutes: 30, notified: false }],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ]
 };
 
 module.exports = mockDb;

@@ -231,8 +231,46 @@ const sendVoiceMessage = async (req, res) => {
 };
 
 const transcribeAudio = async (req, res) => {
-  const { spokenText, text } = req.body || {};
-  const transcribedText = (spokenText || text || '').trim();
+  const { spokenText, text, audioBase64, lang } = req.body || {};
+  let transcribedText = (spokenText || text || '').trim();
+
+  const openAiApiKey = (process.env.OPENAI_API_KEY || mockDb.dualLlmConfig.openAiKey || '').trim();
+
+  if (audioBase64 && openAiApiKey && (!transcribedText || transcribedText.length < 2)) {
+    try {
+      const base64Data = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+      const audioBuffer = Buffer.from(base64Data, 'base64');
+
+      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="speech.webm"\r\nContent-Type: audio/webm\r\n\r\n`;
+      const modelField = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n--${boundary}--\r\n`;
+
+      const bodyBuffer = Buffer.concat([
+        Buffer.from(header),
+        audioBuffer,
+        Buffer.from(modelField)
+      ]);
+
+      const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAiApiKey}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        },
+        body: bodyBuffer
+      });
+
+      if (whisperResp.ok) {
+        const whisperData = await whisperResp.json();
+        if (whisperData && whisperData.text) {
+          transcribedText = whisperData.text.trim();
+        }
+      }
+    } catch (err) {
+      console.warn('OpenAI Whisper Transcribe Notice:', err.message);
+    }
+  }
+
   res.json({ success: true, transcribedText });
 };
 

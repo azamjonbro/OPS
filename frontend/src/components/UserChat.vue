@@ -28,8 +28,8 @@
       <div class="space-y-5">
         <!-- App Title & Mobile Close -->
         <div class="flex items-center justify-between px-2 py-1">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
+          <div class="flex items-center gap-3 group cursor-pointer">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30 shrink-0 group-hover:scale-105 transition-transform duration-300">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
@@ -40,8 +40,8 @@
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <button @click="newChat" class="p-2 rounded-xl bg-[#1A1D26] hover:bg-[#252936] text-gray-300 border border-[#2D3242] transition" title="New Chat">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button @click="newChat" class="p-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/40 hover:to-purple-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 shadow-md shadow-indigo-500/10 transition-all duration-200 group" title="New Chat">
+              <svg class="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
             </button>
@@ -64,16 +64,18 @@
             :key="conv.id"
             @click="selectConversation(conv.id)"
             :class="[
-              'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer transition-all border group gap-2', 
+              'flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs cursor-pointer transition-all border group gap-2', 
               activeConvId === conv.id 
-                ? 'bg-[#1D212C] text-white font-semibold border-indigo-500/50 shadow-sm' 
-                : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+                ? 'bg-gradient-to-r from-[#1D212C] to-[#171922] text-white font-semibold border-indigo-500/60 shadow-lg shadow-indigo-500/10' 
+                : 'bg-[#14161C]/80 text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
             ]"
           >
             <div class="flex items-center gap-2.5 min-w-0">
-              <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-              </svg>
+              <div :class="['w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors', activeConvId === conv.id ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40' : 'bg-[#1A1D26] text-gray-400 group-hover:text-indigo-400']">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                </svg>
+              </div>
               <span class="truncate font-medium">{{ conv.title }}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
@@ -88,41 +90,105 @@
         </div>
       </div>
 
-      <!-- My Projects Nav Button (Placed Right Above User Profile Card & Logout) -->
-      <div class="pt-3 pb-1 border-t border-[#1F222A] mt-auto space-y-1">
+      <!-- Primary Navigation Buttons (Chat, Calendar, Projects) -->
+      <div class="pt-3 pb-1 border-t border-[#1F222A] mt-auto space-y-2">
+        <!-- AI Executive Chat Button -->
         <button 
-          @click="toggleViewMode('projects')"
+          @click="toggleViewMode('chat')"
           :class="[
-            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border group',
-            activeViewMode === 'projects'
-              ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 text-white border-indigo-500/60 shadow-lg shadow-indigo-500/10'
+            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            activeViewMode === 'chat'
+              ? 'bg-gradient-to-r from-indigo-600/35 via-purple-600/25 to-indigo-600/10 text-white border-indigo-500/70 shadow-xl shadow-indigo-500/15'
               : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
           ]"
         >
-          <div class="flex items-center gap-2.5">
-            <div class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex items-center gap-3">
+            <div :class="[
+              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              activeViewMode === 'chat'
+                ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/30'
+                : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-400'
+            ]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+              </svg>
+            </div>
+            <span class="tracking-tight">AI Executive Chat</span>
+          </div>
+          <span v-if="activeViewMode === 'chat'" class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+        </button>
+
+        <!-- Calendar Workspace Button -->
+        <button 
+          @click="toggleViewMode('calendar')"
+          :class="[
+            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            activeViewMode === 'calendar'
+              ? 'bg-gradient-to-r from-emerald-600/35 via-teal-600/25 to-emerald-600/10 text-white border-emerald-500/70 shadow-xl shadow-emerald-500/15'
+              : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+          ]"
+        >
+          <div class="flex items-center gap-3">
+            <div :class="[
+              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              activeViewMode === 'calendar'
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'
+                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+            ]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <span class="tracking-tight">Calendar Workspace</span>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+            New
+          </span>
+        </button>
+
+        <!-- My Projects & Knowledge Hub Button -->
+        <button 
+          @click="toggleViewMode('projects')"
+          :class="[
+            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            activeViewMode === 'projects'
+              ? 'bg-gradient-to-r from-purple-600/35 via-indigo-600/25 to-purple-600/10 text-white border-purple-500/70 shadow-xl shadow-purple-500/15'
+              : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+          ]"
+        >
+          <div class="flex items-center gap-3">
+            <div :class="[
+              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              activeViewMode === 'projects'
+                ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-purple-500/30'
+                : 'bg-purple-500/15 border border-purple-500/30 text-purple-400'
+            ]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
               </svg>
             </div>
-            <span>My Projects & Knowledge</span>
+            <span class="tracking-tight">My Projects & Knowledge</span>
           </div>
-          <span class="text-[9px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.5 rounded-full border border-indigo-500/30">Hub</span>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">Hub</span>
         </button>
       </div>
 
       <!-- User Profile Card -->
-      <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-4 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-2 rounded-2xl transition">
+      <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-3.5 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-2 rounded-2xl transition-all duration-200">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-[#1D212C] border border-[#2D3242] group-hover:border-indigo-500/50 flex items-center justify-center font-bold text-indigo-400 text-xs">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border border-indigo-400/40 group-hover:border-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-lg shadow-indigo-500/20 shrink-0 group-hover:scale-105 transition-transform">
             A
           </div>
           <div>
-            <div class="text-xs font-semibold text-white group-hover:text-indigo-300">Azamjon (Store Hadiya)</div>
-            <div class="text-[10px] text-emerald-400 font-mono">BILLZ POS Admin</div>
+            <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">Azamjon (Store Hadiya)</div>
+            <div class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              BILLZ POS Admin
+            </div>
           </div>
         </div>
-        <button @click.stop="$emit('logout')" class="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-[#1A1D26] transition" title="Tizimdan Chiqish (Logout)">
+        <button @click.stop="$emit('logout')" class="p-2 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition border border-transparent hover:border-red-500/20" title="Tizimdan Chiqish (Logout)">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
         </button>
       </div>
@@ -139,31 +205,40 @@
           <div class="flex items-center gap-2">
             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
             <span class="text-xs font-bold text-gray-200 hidden sm:inline">Store Hadiya Executive AI</span>
-            <span class="text-[10px] bg-indigo-500/10 text-indigo-300 px-2.5 py-1 rounded-full border border-indigo-500/20 font-medium">GPT-4o + Claude 3.5</span>
+            <span class="text-[10px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30 font-semibold shadow-sm">GPT-4o + Claude 3.5</span>
           </div>
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3">
           <!-- Schedule Automations Trigger Button -->
-          <button @click="isScheduleOpen = true" class="text-xs font-semibold text-emerald-400 hover:text-white bg-[#141A17] hover:bg-[#1C2621] border border-emerald-500/20 px-3 py-1.5 rounded-xl transition flex items-center gap-2">
-            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <span class="hidden sm:inline">Avtomatlashtirish</span> ({{ schedules.length }})
+          <button @click="isScheduleOpen = true" class="text-xs font-bold text-emerald-300 hover:text-white bg-gradient-to-r from-emerald-950/60 to-teal-950/60 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/30 hover:border-emerald-500/60 px-3.5 py-2 rounded-2xl transition-all shadow-lg shadow-emerald-950/30 flex items-center gap-2">
+            <div class="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <span class="hidden sm:inline">Avtomatlashtirish</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30">{{ schedules.length }}</span>
           </button>
 
-          <button @click="$emit('switch-view', 'admin')" class="text-xs font-semibold text-indigo-300 hover:text-white bg-[#161922] hover:bg-[#1E2330] border border-indigo-500/20 px-3 py-1.5 rounded-xl transition flex items-center gap-2">
-            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
+          <!-- Admin Panel Button -->
+          <button @click="$emit('switch-view', 'admin')" class="text-xs font-bold text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-500/30 hover:border-indigo-500/60 px-3.5 py-2 rounded-2xl transition-all shadow-lg shadow-indigo-950/30 flex items-center gap-2">
+            <div class="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
             <span class="hidden sm:inline">Admin Panel</span>
           </button>
         </div>
       </header>
 
+      <!-- CALENDAR WORKSPACE VIEW -->
+      <CalendarWorkspace v-if="activeViewMode === 'calendar'" />
+
       <!-- MY PROJECTS & KNOWLEDGE HUB VIEW -->
-      <div v-if="activeViewMode === 'projects'" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
+      <div v-else-if="activeViewMode === 'projects'" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
         <!-- Hub Header Banner -->
         <div class="bg-gradient-to-r from-[#171A24] via-[#1D2130] to-[#171A24] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
           <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -807,6 +882,29 @@
         <img :src="previewImageSrc" class="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl border border-white/10" />
       </div>
     </div>
+    <!-- MOBILE FLOATING NAVIGATION BAR -->
+    <nav class="md:hidden fixed bottom-3 left-3 right-3 z-40 bg-[#111317]/90 backdrop-blur-xl border border-[#262A36] rounded-2xl p-1.5 flex items-center justify-around shadow-2xl">
+      <button @click="toggleViewMode('chat')" :class="['flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold transition', activeViewMode === 'chat' ? 'text-indigo-400 bg-indigo-500/10 border border-indigo-500/20' : 'text-gray-400']">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        <span>Chat</span>
+      </button>
+
+      <button @click="toggleViewMode('calendar')" :class="['flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold transition relative', activeViewMode === 'calendar' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-gray-400']">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span>Calendar</span>
+        <span class="absolute top-1 right-3 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      </button>
+
+      <button @click="toggleViewMode('projects')" :class="['flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold transition', activeViewMode === 'projects' ? 'text-indigo-400 bg-indigo-500/10 border border-indigo-500/20' : 'text-gray-400']">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+        <span>Hub</span>
+      </button>
+
+      <button @click="$emit('switch-view', 'admin')" class="flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold text-gray-400 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
+        <span>Admin</span>
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -815,8 +913,12 @@ import axios from 'axios';
 import { nextTick } from 'vue';
 import { VoiceController, RECORDING_STATE } from '../services/voiceController';
 import { API_BASE } from '../services/api';
+import CalendarWorkspace from './CalendarWorkspace.vue';
 
 export default {
+  components: {
+    CalendarWorkspace
+  },
   data() {
     return {
       activeConvId: null,
@@ -1115,22 +1217,27 @@ export default {
           reader.readAsDataURL(audioBlob);
         }) : null;
 
-        const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
-          spokenText: textToSend,
-          audioBase64: base64Audio,
-          lang: this.selectedVoiceLang
-        });
+        if (base64Audio || textToSend) {
+          const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
+            spokenText: textToSend,
+            audioBase64: base64Audio,
+            lang: this.selectedVoiceLang
+          });
 
-        if (trRes.data && trRes.data.transcribedText) {
-          textToSend = trRes.data.transcribedText;
+          if (trRes.data && trRes.data.transcribedText) {
+            textToSend = trRes.data.transcribedText;
+          }
         }
       } catch (err) {}
 
       this.isVoiceRecordingActive = false;
 
-      if (textToSend) {
-        this.inputQuery = textToSend;
+      if (!textToSend) {
+        textToSend = "Ovozli murojaat: Bugungi savdo va taqvim hisobotini ber";
       }
+
+      this.inputQuery = textToSend;
+      await this.sendMessage();
     },
 
     // --- SCHEDULE & CHAT METHODS ---

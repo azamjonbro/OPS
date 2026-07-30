@@ -23,6 +23,11 @@ export default {
       currentView: 'chat' // 'chat' or 'admin'
     };
   },
+  mounted() {
+    if (window.location.pathname === '/calendar' || window.location.hash === '#/calendar') {
+      this.currentView = 'chat';
+    }
+  },
   methods: {
     switchView(viewName) {
       this.currentView = viewName;

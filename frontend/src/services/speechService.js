@@ -91,10 +91,11 @@ export class SpeechService {
 
       this.speechRecognition.onerror = (e) => {
         console.warn('Speech recognition notice:', e.error);
-        if (e.error === 'language-not-supported') {
+        if (e.error === 'language-not-supported' || e.error === 'not-allowed') {
           try {
-            this.lang = 'en-US';
-            this.speechRecognition.lang = 'en-US';
+            const fallbackLang = this.lang === 'uz-UZ' ? 'ru-RU' : 'en-US';
+            this.lang = fallbackLang;
+            this.speechRecognition.lang = fallbackLang;
           } catch (err) {}
         }
       };
