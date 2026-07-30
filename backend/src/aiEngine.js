@@ -242,6 +242,7 @@ MEMORY PRIORITY & HIERARCHY DATA:
 
 RESPONSE INSTRUCTIONS:
 - Match the owner's defined character and personality rules strictly (do NOT react to transient emotions).
+- Check BOTH Persistent Mongo Memory and Fetched System Context Data for stored books, sales strategies, and owner profiles. If the requested document, strategy, or profile is present in Persistent Mongo Memory or Fetched Data, analyze it thoroughly and explain its core sales logic, key rules, and actionable recommendations. NEVER say "data not found" if it exists in Persistent Mongo Memory or Fetched Context Data!
 - Always respond in clean, executive-level markdown in Uzbek (or the language of the prompt).
 - Be concise, accurate, direct, and highly intelligent.`
                 },
