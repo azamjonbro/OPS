@@ -50,21 +50,38 @@ class ContextBuilder {
       contextData.chatHistory = history.map(h => `User: "${h.content}"`);
     } catch (e) {}
 
-    // 3. Trigger Tool Connectors Based on Intent
-    if (intent === 'sales' || intent === 'inventory') {
-      const billzRes = await connectorRegistry.executeTool('billz_get_sales_report', {});
-      if (billzRes && billzRes.success) {
-        contextData.executedTools.push({ tool: 'billz_get_sales_report', label: 'Billz Sales Data', result: billzRes.data });
-      }
-    } else if (intent === 'documentation' || intent === 'project') {
+    // 3. Central Server Orchestration: Trigger Notion, Billz, Email, Schedule based on query terms & intent
+    const textLower = userMessage.toLowerCase();
+
+    // Notion Workspace Query (pages, projects, documents, tasks)
+    if (intent === 'documentation' || intent === 'project' || textLower.includes('notion') || textLower.includes('sahifa') || textLower.includes('loyiha') || textLower.includes('hujjat') || textLower.includes('task')) {
       const notionRes = await connectorRegistry.executeTool('notion_search_workspace', { query: userMessage });
       if (notionRes && notionRes.success) {
         contextData.executedTools.push({ tool: 'notion_search_workspace', label: 'Notion Workspace Data', result: notionRes.data });
       }
-    } else if (intent === 'calendar') {
+    }
+
+    // Billz POS Live Data Query (sales, products, warehouse, stock, revenue)
+    if (intent === 'sales' || intent === 'inventory' || textLower.includes('billz') || textLower.includes('savdo') || textLower.includes('ombor') || textLower.includes('mahsulot') || textLower.includes('tushum') || textLower.includes('tovar')) {
+      const billzRes = await connectorRegistry.executeTool('billz_get_sales_report', {});
+      if (billzRes && billzRes.success) {
+        contextData.executedTools.push({ tool: 'billz_get_sales_report', label: 'Billz POS Live Sales Data', result: billzRes.data });
+      }
+    }
+
+    // Email Dispatcher Query (mail, email, pochta)
+    if (textLower.includes('email') || textLower.includes('pochta') || textLower.includes('mail')) {
+      const emailRes = await connectorRegistry.executeTool('gmail_send_email', { to: 'admin@hadiya.uz', subject: 'Report Update', body: userMessage });
+      if (emailRes && emailRes.success) {
+        contextData.executedTools.push({ tool: 'gmail_send_email', label: 'Email Dispatcher Notification', result: emailRes.data });
+      }
+    }
+
+    // Calendar / Schedule Query (meeting, schedule, reja, eslatma)
+    if (intent === 'calendar' || textLower.includes('calendar') || textLower.includes('meeting') || textLower.includes('eslat') || textLower.includes('reja')) {
       const calRes = await connectorRegistry.executeTool('google_calendar_list_events', {});
       if (calRes && calRes.success) {
-        contextData.executedTools.push({ tool: 'google_calendar_list_events', label: 'Calendar Events', result: calRes.data });
+        contextData.executedTools.push({ tool: 'google_calendar_list_events', label: 'Google Calendar Events', result: calRes.data });
       }
     }
 
