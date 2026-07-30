@@ -107,7 +107,7 @@ export class VoiceController {
     }
   }
 
-  finish() {
+  async finish() {
     if (this.state !== RECORDING_STATE.RECORDING && this.state !== RECORDING_STATE.PAUSED) return;
 
     this.setState(RECORDING_STATE.STOPPED);
@@ -115,7 +115,14 @@ export class VoiceController {
     this.speechService.stop();
     
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      try { this.mediaRecorder.stop(); } catch (err) {}
+      await new Promise((resolve) => {
+        this.mediaRecorder.onstop = () => resolve();
+        try {
+          this.mediaRecorder.stop();
+        } catch (err) {
+          resolve();
+        }
+      });
     }
 
     this._stopAudioContext();
@@ -124,7 +131,8 @@ export class VoiceController {
 
   getAudioBlob() {
     if (this.audioChunks && this.audioChunks.length > 0) {
-      return new Blob(this.audioChunks, { type: 'audio/webm' });
+      const mimeType = (this.mediaRecorder && this.mediaRecorder.mimeType) ? this.mediaRecorder.mimeType : 'audio/webm';
+      return new Blob(this.audioChunks, { type: mimeType });
     }
     return null;
   }
@@ -171,13 +179,22 @@ export class VoiceController {
     // MediaRecorder API (Records Raw Audio Binary Blob for OpenAI Whisper)
     if (window.MediaRecorder) {
       try {
-        this.mediaRecorder = new MediaRecorder(this.mediaStream);
+        let mimeType = 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        }
+
+        this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType });
         this.mediaRecorder.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
             this.audioChunks.push(event.data);
           }
         };
-        this.mediaRecorder.start(100);
+        this.mediaRecorder.start(200);
       } catch (err) {
         console.warn('MediaRecorder init notice:', err);
       }
