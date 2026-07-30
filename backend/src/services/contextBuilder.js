@@ -101,35 +101,17 @@ class ContextBuilder {
       }
     }
 
-    // Billz POS Data Query via MongoDB Local Cache (Ultra-Fast Response)
+    // Billz POS Direct Live API Query
     const isBillzRelevant = intent === 'sales' || intent === 'inventory' || textLower.includes('billz') || textLower.includes('savdo') || textLower.includes('ombor') || textLower.includes('mahsulot') || textLower.includes('tushum') || textLower.includes('tovar') || textLower.includes('hisobot') || textLower.includes('pos');
     if (isBillzRelevant) {
-      const mongoose = require('mongoose');
-      const Product = require('../models/Product');
-      let dbProducts = [];
-      if (mongoose.connection.readyState === 1) {
-        try {
-          dbProducts = await Product.find().sort({ stock: -1 }).limit(20).lean();
-        } catch (e) {}
+      const billzRes = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
+      if (billzRes && billzRes.success) {
+        contextData.executedTools.push({
+          tool: 'billz_get_sales',
+          label: 'Direct Live Billz POS API Integration Query',
+          result: billzRes.data
+        });
       }
-
-      if (dbProducts.length === 0) {
-        const billzRes = await connectorRegistry.executeTool('billz_get_products', {});
-        if (billzRes && billzRes.success) {
-          dbProducts = (billzRes.data && billzRes.data.products) ? billzRes.data.products : [];
-        }
-      }
-
-      contextData.executedTools.push({
-        tool: 'mongodb_product_catalog_query',
-        label: 'Fast MongoDB Product Catalog & Inventory Query (<2ms)',
-        result: {
-          totalProductsCount: dbProducts.length > 0 ? dbProducts.length : 1152,
-          fastSellers: dbProducts.filter(p => p.salesVelocity === 'FAST_SELLER'),
-          outOfStockItems: dbProducts.filter(p => p.status === 'OUT_OF_STOCK'),
-          products: dbProducts
-        }
-      });
     }
 
     // Email Dispatcher Query (mail, email, pochta)

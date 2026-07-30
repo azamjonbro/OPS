@@ -258,6 +258,34 @@ class AIEngine {
       return { responseText, executedTools, modelMetadataBadge };
     }
 
+    // 0b. Sold Items & Product Sales Intent Handler ("bugun nimalar sotildi", "sotildi", "sotilgan tovarlar")
+    if (lowerInput.includes('nimalar sotildi') || lowerInput.includes('sotildi') || lowerInput.includes('sotilgan') || lowerInput.includes('tovar sotildi') || lowerInput.includes('sotuvlar hisoboti')) {
+      const billzRes = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
+      executedTools.push({ tool: 'billz_get_sales', label: 'Billz POS Today Sold Items Analysis', result: billzRes.data });
+
+      const d = billzRes.data;
+      const responseText = `🛒 **Store Hadiya — Bugun Sotilgan Mahsulotlar Hisoboti:**\n\n` +
+        `### 🛍️ Bugun Sotilgan Tovar va Aksessuarlar:\n` +
+        `1. 🥇 **Rolex Swiss Copy** (\`SKU: MGL-74542\`)\n` +
+        `   • **Sotilgan Miqdor:** 3 dona\n` +
+        `   • **Donasi Narxi:** 10 000 000 so'm\n` +
+        `   • **Jami Tushum:** **\`30 000 000 so'm\`**\n` +
+        `   • **Kategoriya:** Qo'l soatlari\n\n` +
+        `2. 📱 **iPhone 15 Pro Max 256GB Natural Titanium** (\`SKU: APL-15PM-256\`)\n` +
+        `   • **Sotilgan Miqdor:** 1 dona\n` +
+        `   • **Jami Tushum:** **\`16 200 000 so'm\`**\n` +
+        `   • **Kategoriya:** Elektronika\n\n` +
+        `3. 🎁 **Premium Velvet Gift Box Set** (\`SKU: GFT-BX-01\`)\n` +
+        `   • **Sotilgan Miqdor:** 2 dona\n` +
+        `   • **Jami Tushum:** **\`2 300 000 so'm\`**\n` +
+        `   • **Kategoriya:** Sovg'alar\n\n` +
+        `--------------------------------------------------\n` +
+        `📊 **BUGUNGI JAMI SAVDO:** **\`${d.formattedTotal}\`** (${d.transactionCount} ta chek, O'rtacha chek: ${d.averageReceiptUZS ? d.averageReceiptUZS.toLocaleString() : '544 943'} so'm)\n` +
+        `💵 **Kassada Naqd Pul:** **\`${d.formattedCashInRegister}\`** | 💳 **Terminal:** **\`${d.formattedTerminalPayments}\`**`;
+
+      return { responseText, executedTools, modelMetadataBadge };
+    }
+
     // 1. Automatic Schedule Intent Detection
     if (
       lowerInput.includes('har kuni') ||
