@@ -118,12 +118,39 @@ class ContextBuilder {
       }
     }
 
-    // Schedule / Calendar Query (meeting, schedule, reja, eslatma, avtomatlashtirish)
-    if (intent === 'calendar' || textLower.includes('calendar') || textLower.includes('meeting') || textLower.includes('eslat') || textLower.includes('reja') || textLower.includes('schedule') || textLower.includes('avtomat')) {
-      const calRes = await connectorRegistry.executeTool('google_calendar_list_events', {});
-      if (calRes && calRes.success) {
-        contextData.executedTools.push({ tool: 'google_calendar_list_events', label: 'Google Calendar Events & Automations', result: calRes.data });
+    // Schedule / Calendar Query (meeting, schedule, reja, eslatma, avtomatlashtirish, taqvim, vazifa)
+    if (intent === 'calendar' || textLower.includes('calendar') || textLower.includes('taqvim') || textLower.includes('meeting') || textLower.includes('eslat') || textLower.includes('reja') || textLower.includes('schedule') || textLower.includes('avtomat') || textLower.includes('vazifa') || textLower.includes('hisobot')) {
+      const mongoose = require('mongoose');
+      const CalendarEvent = require('../models/CalendarEvent');
+      const mockDb = require('../store');
+
+      let calendarEventsData = [];
+      if (mongoose.connection.readyState === 1) {
+        try {
+          const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 }).limit(10).lean();
+          if (dbEvts && dbEvts.length > 0) {
+            calendarEventsData = dbEvts.map(e => ({
+              title: e.title,
+              startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+              startTime: e.startTime,
+              endTime: e.endTime,
+              priority: e.priority,
+              category: e.category,
+              status: e.status
+            }));
+          }
+        } catch (e) {}
       }
+
+      if (calendarEventsData.length === 0 && mockDb.calendarEvents) {
+        calendarEventsData = mockDb.calendarEvents;
+      }
+
+      contextData.executedTools.push({
+        tool: 'calendar_list_events',
+        label: 'Fetched Calendar Events from MongoDB',
+        result: { count: calendarEventsData.length, events: calendarEventsData }
+      });
     }
 
     return contextData;

@@ -24,79 +24,78 @@
     <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 z-40 bg-black/60 md:hidden"></div>
 
     <!-- Sidebar (Desktop & Mobile Drawer) -->
-    <aside :class="['w-72 border-r border-[#1F222A] bg-[#111317] flex flex-col justify-between p-4 z-40 transition-all duration-300 md:static fixed inset-y-0 left-0', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
-      <div class="space-y-5">
-        <!-- App Title & Mobile Close -->
-        <div class="flex items-center justify-between px-2 py-1">
-          <div class="flex items-center gap-3 group cursor-pointer">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30 shrink-0 group-hover:scale-105 transition-transform duration-300">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-            </div>
-            <div>
-              <span class="font-bold text-sm tracking-tight text-white block">Jarvis AI Workspace</span>
-              <span class="text-[10px] text-indigo-400 font-mono">Store Hadiya POS v2</span>
-            </div>
+    <aside :class="['w-72 border-r border-[#1F222A] bg-[#111317] flex flex-col justify-between p-4 z-40 transition-all duration-300 md:static fixed inset-y-0 left-0 h-full overflow-hidden', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
+      <!-- App Title & New Chat Action Header -->
+      <div class="flex items-center justify-between px-2 pb-3 border-b border-[#1F222A] shrink-0">
+        <div class="flex items-center gap-3 group cursor-pointer">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30 shrink-0 group-hover:scale-105 transition-transform duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
           </div>
-          <div class="flex items-center gap-1">
-            <button @click="newChat" class="p-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/40 hover:to-purple-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 shadow-md shadow-indigo-500/10 transition-all duration-200 group" title="New Chat">
-              <svg class="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-              </svg>
-            </button>
-            <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl bg-[#1A1D26] text-gray-400 md:hidden">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+          <div>
+            <span class="font-bold text-sm tracking-tight text-white block">Jarvis AI Workspace</span>
+            <span class="text-[10px] text-indigo-400 font-mono">Store Hadiya POS v2</span>
           </div>
         </div>
+        <div class="flex items-center gap-1">
+          <button @click="newChat" class="p-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/40 hover:to-purple-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 shadow-md shadow-indigo-500/10 transition-all duration-200 group" title="New Chat">
+            <svg class="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+          </button>
+          <button @click="isMobileMenuOpen = false" class="p-2 rounded-xl bg-[#1A1D26] text-gray-400 md:hidden">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
 
-        <!-- Conversation History -->
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between px-2 mb-2">
-            <span class="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Mavjud Chatlar</span>
-            <button v-if="conversations.length > 0" @click="promptClearAllChats" class="text-[10px] text-gray-400 hover:text-red-400 transition font-medium">Tozalash</button>
-          </div>
-          <div 
-            v-for="conv in conversations" 
-            :key="conv.id"
-            @click="selectConversation(conv.id)"
-            :class="[
-              'flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs cursor-pointer transition-all border group gap-2', 
-              activeConvId === conv.id 
-                ? 'bg-gradient-to-r from-[#1D212C] to-[#171922] text-white font-semibold border-indigo-500/60 shadow-lg shadow-indigo-500/10' 
-                : 'bg-[#14161C]/80 text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
-            ]"
-          >
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div :class="['w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors', activeConvId === conv.id ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40' : 'bg-[#1A1D26] text-gray-400 group-hover:text-indigo-400']">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-                </svg>
-              </div>
-              <span class="truncate font-medium">{{ conv.title }}</span>
-            </div>
-            <div class="flex items-center gap-1 shrink-0">
-              <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 rounded-lg hover:bg-[#252834] opacity-0 group-hover:opacity-100 transition-opacity duration-200" title="Chatni o'chirish">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
-              <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+      <!-- Dedicated Scrollable Conversation History Container -->
+      <div class="flex-1 min-h-0 overflow-y-auto my-3 pr-1 space-y-1.5 custom-scrollbar">
+        <div class="flex items-center justify-between px-2 pb-2 pt-1 sticky top-0 bg-[#111317] z-10 border-b border-[#1F222A]/50">
+          <span class="text-[10px] font-bold tracking-widest text-gray-500 uppercase">Mavjud Chatlar</span>
+          <button v-if="conversations.length > 0" @click="promptClearAllChats" class="text-[10px] text-gray-400 hover:text-red-400 transition font-medium">Tozalash</button>
+        </div>
+
+        <div 
+          v-for="conv in conversations" 
+          :key="conv.id"
+          @click="selectConversation(conv.id)"
+          :class="[
+            'flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs cursor-pointer transition-all border group gap-2', 
+            activeConvId === conv.id 
+              ? 'bg-gradient-to-r from-[#1D212C] to-[#171922] text-white font-semibold border-indigo-500/60 shadow-lg shadow-indigo-500/10' 
+              : 'bg-[#14161C]/80 text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+          ]"
+        >
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div :class="['w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors', activeConvId === conv.id ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40' : 'bg-[#1A1D26] text-gray-400 group-hover:text-indigo-400']">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
               </svg>
             </div>
+            <span class="truncate font-medium">{{ conv.title }}</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button @click.stop="promptDeleteChat(conv.id)" class="text-gray-400 hover:text-red-400 p-1 rounded-lg hover:bg-[#252834] opacity-0 group-hover:opacity-100 transition-opacity duration-200" title="Chatni o'chirish">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+            <svg v-if="conv.isPinned" class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+            </svg>
           </div>
         </div>
       </div>
 
-      <!-- Primary Navigation Buttons (Chat, Calendar, Projects) -->
-      <div class="pt-3 pb-1 border-t border-[#1F222A] mt-auto space-y-2">
+      <!-- Bottom Stack: Primary Navigation & User Profile Card -->
+      <div class="shrink-0 space-y-2 border-t border-[#1F222A] pt-3">
         <!-- AI Executive Chat Button -->
         <button 
           @click="toggleViewMode('chat')"
           :class="[
-            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            'w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
             activeViewMode === 'chat'
               ? 'bg-gradient-to-r from-indigo-600/35 via-purple-600/25 to-indigo-600/10 text-white border-indigo-500/70 shadow-xl shadow-indigo-500/15'
               : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
@@ -104,12 +103,12 @@
         >
           <div class="flex items-center gap-3">
             <div :class="[
-              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              'w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
               activeViewMode === 'chat'
                 ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/30'
                 : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-400'
             ]">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
               </svg>
             </div>
@@ -122,7 +121,7 @@
         <button 
           @click="toggleViewMode('calendar')"
           :class="[
-            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            'w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
             activeViewMode === 'calendar'
               ? 'bg-gradient-to-r from-emerald-600/35 via-teal-600/25 to-emerald-600/10 text-white border-emerald-500/70 shadow-xl shadow-emerald-500/15'
               : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
@@ -130,12 +129,12 @@
         >
           <div class="flex items-center gap-3">
             <div :class="[
-              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              'w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
               activeViewMode === 'calendar'
                 ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'
                 : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
             ]">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
             </div>
@@ -151,7 +150,7 @@
         <button 
           @click="toggleViewMode('projects')"
           :class="[
-            'w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
+            'w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 border group relative overflow-hidden',
             activeViewMode === 'projects'
               ? 'bg-gradient-to-r from-purple-600/35 via-indigo-600/25 to-purple-600/10 text-white border-purple-500/70 shadow-xl shadow-purple-500/15'
               : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
@@ -159,12 +158,12 @@
         >
           <div class="flex items-center gap-3">
             <div :class="[
-              'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
+              'w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-md',
               activeViewMode === 'projects'
                 ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-purple-500/30'
                 : 'bg-purple-500/15 border border-purple-500/30 text-purple-400'
             ]">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
               </svg>
             </div>
@@ -172,25 +171,25 @@
           </div>
           <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">Hub</span>
         </button>
-      </div>
 
-      <!-- User Profile Card -->
-      <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-3.5 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-2 rounded-2xl transition-all duration-200">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border border-indigo-400/40 group-hover:border-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-lg shadow-indigo-500/20 shrink-0 group-hover:scale-105 transition-transform">
-            A
-          </div>
-          <div>
-            <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">Azamjon (Store Hadiya)</div>
-            <div class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              BILLZ POS Admin
+        <!-- User Profile Card -->
+        <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-2.5 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-1.5 rounded-2xl transition-all duration-200 mt-1">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 border border-indigo-400/40 group-hover:border-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-lg shadow-indigo-500/20 shrink-0 group-hover:scale-105 transition-transform">
+              A
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">Azamjon (Store Hadiya)</div>
+              <div class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                BILLZ POS Admin
+              </div>
             </div>
           </div>
+          <button @click.stop="$emit('logout')" class="p-1.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition border border-transparent hover:border-red-500/20" title="Tizimdan Chiqish (Logout)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </button>
         </div>
-        <button @click.stop="$emit('logout')" class="p-2 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition border border-transparent hover:border-red-500/20" title="Tizimdan Chiqish (Logout)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-        </button>
       </div>
     </aside>
 
@@ -564,8 +563,27 @@
             </button>
           </div>
 
+          <!-- VOICE TRANSCRIBING LOADING STATE (OpenAI Whisper) -->
+          <div v-if="isTranscribingVoice" class="flex items-center justify-between bg-gradient-to-r from-[#171822] via-[#1D1F2D] to-[#171822] border border-indigo-500/50 rounded-[28px] px-5 py-3 shadow-2xl transition-all duration-300 gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-400 shrink-0">
+                <svg class="w-4 h-4 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-white flex items-center gap-2">
+                  <span>🧠 OpenAI Whisper AI ovozni matnga o'girmoqda...</span>
+                  <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                </div>
+                <div class="text-[10px] text-indigo-300 font-mono">Audio golos formatida yuborildi & Whisper API transkripsiya qilmoqda...</div>
+              </div>
+            </div>
+            <span class="text-xs font-mono px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold animate-pulse">TRANSCRIBING...</span>
+          </div>
+
           <!-- INLINE RECORDING ACTIVE STATE (Gemini Live Mode) -->
-          <div v-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181D] border border-white/10 rounded-[28px] px-4 py-2.5 shadow-2xl transition-all duration-300 gap-3">
+          <div v-else-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181D] border border-white/10 rounded-[28px] px-4 py-2.5 shadow-2xl transition-all duration-300 gap-3">
             <!-- Left: Plus Attachment Button -->
             <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#22252E] hover:bg-[#2C303B] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -959,6 +977,7 @@ export default {
 
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
+      isTranscribingVoice: false,
       selectedVoiceLang: 'en-US',
       recordingState: RECORDING_STATE.IDLE,
       voiceStatusBadge: '🎤 Listening...',
@@ -1202,13 +1221,16 @@ export default {
       }
     },
     async sendVoiceRecording() {
-      let textToSend = (this.liveSpokenText || this.inputQuery || '').trim();
-
       let audioBlob = null;
       if (this.voiceController) {
+        await this.voiceController.finish();
         audioBlob = this.voiceController.getAudioBlob();
-        this.voiceController.finish();
       }
+
+      this.isVoiceRecordingActive = false;
+      this.isTranscribingVoice = true;
+
+      let textToSend = (this.liveSpokenText || this.inputQuery || '').trim();
 
       try {
         const reader = new FileReader();
@@ -1228,12 +1250,16 @@ export default {
             textToSend = trRes.data.transcribedText;
           }
         }
-      } catch (err) {}
-
-      this.isVoiceRecordingActive = false;
+      } catch (err) {
+        console.warn('Voice transcription error:', err);
+      } finally {
+        this.isTranscribingVoice = false;
+      }
 
       if (!textToSend) {
-        textToSend = "Ovozli murojaat: Bugungi savdo va taqvim hisobotini ber";
+        this.inputQuery = '';
+        this.voiceStatusBadge = "🎙️ Ovozingizni eshita olmadim. Qaytadan gapiring.";
+        return;
       }
 
       this.inputQuery = textToSend;
