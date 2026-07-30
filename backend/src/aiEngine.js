@@ -153,26 +153,30 @@ class AIEngine {
       return { responseText, executedTools, modelMetadataBadge };
     }
 
-    // 2. Billz Sales Intent
-    if (lowerInput.includes('billz') || lowerInput.includes('savdo') || lowerInput.includes('sales')) {
-      const res = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
-      executedTools.push({ tool: 'billz_get_sales', result: res.data, status: 'SUCCESS' });
-
-      const responseText = `${this.dualLlmEnabled ? '> 🧠 **Dual LLM Consensus Active (OpenAI GPT-4o + Claude 3.5 Sonnet)**\n\n' : ''}` +
-        `Bugungi **Billz POS (Store Hadiya)** savdo ko'rsatkichlari bo'yicha birlashgan hisobot:\n\n` +
-        `• **Do'kon:** ${res.data.storeName} (Shop ID: \`${res.data.shopId}\`)\n` +
-        `• **Jami tushum:** ${res.data.formattedTotal}\n` +
-        `• **Tranzaksiyalar soni:** ${res.data.transactionCount} ta chek\n` +
-        `• **O'rtacha chek:** ${res.data.averageReceiptUZS.toLocaleString()} so'm\n` +
-        `• **Eng ko'p sotilgan mahsulot:** ${res.data.topSellingItem} (SKU: \`${res.data.topSellingSku}\`)\n` +
-        `• **Katalogdagi jami mahsulotlar:** **${res.data.totalProductsInStore.toLocaleString()} ta**\n\n` +
-        `*GPT-4o Tahlili:* Bugungi **Store Hadiya** savdolari kunlik rejadan 22% yuqori.\n` +
-        `*Claude 3.5 Tahlili:* **Rolex Swiss copy** mahsulotiga talab yuqori, 10 000 000 so'm chakana narxida marja darajasi saqlangan.`;
-
-      return { responseText, executedTools, modelMetadataBadge };
+    // 2. Notion Workspace Intent
+    if (
+      lowerInput.includes('notion') ||
+      lowerInput.includes('page') ||
+      lowerInput.includes('sahifa') ||
+      lowerInput.includes('workspace') ||
+      lowerInput.includes('agency') ||
+      lowerInput.includes('swisswatch') ||
+      lowerInput.includes('bahodir') ||
+      lowerInput.includes('moliya') ||
+      lowerInput.includes('project') ||
+      lowerInput.includes('task')
+    ) {
+      const notionRes = await connectorRegistry.executeTool('notion_search_workspace', { query: userMessage });
+      executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
     }
 
-    // 3. Schedule Meeting Intent
+    // 3. Billz Sales & Products Intent
+    if (lowerInput.includes('billz') || lowerInput.includes('savdo') || lowerInput.includes('sales') || lowerInput.includes('mahsulot') || lowerInput.includes('katalog') || lowerInput.includes('rolex')) {
+      const res = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
+      executedTools.push({ tool: 'billz_get_sales', label: 'Fetched Billz POS Sales & Product Data', result: res.data });
+    }
+
+    // 4. Schedule Meeting Intent
     if (
       lowerInput.includes('meeting') ||
       lowerInput.includes('uchrashuv') ||
@@ -186,68 +190,56 @@ class AIEngine {
       const tgRes = await connectorRegistry.executeTool('telegram_send_message', { chatId: '@admin_channel', text: "Ertaga 09:00 da Aziz bilan meeting belgilandi." });
       executedTools.push({ tool: 'telegram_send_message', label: 'Telegram Notification Sent', result: tgRes.data });
 
-      const notionRes = await connectorRegistry.executeTool('notion_create_task', { title: 'Meeting with Aziz', priority: 'High', assignee: 'Aziz' });
-      executedTools.push({ tool: 'notion_create_task', label: 'Notion Task Created', result: notionRes.data });
-
-      const responseText = `${this.dualLlmEnabled ? '> 🧠 **Dual LLM Consensus Active (OpenAI GPT-4o + Claude 3.5 Sonnet)**\n\n' : ''}` +
-        `Uchrashuv muvaffaqiyatli rejalashtirildi va barcha tizimlarga biriktirildi! 📅✨\n\n` +
-        `1. **Google Calendar:** Ertaga soat 09:00 ga "Meeting with Aziz" uchrashuvi yaratildi.\n` +
-        `2. **Telegram Bot:** Telegram orqali bildirishnoma yuborildi.\n` +
-        `3. **Notion Workspace:** Notion ma'lumotlar bazasida yangi task ochildi.`;
-
-      return { responseText, executedTools, modelMetadataBadge };
+      const notionTaskRes = await connectorRegistry.executeTool('notion_create_task', { title: 'Meeting with Aziz', priority: 'High', assignee: 'Aziz' });
+      executedTools.push({ tool: 'notion_create_task', label: 'Notion Task Created', result: notionTaskRes.data });
     }
 
-    // 4. Product Catalog Lookup Intent
-    if (
-      lowerInput.includes('rolex') ||
-      lowerInput.includes('mahsulot') ||
-      lowerInput.includes('tavar') ||
-      lowerInput.includes('narx') ||
-      lowerInput.includes('hadiya') ||
-      lowerInput.includes('katalog') ||
-      lowerInput.includes('soat')
-    ) {
-      let catalogData = null;
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const jsonPath = path.join(__dirname, 'all_products_export.json');
-        if (fs.existsSync(jsonPath)) {
-          catalogData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    // 5. OpenAI Real API Call (GPT-4o / GPT-4o-mini)
+    const openAiApiKey = (this.openAiKey || process.env.OPENAI_API_KEY || '').trim();
+    if (openAiApiKey) {
+      const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
+      for (const modelName of modelsToTry) {
+        try {
+          const openAiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAiApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are Store Hadiya Executive POS & Workspace AI Assistant. You strictly execute commands and answer queries for the user. When Notion workspace data is fetched (containing fullPageContent text blocks, subpages, and databases), thoroughly analyze the actual text contents and explain to the user in detail what was discussed, what tasks or projects are noted, and give a complete breakdown. Do NOT just print page links; explain the core content, instructions, and notes found inside the Notion pages. Always respond in clean markdown in Uzbek (or the language of the prompt).`
+                },
+                {
+                  role: 'user',
+                  content: `User Input: "${userMessage}"\n\nFetched System Context Data: ${JSON.stringify(executedTools, null, 2)}`
+                }
+              ],
+              temperature: 0.7
+            })
+          });
+
+          if (openAiResp.ok) {
+            const aiData = await openAiResp.json();
+            if (aiData.choices && aiData.choices[0] && aiData.choices[0].message) {
+              const realAiText = aiData.choices[0].message.content;
+              return {
+                responseText: realAiText,
+                executedTools,
+                modelMetadataBadge: `🧠 OpenAI ${modelName.toUpperCase()} Live Intelligence`
+              };
+            }
+          }
+        } catch (err) {
+          console.log(`OpenAI ${modelName} fetch notice:`, err.message);
         }
-      } catch (e) {}
-
-      const totalCount = catalogData ? (catalogData.totalCount || catalogData.count || 1152) : 1152;
-      const sampleItem = (catalogData && catalogData.products && catalogData.products[0]) ? catalogData.products[0] : {
-        name: "Rolex Swiss copy",
-        sku: "MGL-74542",
-        retail_price: 10000000,
-        formattedRetailPrice: "10 000 000 so'm",
-        barcode: "2000000045450"
-      };
-
-      executedTools.push({
-        tool: 'billz_catalog_lookup',
-        label: 'Queried Hadiya Store Products Catalog',
-        result: { storeName: 'Store Hadiya', totalCount, sampleItem }
-      });
-
-      const responseText = `${this.dualLlmEnabled ? '> 🧠 **Dual LLM Consensus Active (OpenAI GPT-4o + Claude 3.5 Sonnet)**\n\n' : ''}` +
-        `📦 **Store Hadiya Mahsulotlar Katalogi Natijasi:**\n\n` +
-        `• **Do'kon:** Store Hadiya (Shop ID: \`ce50a545-c097-4085-936e-319188e72163\`)\n` +
-        `• **Jami bazadagi mahsulotlar soni:** **${totalCount.toLocaleString()} ta**\n` +
-        `• **Qidirilgan Mahsulot:** **${sampleItem.name}**\n` +
-        `• **SKU:** \`${sampleItem.sku}\` | **Shtrixkod:** \`${sampleItem.barcode}\`\n` +
-        `• **Chakana Sotish Narxi:** **${sampleItem.formattedRetailPrice || (sampleItem.retail_price ? sampleItem.retail_price.toLocaleString() + " so'm" : "10 000 000 so'm")}**\n` +
-        `• **Kategoriya:** Qo'l soat\n\n` +
-        `*GPT-4o Tahlili:* Store Hadiya bazasida **1,152 ta mahsulot** mavjud va barcha 12 ta sahifa ma'lumotlar strukturasi integratsiya qilingan.\n` +
-        `*Claude 3.5 Tahlili:* Rolex Swiss copy mahsuloti 74.4% yuqori marja bilan baholangan.`;
-
-      return { responseText, executedTools, modelMetadataBadge };
+      }
     }
 
-    // Default AI Executive Response
+    // Structured Fallback AI Executive Response
     const responseText = `${this.dualLlmEnabled ? '> 🧠 **Dual LLM Mode (OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet)**\n\n' : ''}` +
       `Assalomu alaykum! Men sizning shaxsiy AI Agentingizman. 🚀\n\n` +
       `Xabaringiz: "${userMessage}"\n\n` +

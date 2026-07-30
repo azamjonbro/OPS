@@ -356,19 +356,21 @@
           </div>
 
           <!-- GEMINI STYLE IDLE INPUT PILL -->
-          <div v-else class="min-h-[56px] flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[28px] px-4 py-2 shadow-xl focus-within:border-indigo-500/50 transition-all">
+          <div v-else class="flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[26px] px-3.5 py-2 shadow-xl focus-within:border-indigo-500/50 transition-all">
             <!-- Left: Attachment (+) Button -->
             <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0 my-auto" title="Attach file or image">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </button>
 
-            <!-- Center: Textarea Input Query -->
+            <!-- Center: Textarea Input Query (Default small 1 line, expands up to 300px) -->
             <textarea 
+              ref="inputQueryRef"
               v-model="inputQuery" 
+              @input="adjustTextareaHeight"
               @keydown.enter.exact.prevent="sendMessage" 
               rows="1"
               placeholder="Спросить Gemini yoki Store Hadiya bo'yicha savol bering..." 
-              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-36 overflow-y-auto leading-normal py-0 font-sans my-auto"
+              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-[300px] overflow-y-auto leading-relaxed py-1 font-sans my-auto"
             ></textarea>
 
             <!-- Right Controls: Send Button (if text or file attached) OR Microphone Button (if input empty) -->
@@ -648,6 +650,18 @@ export default {
     }
   },
   methods: {
+    adjustTextareaHeight() {
+      nextTick(() => {
+        const el = this.$refs.inputQueryRef;
+        if (el) {
+          el.style.height = 'auto';
+          if (this.inputQuery && this.inputQuery.trim()) {
+            const targetHeight = Math.min(el.scrollHeight, 300);
+            el.style.height = targetHeight + 'px';
+          }
+        }
+      });
+    },
     openImagePreview(src) {
       if (!src) return;
       this.previewImageSrc = src;
@@ -840,6 +854,7 @@ export default {
       const fileToSend = this.attachedFile;
       this.inputQuery = '';
       this.attachedFile = null;
+      this.adjustTextareaHeight();
 
       if (!this.activeConvId) {
         try {

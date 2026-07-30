@@ -20,8 +20,7 @@ export class SpeechService {
     this.buffer = transcriptBuffer;
     this.options = options;
     this.speechRecognition = null;
-    this.isListening = false;
-    this.lang = options.lang || 'en-US';
+    this.lang = options.lang || (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'uz-UZ');
     this.status = VOICE_STATUS.LISTENING;
     this.onStatusChange = options.onStatusChange || (() => {});
   }
