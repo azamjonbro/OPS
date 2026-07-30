@@ -835,6 +835,7 @@ export default {
     this.activeConvId = null;
     this.messages = [];
     this.fetchSchedules();
+    this.fetchOwnerProfile();
   },
   beforeUnmount() {
     if (this.voiceController) {
@@ -898,6 +899,33 @@ export default {
     queryAiAboutMemory(item) {
       this.activeViewMode = 'chat';
       this.inputQuery = `"${item.title}" xotira hujjati bo'yicha tahlil bering va undagi sotuv logikalarini tushuntiring.`;
+    },
+    async fetchOwnerProfile() {
+      try {
+        const res = await axios.get(`${API_BASE}/api/chat/owner/profile`);
+        if (res.data && res.data.profile) {
+          this.ownerTitle = res.data.profile.title || this.ownerTitle;
+          this.ownerCharacterPrompt = res.data.profile.content || this.ownerCharacterPrompt;
+        }
+      } catch (e) {}
+    },
+    async saveOwnerProfile() {
+      this.isSavingOwnerProfile = true;
+      try {
+        await axios.post(`${API_BASE}/api/chat/owner/profile`, {
+          title: this.ownerTitle,
+          content: this.ownerCharacterPrompt
+        });
+        this.ownerProfileSavedBadge = true;
+        setTimeout(() => { this.ownerProfileSavedBadge = false; }, 3000);
+      } catch (e) {
+        alert("Xarakter sozlamasini saqlashda xatolik: " + e.message);
+      } finally {
+        this.isSavingOwnerProfile = false;
+      }
+    },
+    applyCharacterPreset(presetText) {
+      this.ownerCharacterPrompt = presetText;
     },
     adjustTextareaHeight() {
       nextTick(() => {
