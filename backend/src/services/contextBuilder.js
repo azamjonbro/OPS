@@ -44,10 +44,49 @@ class ContextBuilder {
       contextData.persistentMemory = allMemories.map(m => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
     } catch (e) {}
 
-    // 2. Fetch Relevant Chat History from MongoDB
+    // 2. MongoDB Deep Chat History Search & Turn Retrieval
     try {
-      const history = await ChatHistory.find({ role: 'user' }).sort({ timestamp: -1 }).limit(5).lean();
-      contextData.chatHistory = history.map(h => `User: "${h.content}"`);
+      const historyQueryMatch = userMessage.match(/"([^"]+)"/) || userMessage.match(/(\bmen\b|\bkimman\b|\byozganman\b|\byozdim\b|\bjavob\b|\bsavol\b|\btarix\b|\bhistory\b|\beslaysanmi\b)/i);
+
+      if (historyQueryMatch) {
+        // Extract key phrase to search in ChatHistory (e.g. "men kimman")
+        const quoteMatch = userMessage.match(/"([^"]+)"/);
+        const searchPhrase = quoteMatch ? quoteMatch[1] : (userMessage.includes('men kimman') ? 'men kimman' : userMessage.split(/\s+/).slice(0, 3).join(' '));
+
+        if (searchPhrase && searchPhrase.length > 2) {
+          const matchedLogs = await ChatHistory.find({
+            content: { $regex: searchPhrase, $options: 'i' }
+          }).sort({ timestamp: -1 }).limit(10).lean();
+
+          if (matchedLogs.length > 0) {
+            // Fetch assistant replies that followed these user messages
+            const enrichedHistory = [];
+            for (const log of matchedLogs) {
+              const reply = await ChatHistory.findOne({
+                conversationId: log.conversationId,
+                timestamp: { $gte: log.timestamp }
+              }).sort({ timestamp: 1 }).lean();
+
+              enrichedHistory.push({
+                userPrompt: log.content,
+                timestamp: log.timestamp,
+                formattedDate: new Date(log.timestamp).toLocaleString(),
+                assistantReply: reply ? reply.content : 'No reply found'
+              });
+            }
+
+            contextData.executedTools.push({
+              tool: 'mongo_chat_history_search',
+              label: 'MongoDB Deep Chat History Search',
+              result: { queryPhrase: searchPhrase, totalFound: enrichedHistory.length, historyRecords: enrichedHistory }
+            });
+          }
+        }
+      }
+
+      // Fetch Recent Conversation Turns (User + Assistant)
+      const recentLogs = await ChatHistory.find().sort({ timestamp: -1 }).limit(10).lean();
+      contextData.chatHistory = recentLogs.reverse().map(h => `${h.role === 'user' ? 'User' : 'Assistant'} [${new Date(h.timestamp).toLocaleTimeString()}]: "${h.content}"`);
     } catch (e) {}
 
     // 3. Central Server Orchestration: Trigger Notion, Billz, Email, Schedule based on query terms & intent

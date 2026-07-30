@@ -246,8 +246,8 @@ MEMORY PRIORITY & HIERARCHY DATA:
 
 RESPONSE INSTRUCTIONS:
 - Match the owner's defined character and personality rules strictly (do NOT react to transient emotions).
+- When the user asks about past messages or questions (e.g. "men kimman deb qachon yozdim senga?" or "mongodb historydan qidir"), check BOTH `mongo_chat_history_search` in Fetched System Context Data AND `Relevant Chat History`. State the EXACT date/time, exact user prompt, and exact assistant response given! NEVER claim history is missing if it exists in MongoDB logs or context data!
 - Act as the central Server Orchestrator: synthesize data fetched from MongoDB, My Data / Chat History, Notion, Billz POS, Schedule, and Email. Provide complete, accurate, executive solutions.
-- Check BOTH Persistent Mongo Memory and Fetched System Context Data for stored books, sales strategies, and owner profiles. Analyze it thoroughly and explain its core sales logic, key rules, and actionable recommendations.
 - Always respond in clean, executive-level markdown in Uzbek (or the language of the prompt).`
                 },
                 {
