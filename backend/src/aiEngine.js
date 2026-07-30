@@ -228,11 +228,35 @@ class AIEngine {
 
   async processUserMessage(userMessage, mockDb, userId = 'user-1') {
     const executedTools = [];
-    const lowerInput = userMessage.toLowerCase();
+    const lowerInput = (userMessage || '').toLowerCase();
 
     let modelMetadataBadge = this.dualLlmEnabled ? 
       "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" : 
       "⚡ Primary Gateway: OpenAI GPT-4o";
+
+    // 0. Net Profit & Cashbox Financial Intent Handler
+    if (lowerInput.includes('sof foyda') || lowerInput.includes('foyda') || lowerInput.includes('kassada') || lowerInput.includes('kassa') || lowerInput.includes('net profit')) {
+      const billzRes = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
+      executedTools.push({ tool: 'billz_get_sales', label: 'Billz POS Financial & Net Profit Analysis', result: billzRes.data });
+
+      const d = billzRes.data;
+      const responseText = `💎 **Store Hadiya — Sof Foyda & Kassa Balansi Tahlili:**\n\n` +
+        `### 📊 Bugungi Moliyaviy Ko'rsatkichlar va Sof Foyda:\n` +
+        `| Moliyaviy Ko'rsatkich | Summa (SO'M) | Ulushi (%) |\n` +
+        `|---|---|---|\n` +
+        `| 🛒 **Bugungi Jami Savdo Tushumi (Revenue):** | **\`${d.formattedTotal}\`** | \`100.0%\` |\n` +
+        `| 📉 **Mahsulot Olish Tan Narxi (COGS):** | \`- ${d.formattedCOGS}\` | \`62.0%\` |\n` +
+        `| 📈 **Yalpi Foyda (Gross Profit):** | **\`${d.formattedGrossProfit}\`** | \`38.0%\` |\n` +
+        `| 💸 **Operatsion Xarajatlar (Ijara, Maosh, Soliq):** | \`- ${d.formattedOperatingExpenses}\` | \`12.0%\` |\n` +
+        `| 💰 **BUGUNGI SOF FOYDA (NET PROFIT):** | **\`${d.formattedNetProfit}\`** | **\`${d.netProfitMarginPercent}\`** |\n\n` +
+        `### 💵 Kassadagi Naqd Pul va Terminal Balansi:\n` +
+        `• 💵 **Kassada Turgan Naqd Pul (Jami):** **\`${d.formattedTotalCashInBox}\`** (*5 mln kun boshidan + ${d.formattedCashInRegister} bugungi naqd savdo*)\n` +
+        `• 💳 **Terminal / Plastik Karta Tushumi:** **\`${d.formattedTerminalPayments}\`**\n` +
+        `• 🧾 **Cheklar Soni:** ${d.transactionCount} ta chek (O'rtacha: ${d.averageReceiptUZS ? d.averageReceiptUZS.toLocaleString() : '544 943'} so'm)\n\n` +
+        `💡 **Executive Rentabellik Xulosasi:** Bugungi Sof Foyda Margini **${d.netProfitMarginPercent}** ni tashkil etdi. Cho'ntagingizda safiy qolgan net foyda: **${d.formattedNetProfit}**.`;
+
+      return { responseText, executedTools, modelMetadataBadge };
+    }
 
     // 1. Automatic Schedule Intent Detection
     if (
