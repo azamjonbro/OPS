@@ -88,6 +88,29 @@
         </div>
       </div>
 
+      <!-- My Projects Nav Button (Placed Right Above User Profile Card & Logout) -->
+      <div class="pt-3 pb-1 border-t border-[#1F222A] mt-auto space-y-1">
+        <button 
+          @click="toggleViewMode('projects')"
+          :class="[
+            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border group',
+            activeViewMode === 'projects'
+              ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 text-white border-indigo-500/60 shadow-lg shadow-indigo-500/10'
+              : 'bg-[#14161C] text-gray-300 border-[#1F222A] hover:bg-[#1A1D26] hover:border-[#2D3242] hover:text-white'
+          ]"
+        >
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+              </svg>
+            </div>
+            <span>My Projects & Knowledge</span>
+          </div>
+          <span class="text-[9px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.5 rounded-full border border-indigo-500/30">Hub</span>
+        </button>
+      </div>
+
       <!-- User Profile Card -->
       <div @click="isUserSettingsOpen = true" class="border-t border-[#1F222A] pt-4 flex items-center justify-between px-2 cursor-pointer group hover:bg-[#161820] p-2 rounded-2xl transition">
         <div class="flex items-center gap-3">
@@ -139,8 +162,162 @@
         </div>
       </header>
 
-      <!-- Message History Container -->
-      <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
+      <!-- MY PROJECTS & KNOWLEDGE HUB VIEW -->
+      <div v-if="activeViewMode === 'projects'" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
+        <!-- Hub Header Banner -->
+        <div class="bg-gradient-to-r from-[#171A24] via-[#1D2130] to-[#171A24] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+            <div class="space-y-1.5">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+                <span>📁 Permanent AI Memory & Projects Hub</span>
+              </div>
+              <h1 class="text-2xl font-bold text-white tracking-tight">My Projects & Knowledge Bank</h1>
+              <p class="text-xs text-gray-300 max-w-xl leading-relaxed">
+                PDF kitoblar, sotuv strategiyalari va biznes logikalarini AI doimiy xotirasiga yuklang. AI ushbu hujjatlar ustida tahlil va sotuv amallarini bajaradi.
+              </p>
+            </div>
+            <button @click="toggleViewMode('chat')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-2 shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+              <span>Chat Muloqotiga Qaytish</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Two Column Workspace: Upload Form & Saved Memory Cards -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <!-- Left Column: Upload New Knowledge / PDF Book / Strategy -->
+          <div class="lg:col-span-5 bg-[#14161C] border border-[#1F222A] rounded-3xl p-5 space-y-4 shadow-xl">
+            <div class="flex items-center gap-2 border-b border-[#1F222A] pb-3">
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                +
+              </div>
+              <h2 class="text-sm font-bold text-white">Yangi Bilim / PDF Kitob Yuklash</h2>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <!-- Title -->
+              <div>
+                <label class="block text-gray-400 font-medium mb-1">Sarlavha / Nomi</label>
+                <input 
+                  v-model="newDocTitle" 
+                  type="text" 
+                  placeholder="masalan: Sotuvni oshirish strategiyasi 2026..." 
+                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <!-- Category -->
+              <div>
+                <label class="block text-gray-400 font-medium mb-1">Kategoriya</label>
+                <select 
+                  v-model="newDocCategory" 
+                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="knowledge">📚 PDF Kitob / Bilim Bazasi</option>
+                  <option value="business">📊 Sotuv Logikasi & Strategiya</option>
+                  <option value="project">🚀 Yangi Loyiha / Project</option>
+                  <option value="architecture">🏗️ Texnik Arxitektura & Qoidalar</option>
+                </select>
+              </div>
+
+              <!-- File Upload Picker -->
+              <div>
+                <label class="block text-gray-400 font-medium mb-1">Fayl Yuklash (.pdf, .txt, .md, .doc)</label>
+                <input 
+                  type="file" 
+                  @change="handleKnowledgeFileUpload" 
+                  accept=".pdf,.txt,.md,.doc,.docx,.json" 
+                  class="w-full text-gray-400 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/20 file:text-indigo-300 hover:file:bg-indigo-600/30 cursor-pointer"
+                />
+              </div>
+
+              <!-- Text Content Input -->
+              <div>
+                <label class="block text-gray-400 font-medium mb-1">Matn / Qoidalar / Logikalar</label>
+                <textarea 
+                  v-model="newDocContent" 
+                  rows="6" 
+                  placeholder="PDF matni, sotuv qoidalari yoki loyiha bo'yicha ko'rsatmalaringizni beravering..." 
+                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"
+                ></textarea>
+              </div>
+
+              <!-- Submit Button -->
+              <button 
+                @click="submitMemoryUpload" 
+                :disabled="isUploadingMemory || !newDocTitle.trim() || !newDocContent.trim()" 
+                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2"
+              >
+                <span v-if="isUploadingMemory">AI Xotirasiga Saqlanmoqda...</span>
+                <span v-else>🧠 AI Doimiy Xotirasiga Saqlash</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Column: Stored Memory Bank Cards -->
+          <div class="lg:col-span-7 space-y-4">
+            <div class="flex items-center justify-between border-b border-[#1F222A] pb-3">
+              <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <span>📚 AI Xotirasidagi Loyihalar va Kitoblar</span>
+                <span class="text-xs font-mono bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full">({{ memoryItems.length }})</span>
+              </h2>
+              <button @click="fetchMemoryItems" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Yangilash 🔄</button>
+            </div>
+
+            <div v-if="memoryItems.length === 0" class="bg-[#14161C] border border-[#1F222A] rounded-3xl p-8 text-center space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto text-xl font-bold">📚</div>
+              <div class="text-sm font-semibold text-white">Hozircha xotirada ma'lumot yo'q</div>
+              <p class="text-xs text-gray-400 max-w-sm mx-auto">
+                Chap tarafdagi shakl orqali sotuv logikalari, PDF kitoblar yoki loyiha ko'rsatmalarini saqlang.
+              </p>
+            </div>
+
+            <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+              <div 
+                v-for="item in memoryItems" 
+                :key="item._id || item.key"
+                class="bg-[#14161C] border border-[#1F222A] hover:border-indigo-500/40 rounded-2xl p-4 space-y-2.5 transition shadow-md group"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        {{ item.category || 'knowledge' }}
+                      </span>
+                      <span class="text-[10px] text-gray-500 font-mono">{{ new Date(item.updatedAt).toLocaleDateString() }}</span>
+                    </div>
+                    <h3 class="text-sm font-bold text-white group-hover:text-indigo-300 transition mt-1">{{ item.title }}</h3>
+                  </div>
+
+                  <button @click="deleteMemoryCard(item._id)" class="text-gray-500 hover:text-red-400 p-1 transition" title="Xotiradan o'chirish">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+
+                <p class="text-xs text-gray-300 line-clamp-3 leading-relaxed bg-[#1A1D26] p-2.5 rounded-xl border border-[#252936]">
+                  {{ item.content }}
+                </p>
+
+                <div class="flex items-center justify-between pt-1 text-xs">
+                  <span class="text-[10px] text-gray-400 font-mono" v-if="item.metadata && item.metadata.fileName">📄 {{ item.metadata.fileName }}</span>
+                  <button 
+                    @click="queryAiAboutMemory(item)" 
+                    class="px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-[11px] font-semibold transition ml-auto flex items-center gap-1.5"
+                  >
+                    <span>🤖 AI Tahlil & Muloqot</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Message History Container (WHEN IN CHAT VIEW MODE) -->
+      <div v-else ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
         <!-- Welcome Screen -->
         <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center text-center my-auto space-y-6 pt-6 pb-10">
           <!-- Glowing AI Hexagon Badge -->
@@ -610,6 +787,15 @@ export default {
       pendingDeleteId: null,
       isDeletingAll: false,
 
+      // View Mode (chat vs projects) & Memory Upload States
+      activeViewMode: 'chat',
+      memoryItems: [],
+      newDocTitle: '',
+      newDocCategory: 'knowledge',
+      newDocContent: '',
+      newDocFileName: '',
+      isUploadingMemory: false,
+
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
       selectedVoiceLang: 'en-US',
@@ -650,6 +836,63 @@ export default {
     }
   },
   methods: {
+    toggleViewMode(mode) {
+      this.activeViewMode = mode;
+      if (mode === 'projects') {
+        this.fetchMemoryItems();
+      }
+    },
+    async fetchMemoryItems() {
+      try {
+        const res = await axios.get(`${API_BASE}/api/chat/memory/items`);
+        if (res.data && res.data.items) {
+          this.memoryItems = res.data.items;
+        }
+      } catch (e) {}
+    },
+    handleKnowledgeFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      this.newDocFileName = file.name;
+      if (!this.newDocTitle) {
+        this.newDocTitle = file.name.replace(/\.[^/.]+$/, "");
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.newDocContent = e.target.result || '';
+      };
+      reader.readAsText(file);
+    },
+    async submitMemoryUpload() {
+      if (!this.newDocTitle.trim() || !this.newDocContent.trim() || this.isUploadingMemory) return;
+      this.isUploadingMemory = true;
+      try {
+        await axios.post(`${API_BASE}/api/chat/memory/upload`, {
+          title: this.newDocTitle.trim(),
+          category: this.newDocCategory,
+          content: this.newDocContent.trim(),
+          fileName: this.newDocFileName || 'Knowledge Document'
+        });
+        this.newDocTitle = '';
+        this.newDocContent = '';
+        this.newDocFileName = '';
+        await this.fetchMemoryItems();
+      } catch (e) {
+        alert("Xotiraga yuklashda xatolik: " + (e.response?.data?.error || e.message));
+      } finally {
+        this.isUploadingMemory = false;
+      }
+    },
+    async deleteMemoryCard(id) {
+      try {
+        await axios.delete(`${API_BASE}/api/chat/memory/items/${id}`);
+        await this.fetchMemoryItems();
+      } catch (e) {}
+    },
+    queryAiAboutMemory(item) {
+      this.activeViewMode = 'chat';
+      this.inputQuery = `"${item.title}" xotira hujjati bo'yicha tahlil bering va undagi sotuv logikalarini tushuntiring.`;
+    },
     adjustTextareaHeight() {
       nextTick(() => {
         const el = this.$refs.inputQueryRef;

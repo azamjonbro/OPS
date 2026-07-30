@@ -11,4 +11,8 @@ router.post('/message', chatController.sendMessage);
 router.post('/voice-message', chatController.sendVoiceMessage);
 router.post('/transcribe-audio', chatController.transcribeAudio);
 
+router.get('/memory/items', chatController.getMemoryItems);
+router.post('/memory/upload', chatController.uploadMemoryItem);
+router.delete('/memory/items/:id', chatController.deleteMemoryItem);
+
 module.exports = router;

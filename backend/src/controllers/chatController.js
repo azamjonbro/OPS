@@ -236,13 +236,58 @@ const transcribeAudio = async (req, res) => {
   res.json({ success: true, transcribedText });
 };
 
+const getMemoryItems = async (req, res) => {
+  try {
+    const OwnerMemory = require('../models/ownerMemoryModel');
+    const items = await OwnerMemory.find().sort({ updatedAt: -1 }).lean();
+    res.json({ success: true, items });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const uploadMemoryItem = async (req, res) => {
+  try {
+    const OwnerMemory = require('../models/ownerMemoryModel');
+    const { title, category, content, fileName } = req.body || {};
+    if (!title || !content) {
+      return res.status(400).json({ success: false, error: "Sarlavha va matn kiritilishi shart." });
+    }
+    const key = `knowledge-${Date.now()}`;
+    const newItem = await OwnerMemory.create({
+      key,
+      category: category || 'knowledge',
+      title,
+      content,
+      metadata: { fileName: fileName || 'Document', uploadedAt: new Date() }
+    });
+    res.json({ success: true, item: newItem });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const deleteMemoryItem = async (req, res) => {
+  try {
+    const OwnerMemory = require('../models/ownerMemoryModel');
+    const { id } = req.params;
+    await OwnerMemory.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   getConversations,
-  getMessages,
   createConversation,
-  deleteConversation,
   clearAllConversations,
+  deleteConversation,
+  getMessages,
   sendMessage,
   sendVoiceMessage,
-  transcribeAudio
+  transcribeAudio,
+  getMemoryItems,
+  uploadMemoryItem,
+  deleteMemoryItem
 };
