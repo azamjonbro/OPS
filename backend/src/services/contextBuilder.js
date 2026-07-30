@@ -12,12 +12,36 @@ class ContextBuilder {
       ownerProfile: null
     };
 
-    // 1. Fetch Persistent Memory & Owner Profile from MongoDB
+    // 1. Fetch Persistent Memory & Owner Profile from MongoDB (General + Targeted Search)
     try {
       const profile = await OwnerMemory.findOne({ key: 'owner-personality-profile' }).lean();
       if (profile) contextData.ownerProfile = profile;
-      const memories = await OwnerMemory.find({ key: { $ne: 'owner-personality-profile' } }).limit(10).lean();
-      contextData.persistentMemory = memories.map(m => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
+
+      // Extract search term from quotes or prompt
+      const match = userMessage.match(/"([^"]+)"/);
+      const cleanTerm = match ? match[1] : userMessage.replace(/xotira hujjati.*/i, '').trim();
+
+      let matchedMemories = [];
+      if (cleanTerm && cleanTerm.length > 2) {
+        matchedMemories = await OwnerMemory.find({
+          key: { $ne: 'owner-personality-profile' },
+          $or: [
+            { title: { $regex: cleanTerm, $options: 'i' } },
+            { content: { $regex: cleanTerm, $options: 'i' } }
+          ]
+        }).limit(5).lean();
+      }
+
+      if (matchedMemories.length > 0) {
+        contextData.executedTools.push({
+          tool: 'mongo_memory_search',
+          label: 'Found Stored Knowledge in MongoDB Memory',
+          result: { count: matchedMemories.length, items: matchedMemories }
+        });
+      }
+
+      const allMemories = await OwnerMemory.find({ key: { $ne: 'owner-personality-profile' } }).sort({ updatedAt: -1 }).limit(15).lean();
+      contextData.persistentMemory = allMemories.map(m => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
     } catch (e) {}
 
     // 2. Fetch Relevant Chat History from MongoDB
