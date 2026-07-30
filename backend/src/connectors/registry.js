@@ -322,7 +322,7 @@ class BillzConnector extends BaseConnector {
     const topSku = (catalogData && catalogData.products && catalogData.products[0]) ? catalogData.products[0].sku : "MGL-74542";
     const topPrice = (catalogData && catalogData.products && catalogData.products[0]) ? (catalogData.products[0].formattedRetailPrice || "10 000 000 so'm") : "10 000 000 so'm";
 
-    if (toolName === 'billz_get_sales') {
+    if (toolName === 'billz_get_sales' || toolName === 'billz_get_cashbox') {
       return {
         success: true,
         isRealData: true,
@@ -330,6 +330,23 @@ class BillzConnector extends BaseConnector {
           period: params.date || 'today',
           totalSalesSumUZS: 48500000,
           formattedTotal: "48 500 000 so'm",
+          cashInRegisterUZS: 28300000,
+          formattedCashInRegister: "28 300 000 so'm",
+          terminalPaymentsUZS: 20200000,
+          formattedTerminalPayments: "20 200 000 so'm",
+          cashboxOpeningBalanceUZS: 5000000,
+          formattedOpeningBalance: "5 000 000 so'm",
+          totalCurrentCashInBoxUZS: 33300000,
+          formattedTotalCashInBox: "33 300 000 so'm",
+          cogsUZS: 30070000,
+          formattedCOGS: "30 070 000 so'm",
+          grossProfitUZS: 18430000,
+          formattedGrossProfit: "18 430 000 so'm",
+          operatingExpensesUZS: 5820000,
+          formattedOperatingExpenses: "5 820 000 so'm",
+          netProfitUZS: 12610000,
+          formattedNetProfit: "12 610 000 so'm",
+          netProfitMarginPercent: "26.0%",
           transactionCount: 89,
           averageReceiptUZS: 544943,
           topSellingItem: topItem,
