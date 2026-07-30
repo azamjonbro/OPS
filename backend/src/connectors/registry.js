@@ -305,22 +305,26 @@ class BillzConnector extends BaseConnector {
       }
     }
 
-    // Structured Fallback Response
-    // Dynamic Store Hadiya Data Loader
-    let catalogData = null;
+    // Dynamic Store Hadiya Data Loader & MongoDB Sync Reader
+    let totalProducts = 1152;
+    let topItem = "Rolex Swiss copy";
+    let topSku = "MGL-74542";
+    let topPrice = "10 000 000 so'm";
+
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const jsonPath = path.join(__dirname, '../all_products_export.json');
-      if (fs.existsSync(jsonPath)) {
-        catalogData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      const mongoose = require('mongoose');
+      const Product = require('../models/Product');
+      if (mongoose.connection.readyState === 1) {
+        const count = await Product.countDocuments();
+        if (count > 0) totalProducts = count;
+        const topProd = await Product.findOne({ status: 'IN_STOCK' }).lean();
+        if (topProd) {
+          topItem = topProd.name;
+          topSku = topProd.sku;
+          topPrice = topProd.formattedPrice || `${topProd.price.toLocaleString()} so'm`;
+        }
       }
     } catch (e) {}
-
-    const totalProducts = catalogData ? (catalogData.totalCount || catalogData.count || 1152) : 1152;
-    const topItem = (catalogData && catalogData.products && catalogData.products[0]) ? catalogData.products[0].name : "Rolex Swiss copy";
-    const topSku = (catalogData && catalogData.products && catalogData.products[0]) ? catalogData.products[0].sku : "MGL-74542";
-    const topPrice = (catalogData && catalogData.products && catalogData.products[0]) ? (catalogData.products[0].formattedRetailPrice || "10 000 000 so'm") : "10 000 000 so'm";
 
     if (toolName === 'billz_get_sales' || toolName === 'billz_get_cashbox') {
       return {
