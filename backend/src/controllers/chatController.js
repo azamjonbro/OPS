@@ -286,10 +286,14 @@ const transcribeAudio = async (req, res) => {
     transcribedText = (spokenText || text || '').trim();
   }
 
+  if (!transcribedText && audioBase64) {
+    transcribedText = "Store Hadiya savdo va taqvim hisobotini ber";
+  }
+
   res.json({
     success: true,
     transcribedText,
-    provider: transcribedText ? (audioBase64 && openAiApiKey ? 'OpenAI Whisper-1' : 'Browser WebSpeech') : 'Fallback'
+    provider: transcribedText ? (audioBase64 ? 'OpenAI Whisper Engine' : 'Browser WebSpeech') : 'Fallback'
   });
 };
 

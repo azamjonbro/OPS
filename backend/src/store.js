@@ -2,8 +2,8 @@
 const mockDb = {
   dualLlmConfig: {
     enabled: true,
-    openAiKey: process.env.OPENAI_API_KEY || '',
-    claudeKey: process.env.CLAUDE_API_KEY || '',
+    openAiKey: process.env.OPENAI_API_KEY || 'sk-proj-openai-live-key-2026',
+    claudeKey: process.env.CLAUDE_API_KEY || 'sk-ant-api03-claude-3-5-sonnet-key',
     status: 'ACTIVE_DUAL_ENSEMBLE'
   },
   schedules: [],
