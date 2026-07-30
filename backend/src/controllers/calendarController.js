@@ -7,32 +7,91 @@ const connectorRegistry = require('../connectors/registry');
 const getEvents = async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
-      const dbEvents = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
-      if (dbEvents && dbEvents.length > 0) {
-        return res.json(dbEvents.map(e => ({
-          id: e._id.toString(),
-          title: e.title,
-          description: e.description,
-          startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
-          endDate: e.endDate ? new Date(e.endDate).toISOString().split('T')[0] : '',
-          startTime: e.startTime,
-          endTime: e.endTime,
-          priority: e.priority,
-          category: e.category,
-          status: e.status,
-          createdBy: e.createdBy,
-          source: e.source,
-          googleCalendarSynced: e.googleCalendarSynced,
-          createdAt: e.createdAt,
-          updatedAt: e.updatedAt
-        })));
+      let dbEvents = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
+      
+      // If MongoDB is empty, seed initial enterprise events directly into MongoDB database
+      if (!dbEvents || dbEvents.length === 0) {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        const dayAfter = new Date(today);
+        dayAfter.setDate(today.getDate() + 2);
+
+        const seedItems = [
+          {
+            title: 'Store Hadiya POS Inventory & Sales Audit',
+            description: 'Haftalik POS kassa va inventarizatsiya natijalarini Billz integratsiyasi orqali audit qilish.',
+            startDate: today,
+            endDate: today,
+            startTime: '10:00',
+            endTime: '11:30',
+            priority: 'High',
+            category: 'Work',
+            status: 'In Progress',
+            createdBy: 'Azamjon (Store Hadiya)',
+            source: 'AI',
+            googleCalendarSynced: true
+          },
+          {
+            title: 'Client Presentation & SwissWatch Strategy',
+            description: 'Mijozlar bilan yangi sotuv va CRM strategiyasi bo\'yicha taqdimot va kelishuv.',
+            startDate: tomorrow,
+            endDate: tomorrow,
+            startTime: '14:00',
+            endTime: '15:30',
+            priority: 'Urgent',
+            category: 'Meeting',
+            status: 'Pending',
+            createdBy: 'Azamjon (Store Hadiya)',
+            source: 'AI',
+            googleCalendarSynced: true
+          },
+          {
+            title: 'Server Infra & Database Migration',
+            description: 'Backend MongoDB klasterini va Node.js server nusxalarini yangilash.',
+            startDate: dayAfter,
+            endDate: dayAfter,
+            startTime: '17:00',
+            endTime: '18:30',
+            priority: 'High',
+            category: 'Deadline',
+            status: 'Pending',
+            createdBy: 'Azamjon (Store Hadiya)',
+            source: 'AI',
+            googleCalendarSynced: false
+          }
+        ];
+        dbEvents = await CalendarEvent.insertMany(seedItems);
       }
+
+      const formatted = dbEvents.map(e => ({
+        id: e._id.toString(),
+        title: e.title,
+        description: e.description,
+        startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+        endDate: e.endDate ? new Date(e.endDate).toISOString().split('T')[0] : '',
+        startTime: e.startTime,
+        endTime: e.endTime,
+        priority: e.priority,
+        category: e.category,
+        status: e.status,
+        createdBy: e.createdBy,
+        source: e.source,
+        googleCalendarSynced: e.googleCalendarSynced,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt
+      }));
+
+      // Sync in-memory store with MongoDB database
+      mockDb.calendarEvents = formatted;
+
+      return res.json(formatted);
     }
   } catch (e) {
     console.error('Error fetching calendar events from MongoDB:', e.message);
   }
 
-  // Fallback to in-memory store
+  // Fallback to in-memory store if DB offline
   return res.json(mockDb.calendarEvents || []);
 };
 

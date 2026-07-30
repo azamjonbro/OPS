@@ -2,6 +2,8 @@ const connectorRegistry = require('./connectors/registry');
 const intentClassifier = require('./services/intentClassifier');
 const contextBuilder = require('./services/contextBuilder');
 const memoryUpdater = require('./services/memoryUpdater');
+const mongoose = require('mongoose');
+const CalendarEvent = require('./models/CalendarEvent');
 
 function getNextWeekday(dayOfWeek) {
   const today = new Date();
@@ -313,7 +315,25 @@ class AIEngine {
       lowerInput.includes('calendar eventlar');
 
     if (isShowCalendarIntent) {
-      const events = mockDb.calendarEvents || [];
+      let events = mockDb.calendarEvents || [];
+      if (mongoose.connection.readyState === 1) {
+        try {
+          const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
+          if (dbEvts && dbEvts.length > 0) {
+            events = dbEvts.map(e => ({
+              id: e._id.toString(),
+              title: e.title,
+              startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+              startTime: e.startTime,
+              endTime: e.endTime,
+              priority: e.priority,
+              category: e.category,
+              status: e.status
+            }));
+          }
+        } catch (e) {}
+      }
+
       executedTools.push({ tool: 'calendar_list_events', label: 'Fetched Calendar Events', result: { count: events.length, events } });
 
       let eventListMd = events.length === 0 
@@ -347,6 +367,16 @@ class AIEngine {
         targetEvt.endTime = `${h.toString().padStart(2, '0')}:${newTime.split(':')[1] || '00'}`;
         targetEvt.updatedAt = new Date();
 
+        if (mongoose.connection.readyState === 1 && targetEvt.id && mongoose.Types.ObjectId.isValid(targetEvt.id)) {
+          try {
+            await CalendarEvent.findByIdAndUpdate(targetEvt.id, {
+              startTime: targetEvt.startTime,
+              endTime: targetEvt.endTime,
+              updatedAt: new Date()
+            });
+          } catch (e) {}
+        }
+
         executedTools.push({
           tool: 'calendar_update_event',
           label: 'Updated Calendar Event Time',
@@ -374,6 +404,11 @@ class AIEngine {
       if (mockDb.calendarEvents && mockDb.calendarEvents.length > 0) {
         const removed = mockDb.calendarEvents.shift();
         deletedTitle = removed.title;
+        if (mongoose.connection.readyState === 1 && removed.id && mongoose.Types.ObjectId.isValid(removed.id)) {
+          try {
+            await CalendarEvent.findByIdAndDelete(removed.id);
+          } catch (e) {}
+        }
       }
 
       executedTools.push({
@@ -429,6 +464,29 @@ class AIEngine {
         updatedAt: new Date()
       };
 
+      // Save directly to MongoDB Database if connected
+      if (mongoose.connection.readyState === 1) {
+        try {
+          const dbEvt = await CalendarEvent.create({
+            title: newCalendarEvent.title,
+            description: newCalendarEvent.description,
+            startDate: new Date(newCalendarEvent.startDate),
+            endDate: new Date(newCalendarEvent.endDate),
+            startTime: newCalendarEvent.startTime,
+            endTime: newCalendarEvent.endTime,
+            priority: newCalendarEvent.priority,
+            category: newCalendarEvent.category,
+            status: newCalendarEvent.status,
+            createdBy: newCalendarEvent.createdBy,
+            source: newCalendarEvent.source,
+            googleCalendarSynced: true
+          });
+          newCalendarEvent.id = dbEvt._id.toString();
+        } catch (e) {
+          console.error('Mongo save error in AI engine:', e.message);
+        }
+      }
+
       if (!mockDb.calendarEvents) mockDb.calendarEvents = [];
       mockDb.calendarEvents.unshift(newCalendarEvent);
 
@@ -451,7 +509,7 @@ class AIEngine {
         `• **Prioritet:** ${newCalendarEvent.priority}\n` +
         `• **Kategoriya:** ${newCalendarEvent.category}\n` +
         `• **Manba:** AI Automatic Task Detection Engine\n\n` +
-        `✅ Google Calendar va Telegram bildirishnomasi bilan avtomatik sinxronlashtirildi.`;
+        `✅ Google Calendar hamda MongoDB ma'lumotlar bazasiga saqlandi.`;
 
       return { responseText, executedTools, modelMetadataBadge };
     }

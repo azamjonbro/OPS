@@ -105,11 +105,11 @@ export class SpeechService {
         if (this.shouldBeListening) {
           setTimeout(() => {
             try {
-              if (this.shouldBeListening && this.speechRecognition) {
-                this.speechRecognition.start();
+              if (this.shouldBeListening) {
+                this.start();
               }
             } catch (err) {}
-          }, 200);
+          }, 150);
         }
       };
 
