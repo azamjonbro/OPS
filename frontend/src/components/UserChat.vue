@@ -713,23 +713,76 @@
           </button>
         </div>
 
-        <!-- User Preferences -->
+        <!-- User Preferences & Owner Personality Persona -->
         <div class="space-y-4 text-xs">
+          <!-- Executive Name / Title -->
           <div>
-            <label class="block font-bold text-gray-300 mb-1.5">Ovozli Tanib Olish Tili (Speech Language)</label>
-            <select v-model="selectedVoiceLang" @change="saveUserLang" class="w-full bg-[#161820] border border-[#222632] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+            <label class="block font-bold text-gray-300 mb-1">Mening Ismim / Unvonim (Owner Profile Title)</label>
+            <input 
+              v-model="ownerTitle" 
+              type="text" 
+              placeholder="masalan: Azamjon (Store Hadiya & Hadiya Agency CEO)..." 
+              class="w-full bg-[#161820] border border-[#222632] rounded-xl px-3.5 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <!-- Personality Character Rules Textarea -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-bold text-gray-300">Mening Xarakterim va Muloqot Qoidalarim</label>
+              <span v-if="ownerProfileSavedBadge" class="text-[10px] text-emerald-400 font-bold font-mono animate-bounce">✓ Xotiraga Saqlandi!</span>
+            </div>
+            <textarea 
+              v-model="ownerCharacterPrompt" 
+              rows="4" 
+              placeholder="Men qisqa, aniq, faktlar va raqamlar bilan gapiradigan insonman. Ortqcha emotsiya va xushomad kerak emas..." 
+              class="w-full bg-[#161820] border border-[#222632] rounded-xl px-3.5 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none font-sans leading-relaxed"
+            ></textarea>
+          </div>
+
+          <!-- Presets Chips -->
+          <div>
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tezkor Xarakter Shablonlari:</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button 
+                @click="applyCharacterPreset('Mening xarakterim: Men qisqa, aniq, faktlar va raqamlar bilan gapiradigan insonman. Ortqcha emotsiya va xushomad kerak emas. Aniq yechim taklif qil.')" 
+                class="px-2.5 py-1 rounded-lg bg-[#1A1D26] hover:bg-[#252936] text-indigo-300 border border-indigo-500/20 text-[10px] font-semibold transition"
+              >
+                ⚡ Qisqa & Faktlar Bilan
+              </button>
+              <button 
+                @click="applyCharacterPreset('Mening xarakterim: Men analitik, moliyaviy raqamlarga, konversiya va ROI ko\'rsatkichlariga birinchi o\'rinda e\'tibor beruvchi biznes egasiman.')" 
+                class="px-2.5 py-1 rounded-lg bg-[#1A1D26] hover:bg-[#252936] text-purple-300 border border-purple-500/20 text-[10px] font-semibold transition"
+              >
+                📊 Analitik & Raqamlar Bilan
+              </button>
+              <button 
+                @click="applyCharacterPreset('Mening xarakterim: Men CTO va COO darajasidagi texnik va operatsion ijrochiman. Menga darhol tayyor action-plan va arxitektura taqdim qil.')" 
+                class="px-2.5 py-1 rounded-lg bg-[#1A1D26] hover:bg-[#252936] text-emerald-300 border border-emerald-500/20 text-[10px] font-semibold transition"
+              >
+                🧠 CTO / COO Ijrochi Uslubi
+              </button>
+            </div>
+          </div>
+
+          <!-- Save Owner Profile Button -->
+          <button 
+            @click="saveOwnerProfile" 
+            :disabled="isSavingOwnerProfile" 
+            class="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md transition flex items-center justify-center gap-2"
+          >
+            <span v-if="isSavingOwnerProfile">Saqlanmoqda...</span>
+            <span v-else>💾 Xarakter va Profilni AI Xotirasiga Saqlash</span>
+          </button>
+
+          <!-- Voice Recognition Language Picker -->
+          <div class="pt-2 border-t border-[#1F222A]">
+            <label class="block font-bold text-gray-300 mb-1">Ovozli Tanib Olish Tili (Speech Language)</label>
+            <select v-model="selectedVoiceLang" @change="saveUserLang" class="w-full bg-[#161820] border border-[#222632] rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-indigo-500">
               <option value="en-US">English (en-US) - Standard Voice Mode</option>
               <option value="uz-UZ">O'zbekcha (uz-UZ) - O'zbek Tili</option>
               <option value="ru-RU">Русский (ru-RU) - Русский Язык</option>
             </select>
-          </div>
-
-          <div class="p-3.5 rounded-2xl bg-[#161820] border border-[#222632] space-y-2">
-            <div class="font-bold text-white flex items-center justify-between">
-              <span>Do'kon Ulanishi Statusi</span>
-              <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono font-bold">ONLINE</span>
-            </div>
-            <p class="text-gray-400 text-[11px]">Store Hadiya POS - 1,152 ta mahsulot bazasi bilan sinxronlangan.</p>
           </div>
 
           <div class="pt-2 flex items-center justify-between border-t border-[#1F222A]">
