@@ -23,6 +23,9 @@ app.use(express.json({ limit: '50mb' }));
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ai_workspace';
 
+// Services
+const billzSyncService = require('./services/billzSyncService');
+
 // Connect to MongoDB
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
   .then(async () => {
@@ -33,8 +36,14 @@ mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
         Schedule.deleteMany({ title: { $in: ['Daily Billz POS Sales Summary', 'Morning Meeting & Agenda Briefing'] } })
       ]);
     } catch (e) {}
+
+    // Start Daily Automated Billz POS -> MongoDB Synchronization
+    billzSyncService.startDailyCronJob();
   })
-  .catch(() => console.log('ℹ️ MongoDB URI offline - Operating with high-performance In-Memory DB Store'));
+  .catch(() => {
+    console.log('ℹ️ MongoDB URI offline - Operating with high-performance In-Memory DB Store');
+    billzSyncService.startDailyCronJob();
+  });
 
 // Mount API Routers
 app.use('/api/chat', chatRoutes);
