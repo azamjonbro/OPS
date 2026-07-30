@@ -89,38 +89,40 @@ class ContextBuilder {
       contextData.chatHistory = recentLogs.reverse().map(h => `${h.role === 'user' ? 'User' : 'Assistant'} [${new Date(h.timestamp).toLocaleTimeString()}]: "${h.content}"`);
     } catch (e) {}
 
-    // 3. Central Server Orchestration: Trigger Notion, Billz, Email, Schedule based on query terms & intent
+    // 3. Central Server Orchestration: Trigger Notion, Billz, Email, Schedule
     const textLower = userMessage.toLowerCase();
 
     // Notion Workspace Query (pages, projects, documents, tasks)
-    if (intent === 'documentation' || intent === 'project' || textLower.includes('notion') || textLower.includes('sahifa') || textLower.includes('loyiha') || textLower.includes('hujjat') || textLower.includes('task')) {
+    const isNotionRelevant = intent === 'documentation' || intent === 'project' || textLower.includes('notion') || textLower.includes('sahifa') || textLower.includes('loyiha') || textLower.includes('hujjat') || textLower.includes('task') || textLower.includes('kitob') || textLower.includes('tahlil') || textLower.includes('ma\'lumot');
+    if (isNotionRelevant) {
       const notionRes = await connectorRegistry.executeTool('notion_search_workspace', { query: userMessage });
       if (notionRes && notionRes.success) {
-        contextData.executedTools.push({ tool: 'notion_search_workspace', label: 'Notion Workspace Data', result: notionRes.data });
+        contextData.executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
       }
     }
 
     // Billz POS Live Data Query (sales, products, warehouse, stock, revenue)
-    if (intent === 'sales' || intent === 'inventory' || textLower.includes('billz') || textLower.includes('savdo') || textLower.includes('ombor') || textLower.includes('mahsulot') || textLower.includes('tushum') || textLower.includes('tovar')) {
+    const isBillzRelevant = intent === 'sales' || intent === 'inventory' || textLower.includes('billz') || textLower.includes('savdo') || textLower.includes('ombor') || textLower.includes('mahsulot') || textLower.includes('tushum') || textLower.includes('tovar') || textLower.includes('hisobot') || textLower.includes('pos');
+    if (isBillzRelevant) {
       const billzRes = await connectorRegistry.executeTool('billz_get_sales_report', {});
       if (billzRes && billzRes.success) {
-        contextData.executedTools.push({ tool: 'billz_get_sales_report', label: 'Billz POS Live Sales Data', result: billzRes.data });
+        contextData.executedTools.push({ tool: 'billz_get_sales_report', label: 'Fetched Billz POS Sales & Product Data', result: billzRes.data });
       }
     }
 
     // Email Dispatcher Query (mail, email, pochta)
-    if (textLower.includes('email') || textLower.includes('pochta') || textLower.includes('mail')) {
+    if (textLower.includes('email') || textLower.includes('pochta') || textLower.includes('mail') || textLower.includes('xabar yubor')) {
       const emailRes = await connectorRegistry.executeTool('gmail_send_email', { to: 'admin@hadiya.uz', subject: 'Report Update', body: userMessage });
       if (emailRes && emailRes.success) {
-        contextData.executedTools.push({ tool: 'gmail_send_email', label: 'Email Dispatcher Notification', result: emailRes.data });
+        contextData.executedTools.push({ tool: 'gmail_send_email', label: 'Email Dispatcher Notification Status', result: emailRes.data });
       }
     }
 
-    // Calendar / Schedule Query (meeting, schedule, reja, eslatma)
-    if (intent === 'calendar' || textLower.includes('calendar') || textLower.includes('meeting') || textLower.includes('eslat') || textLower.includes('reja')) {
+    // Schedule / Calendar Query (meeting, schedule, reja, eslatma, avtomatlashtirish)
+    if (intent === 'calendar' || textLower.includes('calendar') || textLower.includes('meeting') || textLower.includes('eslat') || textLower.includes('reja') || textLower.includes('schedule') || textLower.includes('avtomat')) {
       const calRes = await connectorRegistry.executeTool('google_calendar_list_events', {});
       if (calRes && calRes.success) {
-        contextData.executedTools.push({ tool: 'google_calendar_list_events', label: 'Google Calendar Events', result: calRes.data });
+        contextData.executedTools.push({ tool: 'google_calendar_list_events', label: 'Google Calendar Events & Automations', result: calRes.data });
       }
     }
 
