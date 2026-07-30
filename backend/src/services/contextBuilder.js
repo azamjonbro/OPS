@@ -8,12 +8,15 @@ class ContextBuilder {
       intent,
       persistentMemory: [],
       chatHistory: [],
-      executedTools: []
+      executedTools: [],
+      ownerProfile: null
     };
 
-    // 1. Fetch Persistent Memory from MongoDB
+    // 1. Fetch Persistent Memory & Owner Profile from MongoDB
     try {
-      const memories = await OwnerMemory.find().limit(10).lean();
+      const profile = await OwnerMemory.findOne({ key: 'owner-personality-profile' }).lean();
+      if (profile) contextData.ownerProfile = profile;
+      const memories = await OwnerMemory.find({ key: { $ne: 'owner-personality-profile' } }).limit(10).lean();
       contextData.persistentMemory = memories.map(m => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
     } catch (e) {}
 

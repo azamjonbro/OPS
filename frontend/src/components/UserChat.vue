@@ -796,6 +796,12 @@ export default {
       newDocFileName: '',
       isUploadingMemory: false,
 
+      // Owner Personality Persona States
+      ownerTitle: 'Azamjon (Store Hadiya CEO)',
+      ownerCharacterPrompt: "Mening xarakterim: Men qisqa, aniq, faktlar va raqamlar bilan gapiradigan insonman. Ortqcha emotsiya va xushomad kerak emas. Biznes qarorlarini darhol taklif qil va muammolarni yechishga yo'naltirilgan bo'l.",
+      isSavingOwnerProfile: false,
+      ownerProfileSavedBadge: false,
+
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
       selectedVoiceLang: 'en-US',

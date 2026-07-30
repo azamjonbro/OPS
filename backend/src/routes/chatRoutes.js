@@ -15,4 +15,7 @@ router.get('/memory/items', chatController.getMemoryItems);
 router.post('/memory/upload', chatController.uploadMemoryItem);
 router.delete('/memory/items/:id', chatController.deleteMemoryItem);
 
+router.get('/owner/profile', chatController.getOwnerProfile);
+router.post('/owner/profile', chatController.saveOwnerProfile);
+
 module.exports = router;

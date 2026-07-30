@@ -278,6 +278,42 @@ const deleteMemoryItem = async (req, res) => {
   }
 };
 
+const getOwnerProfile = async (req, res) => {
+  try {
+    const OwnerMemory = require('../models/ownerMemoryModel');
+    let profile = await OwnerMemory.findOne({ key: 'owner-personality-profile' }).lean();
+    if (!profile) {
+      profile = {
+        title: "Azamjon (Store Hadiya CEO)",
+        content: "Mening xarakterim: Men qisqa, aniq, faktlar va raqamlar bilan gapiradigan insonman. Ortqcha emotsiya va xushomad kerak emas. Biznes qarorlarini darhol taklif qil va muammolarni yechishga yo'naltirilgan bo'l."
+      };
+    }
+    res.json({ success: true, profile });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const saveOwnerProfile = async (req, res) => {
+  try {
+    const OwnerMemory = require('../models/ownerMemoryModel');
+    const { title, content } = req.body || {};
+    const updated = await OwnerMemory.findOneAndUpdate(
+      { key: 'owner-personality-profile' },
+      { 
+        category: 'owner',
+        title: title || "Azamjon (Store Hadiya CEO)",
+        content: content || '',
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, profile: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   getConversations,
   createConversation,
@@ -289,5 +325,7 @@ module.exports = {
   transcribeAudio,
   getMemoryItems,
   uploadMemoryItem,
-  deleteMemoryItem
+  deleteMemoryItem,
+  getOwnerProfile,
+  saveOwnerProfile
 };
