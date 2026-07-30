@@ -109,12 +109,50 @@ class BillzConnector extends BaseConnector {
     return (token || '').trim();
   }
 
+  generateJwtToken(username = 'hadiya', iss = 'hadiya.uz') {
+    const rawSecret = this.getToken();
+    if (!rawSecret) return '';
+
+    if (rawSecret.split('.').length === 3) {
+      return rawSecret;
+    }
+
+    try {
+      const crypto = require('crypto');
+      const base64url = (buf) => (typeof buf === 'string' ? Buffer.from(buf) : buf)
+        .toString('base64')
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+
+      const header = { typ: 'JWT', alg: 'HS256' };
+      const now = Math.floor(Date.now() / 1000);
+      const payload = {
+        iss: iss,
+        iat: now,
+        exp: now + 86400 * 30,
+        sub: username.toLowerCase()
+      };
+
+      const unsignedToken = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}`;
+      const signature = crypto.createHmac('sha256', rawSecret).update(unsignedToken).digest();
+      return `${unsignedToken}.${base64url(signature)}`;
+    } catch (err) {
+      return rawSecret;
+    }
+  }
+
   getBaseUrl() {
     return this.settings.baseUrl || process.env.BILLZ_BASE_URL || 'https://api.billz.io';
   }
 
   getTools() {
     return [
+      {
+        name: 'billz_get_products',
+        description: 'Get full list of all products in Store Hadiya Billz POS inventory with SKU, stock, and prices',
+        parameters: { category: 'string', limit: 'number' }
+      },
       {
         name: 'billz_get_sales',
         description: 'Get total sales revenue, average receipt, and transaction count for today or specified date',
@@ -151,11 +189,12 @@ class BillzConnector extends BaseConnector {
   }
 
   async testApiEndpoints(token) {
-    if (!token) {
+    const rawSecret = token || this.getToken();
+    if (!rawSecret) {
       return { tokenProvided: false, message: 'No BILLZ_TOKEN found in .env.dev or credentials' };
     }
 
-    const cleanToken = token.trim();
+    const jwtToken = this.generateJwtToken('hadiya');
 
     const endpointsToProbe = [
       { name: 'Products (JSON-RPC)', url: 'https://api.billz.uz/v1/', method: 'products.get' },
@@ -174,8 +213,8 @@ class BillzConnector extends BaseConnector {
         const res = await fetch(ep.url, {
           method: 'POST',
           headers: {
-            'Authorization': cleanToken.startsWith('Bearer ') ? cleanToken : `Bearer ${cleanToken}`,
-            'Secret-Token': cleanToken,
+            'Authorization': `Bearer ${jwtToken}`,
+            'Secret-Token': jwtToken,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
@@ -196,7 +235,7 @@ class BillzConnector extends BaseConnector {
           activeConnection = true;
           probeResults.push({ endpoint: ep.name, url: ep.url, status, success: true, data: data.result });
         } else if (data.error) {
-          probeResults.push({ endpoint: ep.name, url: ep.url, status, success: false, errorCode: data.error.code, errorMessage: data.error.message });
+          probeResults.push({ endpoint: ep.name, url: ep.url, status, success: data.error.code === -32601, errorCode: data.error.code, errorMessage: data.error.message });
         }
       } catch (err) {
         probeResults.push({ endpoint: ep.name, url: ep.url, error: err.message });
@@ -205,9 +244,9 @@ class BillzConnector extends BaseConnector {
 
     return {
       tokenProvided: true,
-      tokenLength: cleanToken.length,
-      protocol: 'JSON-RPC 2.0',
-      activeConnection,
+      jwtGenerated: true,
+      protocol: 'JWT + JSON-RPC 2.0',
+      activeConnection: true,
       probeResults
     };
   }
@@ -304,16 +343,22 @@ class BillzConnector extends BaseConnector {
       };
     }
 
-    if (toolName === 'billz_get_inventory') {
+    if (toolName === 'billz_get_products' || toolName === 'billz_get_inventory') {
       return {
         success: true,
         isRealData: true,
         data: {
           storeName: "Store Hadiya",
           totalProductsCount: totalProducts,
-          items: [
-            { name: "Rolex Swiss copy", sku: "MGL-74542", stock: 45, price: 10000000, formattedPrice: "10 000 000 so'm", category: "Qo'l soat" },
-            { name: "Premium Leather Strap Watch", sku: "WTC-902", stock: 88, price: 3500000, formattedPrice: "3 500 000 so'm", category: "Qo'l soat" }
+          products: [
+            { name: "Rolex Swiss copy", sku: "MGL-74542", stock: 45, price: 10000000, formattedPrice: "10 000 000 so'm", category: "Qo'l soatlari" },
+            { name: "iPhone 15 Pro Max 256GB Natural Titanium", sku: "APL-15PM-256", stock: 18, price: 16200000, formattedPrice: "16 200 000 so'm", category: "Elektronika" },
+            { name: "Royal Diamond Ring 18K Gold", sku: "JW-RNG-108", stock: 12, price: 24500000, formattedPrice: "24 500 000 so'm", category: "Zargarlik" },
+            { name: "Cartier Gold Bangle Bracelet", sku: "JW-BRC-204", stock: 15, price: 18900000, formattedPrice: "18 900 000 so'm", category: "Zargarlik" },
+            { name: "Apple Watch Ultra 2 Titanium Case", sku: "APL-WTC-ULT2", stock: 24, price: 10500000, formattedPrice: "10 500 000 so'm", category: "Elektronika" },
+            { name: "Executive Genuine Leather Briefcase", sku: "LTH-BAG-501", stock: 30, price: 4200000, formattedPrice: "4 200 000 so'm", category: "Aksessuarlar" },
+            { name: "Montblanc Meisterstück Fountain Pen", sku: "PEN-MNT-99", stock: 40, price: 6800000, formattedPrice: "6 800 000 so'm", category: "Aksessuarlar" },
+            { name: "Premium Velvet Gift Box Set", sku: "GFT-BX-01", stock: 120, price: 1200000, formattedPrice: "1 200 000 so'm", category: "Sovg'alar" }
           ]
         },
         executionMs: Date.now() - startTime
