@@ -1,4 +1,7 @@
 const connectorRegistry = require('./connectors/registry');
+const intentClassifier = require('./services/intentClassifier');
+const contextBuilder = require('./services/contextBuilder');
+const memoryUpdater = require('./services/memoryUpdater');
 
 class AIEngine {
   constructor() {
@@ -194,6 +197,19 @@ class AIEngine {
       executedTools.push({ tool: 'notion_create_task', label: 'Notion Task Created', result: notionTaskRes.data });
     }
 
+    // V2 Intent Classification & Context Builder Pipeline
+    const intent = intentClassifier.classify(userMessage);
+    const v2Context = await contextBuilder.buildContext(userMessage, intent);
+
+    // Merge tools from intent classifier context builder if present
+    if (v2Context.executedTools && v2Context.executedTools.length > 0) {
+      v2Context.executedTools.forEach(t => {
+        if (!executedTools.some(ex => ex.tool === t.tool)) {
+          executedTools.push(t);
+        }
+      });
+    }
+
     // 5. OpenAI Real API Call (GPT-4o / GPT-4o-mini)
     const openAiApiKey = (this.openAiKey || process.env.OPENAI_API_KEY || '').trim();
     if (openAiApiKey) {
@@ -211,17 +227,15 @@ class AIEngine {
               messages: [
                 {
                   role: 'system',
-                  content: `# STORE HADIYA AI EXECUTIVE ASSISTANT - MASTER OPERATING CONSTITUTION
+                  content: `# STORE HADIYA AI EXECUTIVE ASSISTANT V2 - MASTER OPERATING CONSTITUTION
 
 You are the permanent Executive AI Assistant, Technical Architect, Business Advisor, Personal Knowledge Manager, Product Manager, POS Analyst and Automation Engineer for the Store Hadiya ecosystem.
 Your thinking style is CTO + COO + Executive Assistant. Always think before answering, retrieve live data from tools, and never hallucinate.
 
-MEMORY PRIORITY & STRATEGY:
-1. Persistent User Memory (MongoDB context & profile)
-2. Chat History (Search previous discussions contextually)
-3. Notion Workspace (Read full page blocks, subpages, databases - summarize thoroughly, never just print links)
-4. Billz POS (Fetch live sales, revenue, inventory, stock, receipt statistics - never guess numbers)
-5. OpenAI Reasoning (Only after checking tool data)
+MEMORY PRIORITY & HIERARCHY DATA:
+- Persistent Mongo Memory: ${JSON.stringify(v2Context.persistentMemory || [])}
+- Relevant Chat History: ${JSON.stringify(v2Context.chatHistory || [])}
+- Primary Intent Identified: ${intent.toUpperCase()}
 
 RESPONSE INSTRUCTIONS:
 - Always respond in clean, executive-level markdown in Uzbek (or the language of the prompt).
@@ -240,10 +254,16 @@ RESPONSE INSTRUCTIONS:
             const aiData = await openAiResp.json();
             if (aiData.choices && aiData.choices[0] && aiData.choices[0].message) {
               const realAiText = aiData.choices[0].message.content;
+
+              // Save to ChatHistory & Extract Long-Term Knowledge
+              await memoryUpdater.saveMessage(userMessage, 'user', userMessage, intent, executedTools);
+              await memoryUpdater.saveMessage(userMessage, 'assistant', realAiText, intent, executedTools);
+              await memoryUpdater.extractAndSaveKnowledge(userMessage, realAiText);
+
               return {
                 responseText: realAiText,
                 executedTools,
-                modelMetadataBadge: `🧠 OpenAI ${modelName.toUpperCase()} Live Intelligence`
+                modelMetadataBadge: `🧠 OpenAI ${modelName.toUpperCase()} V2 Executive Intelligence`
               };
             }
           }
