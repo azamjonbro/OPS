@@ -6,11 +6,44 @@ STORE HADIYA - AI EXECUTIVE ASSISTANT & POS WORKSPACE (JARVIS PROJECT SUMMARY)
 --------------------------------------------------------------------------------
 Ushbu loyiha Store Hadiya biznes egasi (Bahodir CEO) uchun mo'ljallangan yagona AI Ijrochi Yordamchi va POS Ishchi Maydoni (Executive Assistant & POS Workspace) hisoblanadi.
 
-Tizim quyidagi asosiy qismlardan iborat:
-- Frontend: Vue 3 + Vite + TailwindCSS (Qorong'u / Dark Mode, Glassmorphism, Modern Gemini Design System).
-- Backend: Node.js + Express.js (MVC Arxitekturasi), MongoDB / Mongoose, RESTful API.
-- AI Engine: Real OpenAI GPT-4o & GPT-4o-mini Chat Completions API integratsiyasi.
-- Tizim Integratsiyalari: Notion Workspace API, Billz POS Tizimi (1,152 ta mahsulot katalogi va savdo hisobotlari), Google Calendar, Telegram Bot.
+Tizim quyidagi Markaziy Server Arxitekturasi (Central Server Orchestration Architecture) bo'yicha ishlaydi:
+
+```
+                  ┌────────────────────────┐
+                  │  user chat panel front │
+                  │  (Vue 3 Frontend)      │
+                  └───────────┬────────────┘
+                              │
+                              ▼
+             ┌──────────────────────────────────┐
+             │       SERVER (Node.js Engine)    │
+             │   Central OpenAI GPT-4o Brain    │
+             └──────┬──────────┬─────────┬──────┘
+                    │          │         │
+                    ▼          ▼         ▼
+            ┌───────────┐ ┌──────────┐ ┌───────────────┐
+            │ schedule  │ │ mongodb  │ │ my data /     │
+            │           │ │          │ │ chat history  │
+            └───────────┘ └──────────┘ └───────┬───────┘
+                                               │
+                                 ┌─────────────┼─────────────┐
+                                 ▼             ▼             ▼
+                            ┌──────────┐  ┌──────────┐  ┌──────────┐
+                            │  notion  │  │  billz   │  │  email   │
+                            └──────────┘  └──────────┘  └──────────┘
+```
+
+⚙️ Markaziy Server Operatsiyalar Oqimi (Server Orchestration Pipeline):
+1. User Chat Panel (Frontend): Foydalanuvchi so'rov yuboradi -> so'rov to'g'ridan-to'g'ri Backend Serverga tushadi.
+2. Server (OpenAI Central Brain):
+   - mongodb: Foydalanuvchi profili, xarakter konstitutsiyasi, xotira hujjatlari va suhbatlar tarixini o'qiydi va saqlaydi.
+   - schedule: Eslatmalar va avtomatlashtirish krontasklarini boshqaradi.
+   - my data / chat history: Maxsus bilimlar bazasidan ma'lumot qidiradi.
+3. Sub-servislar va Integratsiyalar:
+   - notion: Notion ishchi maydonidagi sahifalar va bloklarni o'qiydi va yozadi.
+   - billz: Live Billz POS omboridagi 1,152 ta mahsulot va savdo hisobotlarini oladi.
+   - email: Email xabarnomalar va hisobot xatlarini jo'natadi.
+4. Birlashtirish (Data Aggregation): Server OpenAI gpt-4o intellekti orqali barcha ma'lumotlarni umumlashtirib, foydalanuvchiga professional, ijrochi darajasidagi yakuniy javobni taqdim etadi.
 
 2. BOSH KONSTITUTSIYA VA SISTEMA PROMPTI (OPERATING CONSTITUTION)
 --------------------------------------------------------------------------------
