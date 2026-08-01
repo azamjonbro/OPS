@@ -15,9 +15,9 @@ function readStoredTheme() {
   }
 }
 
-/** 'dark' | 'light'. The stored choice wins; otherwise follow the OS, defaulting dark. */
+/** 'dark' | 'light'. Dark mode is the primary executive theme. */
 export function getTheme() {
-  return readStoredTheme() || (systemPrefersLight() ? 'light' : 'dark');
+  return readStoredTheme() || 'dark';
 }
 
 function applyThemeClass(theme) {
@@ -39,16 +39,9 @@ export function toggleTheme() {
   return next;
 }
 
-/** Applies the resolved theme immediately; call once at app startup. */
+/** Applies the resolved theme immediately; call once at app startup. Default is dark. */
 export function initTheme() {
   applyThemeClass(getTheme());
-
-  // Only react to OS changes while the user hasn't made an explicit choice here.
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
-      if (!readStoredTheme()) applyThemeClass(e.matches ? 'light' : 'dark');
-    });
-  }
 }
 
 export function onThemeChange(fn) {

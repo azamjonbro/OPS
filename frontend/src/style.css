@@ -57,7 +57,12 @@
 
 @layer base {
   body {
-    @apply bg-canvas text-gray-100 transition-colors duration-200;
+    /* `@apply bg-canvas` fails here: Tailwind can't resolve an @apply'd utility built
+       from an extended color that uses the <alpha-value> CSS-variable pattern this
+       early in the stylesheet. Setting it directly sidesteps that resolution order
+       issue; text-gray-100 is a stock (non-extended) color, so @apply is fine for it. */
+    background-color: rgb(var(--color-canvas));
+    @apply text-gray-100 transition-colors duration-200;
   }
 }
 
