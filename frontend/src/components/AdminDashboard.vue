@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-[#0B0C0E] text-gray-100 font-sans flex flex-col">
+  <div class="min-h-screen bg-canvas text-gray-100 font-sans flex flex-col">
     <!-- Header -->
     <header class="h-16 border-b border-white/10 bg-[#121418] px-6 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
       <div class="flex items-center gap-3">
@@ -18,26 +18,26 @@
     </header>
 
     <!-- Sub Header Tabs -->
-    <div class="border-b border-white/5 bg-[#0E1013] px-6 py-2 flex items-center gap-2 text-xs font-medium text-gray-400">
+    <div class="border-b border-white/5 bg-sunken px-6 py-2 flex items-center gap-2 text-xs font-medium text-gray-400">
       <button 
         @click="activeTab = 'integrations'" 
         :class="['px-4 py-2 rounded-xl transition flex items-center gap-2', activeTab === 'integrations' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'hover:bg-white/5 hover:text-white']"
       >
-        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <Icon name="logo" size="md" class="text-indigo-400" />
         Connections Hub ({{ integrations.length }})
       </button>
       <button 
         @click="activeTab = 'models'" 
         :class="['px-4 py-2 rounded-xl transition flex items-center gap-2', activeTab === 'models' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'hover:bg-white/5 hover:text-white']"
       >
-        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        <Icon name="monitor" size="md" class="text-purple-400" />
         Dual AI Models (OpenAI + Claude)
       </button>
       <button 
         @click="activeTab = 'logs'" 
         :class="['px-4 py-2 rounded-xl transition flex items-center gap-2', activeTab === 'logs' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'hover:bg-white/5 hover:text-white']"
       >
-        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <Icon name="file" size="md" class="text-emerald-400" />
         Audit Logs & Analytics
       </button>
     </div>
@@ -46,25 +46,25 @@
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
       <!-- Overview Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="p-4 rounded-2xl bg-[#14161B] border border-white/5 space-y-1">
+        <div class="p-4 rounded-2xl bg-card border border-white/5 space-y-1">
           <div class="text-xs text-gray-400">Active Connectors</div>
           <div class="text-2xl font-bold text-white">{{ stats.connectedIntegrations || 7 }} / {{ stats.totalIntegrations || 7 }}</div>
           <div class="text-[10px] text-emerald-400 flex items-center gap-1"><span>●</span> All Systems Operational</div>
         </div>
 
-        <div class="p-4 rounded-2xl bg-[#14161B] border border-white/5 space-y-1">
+        <div class="p-4 rounded-2xl bg-card border border-white/5 space-y-1">
           <div class="text-xs text-gray-400">Total Tool Invocations</div>
           <div class="text-2xl font-bold text-white">{{ stats.totalAuditLogs || 28 }}</div>
           <div class="text-[10px] text-indigo-400">Realtime MCP Dispatch</div>
         </div>
 
-        <div class="p-4 rounded-2xl bg-[#14161B] border border-white/5 space-y-1">
+        <div class="p-4 rounded-2xl bg-card border border-white/5 space-y-1">
           <div class="text-xs text-gray-400">Database Backend</div>
           <div class="text-2xl font-bold text-white">MongoDB</div>
           <div class="text-[10px] text-gray-400">Mongoose ODM Active</div>
         </div>
 
-        <div class="p-4 rounded-2xl bg-[#14161B] border border-white/5 space-y-1">
+        <div class="p-4 rounded-2xl bg-card border border-white/5 space-y-1">
           <div class="text-xs text-gray-400">AI Ensemble Mode</div>
           <div class="text-xl font-bold text-indigo-400">OpenAI + Claude</div>
           <div class="text-[10px] text-purple-400">Dual Model Active</div>
@@ -84,7 +84,7 @@
           <div 
             v-for="item in integrations" 
             :key="item.type"
-            class="p-5 rounded-2xl bg-[#14161B] border border-white/10 hover:border-indigo-500/40 transition space-y-4 flex flex-col justify-between"
+            class="p-5 rounded-2xl bg-card border border-white/10 hover:border-indigo-500/40 transition space-y-4 flex flex-col justify-between"
           >
             <div class="space-y-2">
               <div class="flex items-center justify-between">
@@ -140,12 +140,12 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">OpenAI API Key</label>
-              <input v-model="dualConfig.openAiKey" type="password" placeholder="sk-proj-..." class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
+              <input v-model="dualConfig.openAiKey" type="password" placeholder="sk-proj-..." class="w-full bg-sunken border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
             </div>
 
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Anthropic Claude API Key</label>
-              <input v-model="dualConfig.claudeKey" type="password" placeholder="sk-ant-api03-..." class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
+              <input v-model="dualConfig.claudeKey" type="password" placeholder="sk-ant-api03-..." class="w-full bg-sunken border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
             </div>
           </div>
 
@@ -155,14 +155,14 @@
           </div>
         </div>
 
-        <div class="bg-[#14161B] border border-white/10 rounded-2xl p-6 space-y-4">
+        <div class="bg-card border border-white/10 rounded-2xl p-6 space-y-4">
           <h2 class="text-base font-semibold text-white">LLM Provider Selection</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <div 
               v-for="m in models" 
               :key="m.id"
               @click="setDefaultModel(m.id)"
-              :class="['p-4 rounded-xl border cursor-pointer transition space-y-2', m.isDefault ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-glow' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-2', m.isDefault ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-glow' : 'bg-sunken border-white/5 text-gray-400 hover:border-white/20']"
             >
               <div class="flex items-center justify-between">
                 <span class="font-semibold text-sm text-white">{{ m.displayName }}</span>
@@ -174,16 +174,16 @@
         </div>
 
         <!-- System Prompt Editor -->
-        <div class="bg-[#14161B] border border-white/10 rounded-2xl p-6 space-y-3">
+        <div class="bg-card border border-white/10 rounded-2xl p-6 space-y-3">
           <h2 class="text-base font-semibold text-white">Active System Prompt & Personality</h2>
-          <textarea rows="4" v-model="systemPrompt" class="w-full bg-[#0E1013] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"></textarea>
+          <textarea rows="4" v-model="systemPrompt" class="w-full bg-sunken border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"></textarea>
           <div class="flex justify-end">
             <button @click="savePrompt" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition">Save System Prompt</button>
           </div>
         </div>
 
         <!-- System Language & Voice Settings -->
-        <div class="bg-[#14161B] border border-white/10 rounded-2xl p-6 space-y-3">
+        <div class="bg-card border border-white/10 rounded-2xl p-6 space-y-3">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-base font-semibold text-white">Tizim Tili va Ovozli Murojaat Sozlamalari (System Language)</h2>
@@ -197,7 +197,7 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
             <div 
               @click="setLanguage('en-US')" 
-              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'en-US' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'en-US' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-sunken border-white/5 text-gray-400 hover:border-white/20']"
             >
               <div class="flex items-center justify-between">
                 <span class="font-bold text-sm text-white">English (US)</span>
@@ -208,7 +208,7 @@
 
             <div 
               @click="setLanguage('uz-UZ')" 
-              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'uz-UZ' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'uz-UZ' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-sunken border-white/5 text-gray-400 hover:border-white/20']"
             >
               <div class="flex items-center justify-between">
                 <span class="font-bold text-sm text-white">O'zbekcha (UZ)</span>
@@ -219,7 +219,7 @@
 
             <div 
               @click="setLanguage('ru-RU')" 
-              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'ru-RU' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-[#0E1013] border-white/5 text-gray-400 hover:border-white/20']"
+              :class="['p-4 rounded-xl border cursor-pointer transition space-y-1', defaultLanguage === 'ru-RU' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-sunken border-white/5 text-gray-400 hover:border-white/20']"
             >
               <div class="flex items-center justify-between">
                 <span class="font-bold text-sm text-white">Русский (RU)</span>
@@ -234,9 +234,9 @@
       <!-- TAB 3: AUDIT LOGS -->
       <div v-else class="space-y-4">
         <h2 class="text-base font-semibold text-white">Realtime Connector Execution Audit Log</h2>
-        <div class="bg-[#14161B] border border-white/10 rounded-2xl overflow-hidden">
+        <div class="bg-card border border-white/10 rounded-2xl overflow-hidden">
           <table class="w-full text-left text-xs text-gray-300">
-            <thead class="bg-[#0E1013] text-gray-400 border-b border-white/10 uppercase tracking-wider font-mono text-[10px]">
+            <thead class="bg-sunken text-gray-400 border-b border-white/10 uppercase tracking-wider font-mono text-[10px]">
               <tr>
                 <th class="p-3">Connector</th>
                 <th class="p-3">Executed Action / Tool</th>

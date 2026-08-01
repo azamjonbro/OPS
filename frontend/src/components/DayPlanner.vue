@@ -1,16 +1,16 @@
 <template>
-  <div class="flex-1 flex flex-col h-full bg-[#0B0C0E] text-gray-100 overflow-hidden">
+  <div class="flex-1 flex flex-col h-full bg-canvas text-gray-100 overflow-hidden">
 
     <!-- PAGE HEADER -->
-    <header class="border-b border-[#1F222A] bg-[#111317]/80 backdrop-blur-xl px-4 sm:px-6 py-4 shrink-0">
+    <header class="border-b border-line bg-surface/80 backdrop-blur-xl px-4 sm:px-6 py-4 shrink-0">
       <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3 min-w-0">
           <button
             @click="$emit('back')"
-            class="p-2 rounded-xl bg-[#1A1D26] hover:bg-[#252936] text-gray-300 hover:text-white transition shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="p-2 rounded-xl bg-muted hover:bg-hover text-gray-300 hover:text-white transition shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             aria-label="Taqvimga qaytish"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            <Icon name="prev" size="md" />
           </button>
 
           <div class="min-w-0">
@@ -23,17 +23,17 @@
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-          <button @click="goToDay(-1)" class="p-2 rounded-xl bg-[#161922] hover:bg-[#1E2330] text-gray-400 hover:text-white transition" aria-label="Oldingi kun">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          <button @click="goToDay(-1)" class="p-2 rounded-xl bg-raised hover:bg-hover text-gray-400 hover:text-white transition" aria-label="Oldingi kun">
+            <Icon name="prev" size="md" />
           </button>
-          <button @click="goToDay(1)" class="p-2 rounded-xl bg-[#161922] hover:bg-[#1E2330] text-gray-400 hover:text-white transition" aria-label="Keyingi kun">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <button @click="goToDay(1)" class="p-2 rounded-xl bg-raised hover:bg-hover text-gray-400 hover:text-white transition" aria-label="Keyingi kun">
+            <Icon name="next" size="md" />
           </button>
           <button
             @click="openCreate('Todo')"
             class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <Icon name="add" size="md" />
             Yangi vazifa
           </button>
         </div>
@@ -41,7 +41,7 @@
 
       <!-- PROGRESS BAR -->
       <div class="max-w-7xl mx-auto mt-4 flex items-center gap-3">
-        <div class="flex-1 h-1.5 rounded-full bg-[#1A1D26] overflow-hidden">
+        <div class="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
             class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out"
             :style="{ width: completionRate + '%' }"
@@ -63,38 +63,38 @@
           class="rounded-2xl border transition-colors duration-200"
           :class="dragOverColumn === col.status
             ? 'border-indigo-500/70 bg-indigo-500/[0.06]'
-            : 'border-[#1F222A] bg-[#111317]'"
+            : 'border-line bg-surface'"
           @dragover.prevent="onColumnDragOver(col.status)"
           @dragleave="onColumnDragLeave(col.status)"
           @drop.prevent="onDrop(col.status, null)"
         >
           <!-- Column header -->
-          <div class="flex items-center justify-between px-4 py-3 border-b border-[#1F222A]">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-line">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full" :class="col.dot"></span>
               <h2 class="text-xs font-bold text-white tracking-wide uppercase">{{ col.label }}</h2>
-              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-[#1A1D26] text-gray-400 tabular-nums">
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-gray-400 tabular-nums">
                 {{ tasksByStatus[col.status].length }}
               </span>
             </div>
             <button
               @click="openCreate(col.status)"
-              class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-300 hover:bg-[#1A1D26] transition"
+              class="p-1.5 rounded-lg text-gray-500 hover:text-indigo-300 hover:bg-muted transition"
               :aria-label="col.label + ' ustuniga vazifa qo\'shish'"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <Icon name="add" size="md" />
             </button>
           </div>
 
           <div class="p-3 space-y-2.5 min-h-[140px]">
             <!-- Skeletons -->
             <template v-if="isLoading">
-              <div v-for="n in 2" :key="'sk' + n" class="rounded-xl border border-[#1F222A] bg-[#14161C] p-3 space-y-2 animate-pulse">
-                <div class="h-3 rounded bg-[#22252E] w-3/4"></div>
-                <div class="h-2 rounded bg-[#1C1F27] w-1/2"></div>
+              <div v-for="n in 2" :key="'sk' + n" class="rounded-xl border border-line bg-card p-3 space-y-2 animate-pulse">
+                <div class="h-3 rounded bg-hover w-3/4"></div>
+                <div class="h-2 rounded bg-sunken w-1/2"></div>
                 <div class="flex gap-2 pt-1">
-                  <div class="h-4 w-12 rounded-md bg-[#1C1F27]"></div>
-                  <div class="h-4 w-16 rounded-md bg-[#1C1F27]"></div>
+                  <div class="h-4 w-12 rounded-md bg-sunken"></div>
+                  <div class="h-4 w-16 rounded-md bg-sunken"></div>
                 </div>
               </div>
             </template>
@@ -110,10 +110,10 @@
                 @dragover.prevent.stop="onCardDragOver(col.status, task)"
                 @drop.prevent.stop="onDrop(col.status, task)"
                 :class="[
-                  'group rounded-xl border bg-[#14161C] p-3 cursor-grab active:cursor-grabbing transition-all duration-200',
+                  'group rounded-xl border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200',
                   draggedTask && draggedTask.id === task.id
                     ? 'opacity-40 scale-[0.98] border-indigo-500/50'
-                    : 'border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#171A22]',
+                    : 'border-line hover:border-indigo-500/40 hover:bg-raised',
                   dropTargetId === task.id ? 'ring-2 ring-indigo-500/60' : ''
                 ]"
               >
@@ -126,7 +126,7 @@
                       : 'border-[#3A3F4F] hover:border-indigo-400'"
                     :aria-label="task.status === 'Done' ? 'Bajarilmagan deb belgilash' : 'Bajarildi deb belgilash'"
                   >
-                    <svg v-if="task.status === 'Done'" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    <Icon v-if="task.status === 'Done'" name="check" size="xs" :stroke-width="3" />
                   </button>
 
                   <div class="min-w-0 flex-1">
@@ -142,14 +142,14 @@
                   </div>
 
                   <div class="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                    <button @click="openEdit(task)" class="p-1 rounded-md text-gray-500 hover:text-indigo-300 hover:bg-[#1F222A] transition" aria-label="Tahrirlash">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <button @click="openEdit(task)" class="p-1 rounded-md text-gray-500 hover:text-indigo-300 hover:bg-line transition" aria-label="Tahrirlash">
+                      <Icon name="edit" size="sm" />
                     </button>
-                    <button @click="archiveTask(task)" class="p-1 rounded-md text-gray-500 hover:text-amber-300 hover:bg-[#1F222A] transition" aria-label="Arxivlash">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                    <button @click="archiveTask(task)" class="p-1 rounded-md text-gray-500 hover:text-amber-300 hover:bg-line transition" aria-label="Arxivlash">
+                      <Icon name="archive" size="sm" />
                     </button>
-                    <button @click="removeTask(task)" class="p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-[#1F222A] transition" aria-label="O'chirish">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <button @click="removeTask(task)" class="p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-line transition" aria-label="O'chirish">
+                      <Icon name="delete" size="sm" />
                     </button>
                   </div>
                 </div>
@@ -159,7 +159,7 @@
                     {{ task.priority }}
                   </span>
                   <span v-if="task.deadline" class="text-[9px] font-mono px-1.5 py-0.5 rounded-md border flex items-center gap-1" :class="deadlineClass(task)">
-                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <Icon name="clock" size="xs" />
                     {{ formatDeadline(task.deadline) }}
                   </span>
                   <span v-if="task.source === 'AI'" class="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30">AI</span>
@@ -170,12 +170,12 @@
                   <button
                     v-if="col.prev"
                     @click="moveTo(task, col.prev)"
-                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-gray-500 hover:text-white hover:bg-[#1F222A] transition"
+                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-gray-500 hover:text-white hover:bg-line transition"
                   >← {{ statusLabel(col.prev) }}</button>
                   <button
                     v-if="col.next"
                     @click="moveTo(task, col.next)"
-                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-gray-500 hover:text-white hover:bg-[#1F222A] transition"
+                    class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-gray-500 hover:text-white hover:bg-line transition"
                   >{{ statusLabel(col.next) }} →</button>
                 </div>
               </article>
@@ -183,7 +183,7 @@
               <!-- Empty state -->
               <div
                 v-if="tasksByStatus[col.status].length === 0"
-                class="rounded-xl border border-dashed border-[#252936] py-8 px-3 text-center"
+                class="rounded-xl border border-dashed border-hover py-8 px-3 text-center"
               >
                 <div class="text-2xl mb-1.5 opacity-40">{{ col.emptyIcon }}</div>
                 <p class="text-[11px] text-gray-500 leading-relaxed">{{ col.emptyText }}</p>
@@ -205,11 +205,11 @@
       class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       @click.self="closeModal"
     >
-      <div class="bg-[#14161C] border border-[#262A36] rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-[#1F222A] pb-3">
+      <div class="bg-card border border-line-strong rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-line pb-3">
           <h3 class="text-base font-bold text-white">{{ editingId ? 'Vazifani tahrirlash' : 'Yangi vazifa' }}</h3>
-          <button @click="closeModal" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-[#1F222A] transition" aria-label="Yopish">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button @click="closeModal" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-line transition" aria-label="Yopish">
+            <Icon name="close" size="lg" />
           </button>
         </div>
 
@@ -222,7 +222,7 @@
               type="text"
               required
               placeholder="Masalan: Yetkazib beruvchiga qo'ng'iroq"
-              class="w-full bg-[#0B0C0E] border border-[#262A36] focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-white outline-none transition"
+              class="w-full bg-canvas border border-line-strong focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-white outline-none transition"
             />
           </div>
 
@@ -232,14 +232,14 @@
               v-model="form.description"
               rows="3"
               placeholder="Qo'shimcha tafsilotlar..."
-              class="w-full bg-[#0B0C0E] border border-[#262A36] focus:border-indigo-500 rounded-xl px-3.5 py-2 text-white outline-none resize-none transition"
+              class="w-full bg-canvas border border-line-strong focus:border-indigo-500 rounded-xl px-3.5 py-2 text-white outline-none resize-none transition"
             ></textarea>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block font-semibold text-gray-300 mb-1">Prioritet</label>
-              <select v-model="form.priority" class="w-full bg-[#0B0C0E] border border-[#262A36] rounded-xl px-3 py-2 text-white outline-none">
+              <select v-model="form.priority" class="w-full bg-canvas border border-line-strong rounded-xl px-3 py-2 text-white outline-none">
                 <option value="Low">Low (Past)</option>
                 <option value="Medium">Medium (O'rta)</option>
                 <option value="High">High (Yuqori)</option>
@@ -248,7 +248,7 @@
             </div>
             <div>
               <label class="block font-semibold text-gray-300 mb-1">Holati</label>
-              <select v-model="form.status" class="w-full bg-[#0B0C0E] border border-[#262A36] rounded-xl px-3 py-2 text-white outline-none">
+              <select v-model="form.status" class="w-full bg-canvas border border-line-strong rounded-xl px-3 py-2 text-white outline-none">
                 <option value="Todo">Todo (Bajarilishi kerak)</option>
                 <option value="Doing">Doing (Jarayonda)</option>
                 <option value="Done">Done (Bajarildi)</option>
@@ -258,15 +258,15 @@
 
           <div>
             <label class="block font-semibold text-gray-300 mb-1">Deadline (ixtiyoriy)</label>
-            <input v-model="form.deadline" type="datetime-local" class="w-full bg-[#0B0C0E] border border-[#262A36] rounded-xl px-3 py-2 text-white outline-none" />
+            <input v-model="form.deadline" type="datetime-local" class="w-full bg-canvas border border-line-strong rounded-xl px-3 py-2 text-white outline-none" />
           </div>
 
           <p v-if="modalError" class="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
             {{ modalError }}
           </p>
 
-          <div class="pt-3 border-t border-[#1F222A] flex items-center justify-end gap-2">
-            <button type="button" @click="closeModal" class="px-4 py-2 rounded-xl bg-[#1F222A] text-gray-300 font-semibold hover:bg-[#2A2E3B] transition">
+          <div class="pt-3 border-t border-line flex items-center justify-end gap-2">
+            <button type="button" @click="closeModal" class="px-4 py-2 rounded-xl bg-line text-gray-300 font-semibold hover:bg-line-hover transition">
               Bekor qilish
             </button>
             <button type="submit" :disabled="isSaving" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold shadow-lg transition">
@@ -385,7 +385,7 @@ export default {
       if (task.status === 'Done') return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
       return new Date(task.deadline) < new Date()
         ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-        : 'bg-[#1A1D26] text-gray-400 border-[#2D3242]';
+        : 'bg-muted text-gray-400 border-line-hover';
     },
 
     // --- DRAG & DROP ---

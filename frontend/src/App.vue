@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen bg-[#0B0C0E] text-gray-100 font-sans">
+  <div class="h-screen bg-canvas text-gray-100 font-sans">
     <LoginPage v-if="!isAuthenticated" @login-success="onLoginSuccess" />
     <UserChat v-else-if="currentView === 'chat'" @switch-view="switchView" @logout="onLogout" />
     <AdminDashboard v-else @switch-view="switchView" @logout="onLogout" />

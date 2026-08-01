@@ -1,12 +1,10 @@
 <template>
-  <div class="min-h-screen bg-[#0B0C0E] text-gray-100 font-sans flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-[#111317] border border-[#1F222A] rounded-3xl p-8 shadow-2xl space-y-6">
+  <div class="min-h-screen bg-canvas text-gray-100 font-sans flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-surface border border-line rounded-3xl p-8 shadow-2xl space-y-6">
       <!-- Brand Logo Header -->
       <div class="text-center space-y-3">
         <div class="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white mx-auto shadow-md">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
+          <Icon name="logo" size="2xl" />
         </div>
         <div>
           <h1 class="text-2xl font-extrabold text-white tracking-tight">Jarvis AI Workspace</h1>
@@ -23,7 +21,7 @@
             type="text" 
             required
             placeholder="admin@hadiya.uz" 
-            class="w-full bg-[#14161C] border border-[#1F222A] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+            class="w-full bg-card border border-line rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
           />
         </div>
 
@@ -35,7 +33,7 @@
               :type="showPassword ? 'text' : 'password'" 
               required
               placeholder="••••••••" 
-              class="w-full bg-[#14161C] border border-[#1F222A] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition pr-10"
+              class="w-full bg-card border border-line rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition pr-10"
             />
             <button 
               type="button" 
@@ -49,7 +47,7 @@
 
         <div class="flex items-center justify-between text-xs pt-1">
           <label class="flex items-center gap-2 cursor-pointer text-gray-400 hover:text-gray-200">
-            <input type="checkbox" v-model="rememberMe" class="rounded bg-[#14161C] border-[#1F222A] text-indigo-600 focus:ring-0" />
+            <input type="checkbox" v-model="rememberMe" class="rounded bg-card border-line text-indigo-600 focus:ring-0" />
             Eslab qolish
           </label>
           <a href="#" class="text-indigo-400 hover:underline">Parolni unutdingizmi?</a>
@@ -67,16 +65,16 @@
 
       <!-- Quick Demo Login Divider -->
       <div class="relative flex items-center justify-center">
-        <div class="border-t border-[#1F222A] w-full"></div>
-        <span class="bg-[#111317] px-3 text-[10px] uppercase font-bold text-gray-500 tracking-wider absolute">yoki</span>
+        <div class="border-t border-line w-full"></div>
+        <span class="bg-surface px-3 text-[10px] uppercase font-bold text-gray-500 tracking-wider absolute">yoki</span>
       </div>
 
       <!-- Quick One-Click Demo Button -->
       <button 
         @click="handleDemoLogin" 
-        class="w-full py-2.5 bg-[#171922] hover:bg-[#1E2230] text-indigo-300 border border-indigo-500/20 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2"
+        class="w-full py-2.5 bg-raised hover:bg-[#1E2230] text-indigo-300 border border-indigo-500/20 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2"
       >
-        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <Icon name="check" size="md" class="text-emerald-400" />
         Demo Admin (Azamjon) Sifatida Kirish
       </button>
 

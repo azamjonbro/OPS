@@ -15,11 +15,11 @@
       <div v-if="integration?.type === 'TELEGRAM'" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Bot Token</label>
-          <input v-model="formData.botToken" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.botToken" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Webhook URL</label>
-          <input v-model="formData.webhookUrl" type="text" placeholder="https://api.yourdomain.com/webhook/telegram" class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.webhookUrl" type="text" placeholder="https://api.yourdomain.com/webhook/telegram" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
       </div>
 
@@ -27,15 +27,15 @@
       <div v-else-if="integration?.type === 'BILLZ'" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Billz API Key</label>
-          <input v-model="formData.apiKey" type="password" placeholder="blz_live_key_9921a..." class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.apiKey" type="password" placeholder="blz_live_key_9921a..." class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">API Secret</label>
-          <input v-model="formData.secret" type="password" placeholder="••••••••••••••••" class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.secret" type="password" placeholder="••••••••••••••••" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Store ID</label>
-          <input v-model="formData.storeId" type="text" placeholder="STORE-TASHKENT-01" class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.storeId" type="text" placeholder="STORE-TASHKENT-01" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
       </div>
 
@@ -43,11 +43,11 @@
       <div v-else-if="integration?.type === 'NOTION'" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Internal Integration Token</label>
-          <input v-model="formData.integrationToken" type="password" placeholder="secret_notion_token_..." class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.integrationToken" type="password" placeholder="secret_notion_token_..." class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">Database ID</label>
-          <input v-model="formData.databaseId" type="text" placeholder="b9281a8291..." class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.databaseId" type="text" placeholder="b9281a8291..." class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
       </div>
 
@@ -55,7 +55,7 @@
       <div v-else class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-300 mb-1">API Secret / OAuth Token</label>
-          <input v-model="formData.apiToken" type="password" placeholder="Enter API Key / Token" class="w-full bg-[#0E1013] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <input v-model="formData.apiToken" type="password" placeholder="Enter API Key / Token" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
         </div>
       </div>
 
