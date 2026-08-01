@@ -288,7 +288,7 @@ class ContextBuilder {
       }
     }
 
-    // --- 3. Explicit numeric ranges ---
+
     const dayNumMatch = lower.match(/\b(\d{1,3})\s*(?:ta\s*)?kun(?:lik|da|gi)?\b/);
     if (dayNumMatch) {
       const days = parseInt(dayNumMatch[1], 10);

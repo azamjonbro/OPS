@@ -471,30 +471,19 @@
 <script>
 import calendarService from '../services/calendarService';
 import chatService from '../services/chatService';
-
-const MONTH_NAMES = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
-
-// toISOString() converts to UTC first, which shifts the date by a day for every local
-// time before 05:00 in UTC+5. Calendar keys must be built from local date parts.
-function toDateKey(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-// `new Date('2026-08-01')` parses as UTC midnight; splitting the parts keeps it local.
-function parseDateKey(key) {
-  const [y, m, d] = String(key).split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
-function errorText(err) {
-  return (err && err.response && err.response.data && err.response.data.error) || (err && err.message) || 'Noma\'lum xatolik';
-}
+import taskService from '../services/taskService';
+import DayPlanner from './DayPlanner.vue';
+import {
+  MONTH_NAMES,
+  WEEKDAY_NAMES,
+  toDateKey,
+  parseDateKey,
+  errorText
+} from '../utils/date';
 
 export default {
   name: 'CalendarWorkspace',
+  components: { DayPlanner },
   data() {
     const today = new Date();
     const year = today.getFullYear();
@@ -510,7 +499,13 @@ export default {
       todayDateKey: todayKey,
       selectedCategoryFilter: 'All',
       categories: ['All', 'Meeting', 'Work', 'Deadline', 'Call', 'Personal', 'Project'],
-      
+
+      // When set, the Trello-style day planner takes over the whole workspace.
+      plannerDayKey: null,
+      // { '2026-08-01': { total, done } } — powers the per-day task indicators.
+      taskCounts: {},
+      isLoadingEvents: true,
+
       // Quick AI Add
       aiQuickAddText: '',
       isAiProcessing: false,
@@ -566,7 +561,8 @@ export default {
           dayNum: cellDate.getDate(),
           isCurrentMonth: cellDate.getMonth() === this.currentMonth,
           isToday: dateKey === this.todayDateKey,
-          events: this.eventsByDate[dateKey] || []
+          events: this.eventsByDate[dateKey] || [],
+          tasks: this.taskCounts[dateKey] || null
         });
       }
       return cells;
