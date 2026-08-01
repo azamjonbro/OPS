@@ -11,6 +11,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 // Models (for startup cleanup / seeding)
 const Conversation = require('./models/Conversation');
@@ -84,6 +85,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/tasks', taskRoutes);
 // Billz Integration Endpoints
 const connectorRegistry = require('./connectors/registry');
 app.get('/api/integrations/billz/health', async (req, res) => {
