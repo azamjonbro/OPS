@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-canvas text-gray-100 font-sans flex flex-col">
     <!-- Header -->
-    <header class="h-16 border-b border-white/10 bg-[#121418] px-6 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+    <header class="h-16 border-b border-white/10 bg-surface px-6 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white shadow-glow">SA</div>
         <div>
@@ -10,7 +10,8 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
+        <ThemeToggle />
         <button @click="$emit('switch-view', 'chat')" class="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-xl border border-white/10 transition flex items-center gap-1.5">
           <span>← Back to User Chat</span>
         </button>
@@ -275,10 +276,11 @@
 
 <script>
 import ConnectionModal from './ConnectionModal.vue';
+import ThemeToggle from './ui/ThemeToggle.vue';
 import { adminService } from '../services/adminService';
 
 export default {
-  components: { ConnectionModal },
+  components: { ConnectionModal, ThemeToggle },
   data() {
     return {
       activeTab: 'integrations',

@@ -5,7 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Store Hadiya - AI Executive Assistant & POS Workspace</title>
-    
+
+    <!-- Applies the saved/system theme before first paint, so there is no dark->light
+         flash while the Vue app boots. Kept tiny and dependency-free on purpose. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('jarvis-theme');
+          var light = stored ? stored === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches;
+          document.documentElement.classList.toggle('light', light);
+          document.documentElement.classList.toggle('dark', !light);
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- PWA & Mobile Web App Meta Tags -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0B0F19" />
@@ -20,7 +33,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-background text-gray-100 antialiased font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+  <body class="bg-canvas text-gray-100 antialiased font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white">
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     <script>

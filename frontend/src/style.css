@@ -2,11 +2,80 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens.
+ *
+ * `:root` holds the dark palette (the app's original, default look). `.light`
+ * overrides the same variable names — Icon.vue, every `bg-card` / `border-line`
+ * utility, and the plain-CSS overrides below all read through these, so toggling
+ * the class on <html> is the entire theme switch.
+ *
+ * Values are "R G B" triplets (no commas, no rgb()) so Tailwind's
+ * `rgb(var(--x) / <alpha-value>)` pattern in tailwind.config.js can splice in an
+ * opacity modifier from utilities like `bg-card/60`.
+ */
+:root {
+  --color-canvas: 11 12 14;
+  --color-sunken: 14 16 20;
+  --color-surface: 17 19 23;
+  --color-card: 20 22 28;
+  --color-raised: 23 26 34;
+  --color-muted: 26 29 38;
+  --color-hover: 37 41 54;
+  --color-line: 31 34 42;
+  --color-line-strong: 38 42 54;
+  --color-line-hover: 45 50 66;
+
+  /* Text roles that the old markup hardcodes as text-white / text-gray-* / text-black.
+     Rewriting ~370 scattered class occurrences to a new set of utilities isn't safely
+     verifiable without a visual tool right now, so instead these variables feed the
+     `.light` override block below, which redefines what those exact Tailwind classes
+     compute to — everything keeps working, only the color swaps per theme. */
+  --text-primary: 255 255 255;
+  --text-secondary: 209 213 219;
+  --text-tertiary: 156 163 175;
+  --text-quaternary: 107 114 128;
+}
+
+.light {
+  --color-canvas: 246 247 249;
+  --color-sunken: 237 238 242;
+  --color-surface: 255 255 255;
+  --color-card: 255 255 255;
+  --color-raised: 249 250 251;
+  --color-muted: 241 242 245;
+  --color-hover: 231 233 238;
+  --color-line: 227 229 234;
+  --color-line-strong: 212 215 222;
+  --color-line-hover: 195 199 208;
+
+  --text-primary: 17 24 39;
+  --text-secondary: 55 65 81;
+  --text-tertiary: 100 108 122;
+  --text-quaternary: 133 140 153;
+}
+
 @layer base {
   body {
-    @apply bg-[#0B0C0E] text-gray-100;
+    @apply bg-canvas text-gray-100 transition-colors duration-200;
   }
 }
+
+/*
+ * Light-mode text retrofit — deliberately NOT inside @layer utilities.
+ * Unlayered CSS always wins over anything Tailwind puts in a @layer, so these
+ * rules override the base utility classes reliably regardless of build order,
+ * with no !important needed. Scoped under .light, so dark mode is untouched.
+ */
+.light .text-white,
+.light .text-gray-100 { color: rgb(var(--text-primary)); }
+.light .text-gray-200,
+.light .text-gray-300 { color: rgb(var(--text-secondary)); }
+.light .text-gray-400 { color: rgb(var(--text-tertiary)); }
+.light .text-gray-500,
+.light .text-gray-600 { color: rgb(var(--text-quaternary)); }
+.light .text-black { color: rgb(var(--text-primary)); }
+.light .placeholder-gray-500::placeholder { color: rgb(var(--text-quaternary) / 0.8); }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
@@ -27,15 +96,28 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.24);
+}
+
 /* Glassmorphism utilities */
 .glass-panel {
-  background: rgba(26, 29, 36, 0.7);
+  background: rgb(var(--color-muted) / 0.7);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-input {
-  background: rgba(20, 22, 27, 0.8);
+  background: rgb(var(--color-card) / 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(8px);
+}
+
+.light .glass-panel,
+.light .glass-input {
+  border-color: rgba(15, 23, 42, 0.08);
 }

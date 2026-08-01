@@ -14,9 +14,9 @@
 import {
   Archive, ArrowRight, AlertTriangle, BarChart3, Bell, BrainCircuit, Calendar, Check,
   ChevronLeft, ChevronRight, CircleCheck, Clock, Columns3, Copy, ExternalLink, FileText,
-  Folder, FolderOpen, Image, ListTodo, Loader2, LogOut, Menu, MessageSquare, Mic, Monitor, Package,
+  Folder, FolderOpen, Image, ListTodo, Loader2, LogOut, Menu, MessageSquare, Mic, Monitor, Moon, Package,
   Pause, Pencil, Phone, Pin, Play, Plus, Reply, RefreshCw, Save, Search, Send, Settings,
-  ShieldCheck, Sparkles, Square, SquarePen, Target, Trash2, UploadCloud, User, X, Zap
+  ShieldCheck, Sparkles, Square, SquarePen, Sun, Target, Trash2, UploadCloud, User, X, Zap
 } from 'lucide-vue-next';
 
 /**
@@ -84,7 +84,11 @@ const ICONS = {
   user: User,
   shield: ShieldCheck,
   warning: AlertTriangle,
-  spinner: Loader2
+  spinner: Loader2,
+
+  // Theme
+  sun: Sun,
+  moon: Moon
 };
 
 // One scale for the whole app — no more w-3.5 / w-4 / w-5 chosen ad hoc per button.

@@ -8,23 +8,28 @@ export default {
   theme: {
     extend: {
       /**
-       * Semantic surface scale, ordered from the darkest (page canvas) to the
-       * lightest (hover). Components reference the role — `bg-card`, `border-line` —
-       * so the palette can be retuned in one place instead of hunting raw hex values
-       * spread across the templates.
+       * Semantic surface scale, ordered from the deepest recess (canvas) to the
+       * most raised (hover). Components reference the role — `bg-card`, `border-line`
+       * — never a hex value, so the palette can be retuned in one place.
+       *
+       * Each token resolves through a CSS custom property (`--color-*`, defined in
+       * style.css for both `:root` and `.light`), using the `rgb(var(--x) / <alpha-value>)`
+       * pattern so opacity modifiers like `bg-card/60` keep working under either theme.
        */
       colors: {
-        canvas: '#0B0C0E',      // page background
-        sunken: '#0E1014',      // inset areas: inputs, code blocks
-        surface: '#111317',     // headers, sidebars, panels
-        card: '#14161C',        // cards, message bubbles
-        raised: '#171A22',      // card hover
-        muted: '#1A1D26',       // secondary buttons, chips
-        hover: '#252936',       // muted hover
-        line: '#1F222A',        // default border
-        'line-strong': '#262A36',
-        'line-hover': '#2D3242',
+        canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
+        sunken: 'rgb(var(--color-sunken) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        card: 'rgb(var(--color-card) / <alpha-value>)',
+        raised: 'rgb(var(--color-raised) / <alpha-value>)',
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        hover: 'rgb(var(--color-hover) / <alpha-value>)',
+        line: 'rgb(var(--color-line) / <alpha-value>)',
+        'line-strong': 'rgb(var(--color-line-strong) / <alpha-value>)',
+        'line-hover': 'rgb(var(--color-line-hover) / <alpha-value>)',
 
+        // Accent hues stay constant across themes — they're always paired with a
+        // tinted background (bg-indigo-500/20) that supplies its own contrast.
         accent: {
           blue: '#3B82F6',
           indigo: '#6366F1',

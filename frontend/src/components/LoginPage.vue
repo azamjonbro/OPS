@@ -1,5 +1,6 @@
 <template>
-  <div class="min-h-screen bg-canvas text-gray-100 font-sans flex items-center justify-center p-4">
+  <div class="min-h-screen bg-canvas text-gray-100 font-sans flex items-center justify-center p-4 relative">
+    <ThemeToggle class="!fixed top-4 right-4" />
     <div class="w-full max-w-md bg-surface border border-line rounded-3xl p-8 shadow-2xl space-y-6">
       <!-- Brand Logo Header -->
       <div class="text-center space-y-3">
@@ -72,7 +73,7 @@
       <!-- Quick One-Click Demo Button -->
       <button 
         @click="handleDemoLogin" 
-        class="w-full py-2.5 bg-raised hover:bg-[#1E2230] text-indigo-300 border border-indigo-500/20 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2"
+        class="w-full py-2.5 bg-raised hover:bg-hover text-indigo-300 border border-indigo-500/20 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2"
       >
         <Icon name="check" size="md" class="text-emerald-400" />
         Demo Admin (Azamjon) Sifatida Kirish
@@ -86,7 +87,10 @@
 </template>
 
 <script>
+import ThemeToggle from './ui/ThemeToggle.vue';
+
 export default {
+  components: { ThemeToggle },
   data() {
     return {
       email: 'admin@hadiya.uz',

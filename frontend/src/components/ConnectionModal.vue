@@ -1,6 +1,6 @@
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div class="w-full max-w-md bg-[#16181D] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-5">
+    <div class="w-full max-w-md bg-raised border border-white/10 rounded-2xl p-6 shadow-2xl space-y-5">
       <div class="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h3 class="text-lg font-semibold text-white flex items-center gap-2">

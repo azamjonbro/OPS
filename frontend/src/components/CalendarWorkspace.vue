@@ -154,7 +154,7 @@
                 @click="selectCellDate(cell.dateKey)"
                 :class="[
                   'min-h-[110px] p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden',
-                  cell.isCurrentMonth ? 'bg-card border-line hover:border-indigo-500/40 hover:bg-[#181B24]' : 'bg-sunken/50 border-transparent text-gray-600',
+                  cell.isCurrentMonth ? 'bg-card border-line hover:border-indigo-500/40 hover:bg-raised' : 'bg-sunken/50 border-transparent text-gray-600',
                   cell.isToday ? 'ring-2 ring-indigo-500 bg-[#1A1E2B]' : '',
                   selectedDateKey === cell.dateKey ? 'border-indigo-500/80 bg-[#1B1F2D]' : ''
                 ]"

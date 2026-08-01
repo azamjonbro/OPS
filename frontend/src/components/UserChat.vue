@@ -182,9 +182,12 @@
               </div>
             </div>
           </div>
-          <button @click.stop="$emit('logout')" class="p-1.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition border border-transparent hover:border-red-500/20" title="Tizimdan Chiqish (Logout)">
-            <Icon name="logout" size="md" />
-          </button>
+          <div class="flex items-center gap-1 shrink-0" @click.stop>
+            <ThemeToggle />
+            <button @click="$emit('logout')" class="p-1.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition border border-transparent hover:border-red-500/20" title="Tizimdan Chiqish (Logout)">
+              <Icon name="logout" size="md" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>
@@ -208,7 +211,7 @@
           <!-- Schedule Automations Trigger Button -->
           <button @click="isScheduleOpen = true" class="text-xs font-bold text-emerald-300 hover:text-white bg-gradient-to-r from-emerald-950/60 to-teal-950/60 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/30 hover:border-emerald-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-emerald-950/30 flex items-center gap-1.5">
             <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <Icon name="clock" size="xs" />
+              <Icon name="clock" size="sm" />
             </div>
             <span class="hidden sm:inline">Avtomatlashtirish</span>
             <span class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30 font-bold">{{ schedules.length }}</span>
@@ -217,7 +220,7 @@
           <!-- Admin Panel Button -->
           <button @click="$emit('switch-view', 'admin')" class="text-xs font-bold text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-500/30 hover:border-indigo-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-indigo-950/30 flex items-center gap-1.5">
             <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-              <Icon name="admin" size="xs" />
+              <Icon name="admin" size="sm" />
             </div>
             <span class="hidden sm:inline">Admin Panel</span>
           </button>
@@ -645,9 +648,9 @@
           </div>
 
           <!-- INLINE RECORDING ACTIVE STATE (Gemini Live Mode) -->
-          <div v-else-if="isVoiceRecordingActive" class="flex items-center justify-between bg-[#16181D] border border-white/10 rounded-[28px] px-4 py-2.5 shadow-2xl transition-all duration-300 gap-3">
+          <div v-else-if="isVoiceRecordingActive" class="flex items-center justify-between bg-raised border border-white/10 rounded-[28px] px-4 py-2.5 shadow-2xl transition-all duration-300 gap-3">
             <!-- Left: Plus Attachment Button -->
-            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-hover hover:bg-[#2C303B] text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
+            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-hover hover:bg-hover text-gray-300 flex items-center justify-center transition shrink-0" title="Attach file or image">
               <Icon name="add" size="md" />
             </button>
 
@@ -987,6 +990,7 @@ import { chatService } from '../services/chatService';
 import { scheduleService } from '../services/scheduleService';
 import CalendarWorkspace from './CalendarWorkspace.vue';
 import MarkdownMessage from './MarkdownMessage.vue';
+import ThemeToggle from './ui/ThemeToggle.vue';
 
 const MAX_TEXT_CHARS = 20000;
 const MAX_IMAGE_EDGE = 1568;
@@ -1047,7 +1051,8 @@ async function downscaleImage(file) {
 export default {
   components: {
     CalendarWorkspace,
-    MarkdownMessage
+    MarkdownMessage,
+    ThemeToggle
   },
   data() {
     return {
