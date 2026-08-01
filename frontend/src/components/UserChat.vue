@@ -416,60 +416,90 @@
             </p>
           </div>
 
-
-
           <!-- Quick Actions Grid -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-xl text-left pt-2">
-            <div @click="openVoiceModal()" class="p-4 rounded-2xl border border-purple-500/25 bg-[#161420] hover:bg-[#1D1B2A] hover:border-purple-500/50 cursor-pointer transition group shadow-lg">
-              <div class="text-xs font-bold text-purple-200 group-hover:text-white flex items-center justify-between">
+            <div 
+              @click="openVoiceModal()" 
+              :class="[
+                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                isLightTheme 
+                  ? 'bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-white border-purple-300 hover:border-purple-500 hover:bg-purple-50/80' 
+                  : 'bg-[#161420] border-purple-500/25 hover:bg-[#1D1B2A] hover:border-purple-500/50'
+              ]"
+            >
+              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-purple-900 group-hover:text-purple-700' : 'text-purple-200 group-hover:text-white']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                   </svg>
                   Ovozli Murojaat (Live Mic)
                 </span>
-                <span class="text-purple-300 font-mono text-[9px] bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-400/30 font-bold">LIVE MIC</span>
+                <span :class="['font-mono text-[9px] px-2 py-0.5 rounded-full border font-bold', isLightTheme ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-purple-500/20 text-purple-300 border-purple-400/30']">LIVE MIC</span>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">Mikrofon orqali ovozli topshiriq bering...</p>
+              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">Mikrofon orqali ovozli topshiriq bering...</p>
             </div>
 
-            <div @click="sendQuick('Do\'kondagi Rolex soatlari narxi va qoldig\'i haqida ma\'lumot ber.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
-              <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
+            <div 
+              @click="sendQuick('Do\'kondagi Rolex soatlari narxi va qoldig\'i haqida ma\'lumot ber.')" 
+              :class="[
+                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                isLightTheme 
+                  ? 'bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60' 
+                  : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
+              ]"
+            >
+              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-slate-800 group-hover:text-emerald-700' : 'text-white group-hover:text-indigo-300']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                   </svg>
                   Mahsulotlar Qoldig'i & Narxi
                 </span>
-                <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-400' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">"Do'kondagi mahsulotlar narxi va qoldig'ini tekshir."</p>
+              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">"Do'kondagi mahsulotlar narxi va qoldig'ini tekshir."</p>
             </div>
 
-            <div @click="sendQuick('Bugungi kunlik biznes va savdo hisobotini chiqar.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
-              <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
+            <div 
+              @click="sendQuick('Bugungi kunlik biznes va savdo hisobotini chiqar.')" 
+              :class="[
+                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                isLightTheme 
+                  ? 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/60' 
+                  : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
+              ]"
+            >
+              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-slate-800 group-hover:text-indigo-700' : 'text-white group-hover:text-indigo-300']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                   </svg>
                   Kunlik Savdo Hisoboti
                 </span>
-                <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-400' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">"Bugungi jami savdo va tushumlarni chiqar."</p>
+              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">"Bugungi jami savdo va tushumlarni chiqar."</p>
             </div>
 
-            <div @click="sendQuick('Har kuni soat 19:00 da kunlik hisobotni Telegramga yuborib tur.')" class="p-4 rounded-2xl border border-[#1F222A] bg-[#14161C] hover:border-indigo-500/40 hover:bg-[#191C24] cursor-pointer transition group shadow-lg">
-              <div class="text-xs font-bold text-white group-hover:text-indigo-300 flex items-center justify-between">
+            <div 
+              @click="sendQuick('Har kuni soat 19:00 da kunlik hisobotni Telegramga yuborib tur.')" 
+              :class="[
+                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                isLightTheme 
+                  ? 'bg-white border-slate-200 hover:border-amber-400 hover:bg-amber-50/60' 
+                  : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
+              ]"
+            >
+              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-slate-800 group-hover:text-amber-700' : 'text-white group-hover:text-indigo-300']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                   </svg>
                   Kunlik Telegram Eslatma
                 </span>
-                <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-400' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">"Har kuni 19:00 da Telegramga savdoni yubor."</p>
+              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">"Har kuni 19:00 da Telegramga savdoni yubor."</p>
             </div>
           </div>
         </div>
@@ -657,9 +687,25 @@
           </div>
 
           <!-- GEMINI STYLE IDLE INPUT PILL -->
-          <div v-else class="flex items-center gap-3 bg-[#1E1F24] border border-[#2C2D33] rounded-[26px] px-3.5 py-2 shadow-xl focus-within:border-indigo-500/50 transition-all">
+          <div 
+            :class="[
+              'flex items-center gap-3 rounded-[26px] px-3.5 py-2 transition-all border shadow-xl',
+              isLightTheme 
+                ? 'bg-white border-indigo-500/30 text-slate-800 shadow-indigo-500/10 focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-500/20' 
+                : 'bg-[#1E1F24] border-[#2C2D33] text-white focus-within:border-indigo-500/50'
+            ]"
+          >
             <!-- Left: Attachment (+) Button -->
-            <button @click="triggerFileInput" class="w-8 h-8 rounded-full bg-[#2A2B32] hover:bg-[#34353E] text-gray-300 flex items-center justify-center transition shrink-0 my-auto" title="Attach file or image">
+            <button 
+              @click="triggerFileInput" 
+              :class="[
+                'w-8 h-8 rounded-full flex items-center justify-center transition shrink-0 my-auto',
+                isLightTheme 
+                  ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200' 
+                  : 'bg-[#2A2B32] hover:bg-[#34353E] text-gray-300'
+              ]" 
+              title="Attach file or image"
+            >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             </button>
 
@@ -671,7 +717,10 @@
               @keydown.enter.exact.prevent="sendMessage" 
               rows="1"
               placeholder="Спросить Gemini yoki Store Hadiya bo'yicha savol bering..." 
-              class="flex-1 bg-transparent text-sm text-white placeholder-[#8E9196] focus:outline-none px-1 resize-none max-h-[300px] overflow-y-auto leading-relaxed py-1 font-sans my-auto"
+              :class="[
+                'flex-1 bg-transparent text-sm focus:outline-none px-1 resize-none max-h-[300px] overflow-y-auto leading-relaxed py-1 font-sans my-auto',
+                isLightTheme ? 'text-slate-800 placeholder-slate-400 font-medium' : 'text-white placeholder-[#8E9196]'
+              ]"
             ></textarea>
 
             <!-- Right Controls: Send Button (if text or file attached) OR Microphone Button (if input empty) -->
@@ -692,10 +741,15 @@
               <button 
                 v-else
                 @click="openVoiceModal()" 
-                class="w-8 h-8 rounded-full bg-white text-black hover:bg-gray-200 flex items-center justify-center font-bold shadow-sm transition shrink-0 my-auto"
+                :class="[
+                  'w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-md transition shrink-0 my-auto',
+                  isLightTheme 
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-95' 
+                    : 'bg-white text-black hover:bg-gray-200'
+                ]"
                 title="Ovozli Yozish (Voice Mode)"
               >
-                <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg :class="['w-4 h-4', isLightTheme ? 'text-white' : 'text-black']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </button>

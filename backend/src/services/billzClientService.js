@@ -320,7 +320,7 @@ class BillzClientService {
       return {
         success: false,
         isRealData: false,
-        error: 'Billz 2.0 REST API dan ma\'lumot olinmadi',
+        error: "Billz v3/order-search dan ma'lumot olinmadi",
         errorMessage: salesRes.errorDiagnostic
           ? `BILLZ API xatosi: ${salesRes.errorDiagnostic.errorMessage || salesRes.errorDiagnostic.errorCode}`
           : "BILLZ API dan real ma'lumot olinmadi.",
@@ -334,7 +334,7 @@ class BillzClientService {
     return {
       success: true,
       isRealData: true,
-      method: 'billz_2.0_rest_fallback',
+      method: 'billz_v3_order_search',
       dateBegin: parsed.dateBegin,
       dateEnd: parsed.dateEnd,
       displayDate: parsed.displayDate,
@@ -344,15 +344,16 @@ class BillzClientService {
         branchName: 'Hadiya Store',
         totalSales: s.totalRevenueUZS,
         formattedTotalSales: s.formattedTotalRevenue,
-        // Not derivable from the 2.0 REST product endpoint — see method docstring.
-        checksCount: null,
+        checksCount: s.checksCount,
         itemsSoldsCount: s.transactedItemsCount,
-        averageCheck: null,
+        averageCheck: s.averageCheckUZS,
+        // Per-method (naqd/karta/click/payme) breakdown isn't in the order-search
+        // response — Billz would need a separate call per company_payment_type_id,
+        // and we don't have those IDs configured. Left null rather than guessed.
         payments: null,
-        returnedProducts: null,
-        netSales: s.totalRevenueUZS,
-        formattedNetSales: s.formattedTotalRevenue,
-        dataSourceNote: "Chek soni, o'rtacha chek va to'lov turlari bo'yicha taqsimot Billz 1.0 hisobot API'si orqali kelardi; hozircha ushbu API uchun ishlaydigan kalit yo'q, shuning uchun bu ko'rsatkichlar ko'rsatilmaydi. Umumiy tushum va sotilgan mahsulotlar soni Billz 2.0 orqali real vaqtda olingan."
+        returnedProducts: s.returnedAmountUZS,
+        netSales: s.netRevenueUZS,
+        formattedNetSales: s.formattedNetRevenue
       },
       rawSalesSummary: s
     };
