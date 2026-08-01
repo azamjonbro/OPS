@@ -505,7 +505,54 @@ function formatBillzConnectionReport(billzRes) {
       executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
     }
 
-    // 3. Billz Sales & Products Intent
+    // 3. Billz Consolidated Daily Sales Report (reports.consolidated) Intent
+    const isDailyReportQuery = !hasAttachment && (
+      lowerInput.includes('hisobot') ||
+      lowerInput.includes('report') ||
+      lowerInput.includes('bugun') ||
+      lowerInput.includes('kecha') ||
+      /(\d{1,2})[-_\s]*(avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
+      /\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/.test(lowerInput)
+    );
+
+    if (isDailyReportQuery && (lowerInput.includes('billz') || lowerInput.includes('hisobot') || lowerInput.includes('savdo') || lowerInput.includes('bugun') || lowerInput.includes('kecha') || lowerInput.includes('avgust') || lowerInput.includes('sotuv'))) {
+      const billzClient = require('./services/billzClientService');
+      const consRes = await billzClient.getConsolidatedReport({ userMessage, date: userMessage });
+
+      executedTools.push({
+        tool: 'billz_get_consolidated_report',
+        label: 'BILLZ Consolidated Reports API (Hadiya Store Branch Only)',
+        result: consRes
+      });
+
+      if (consRes.notFound) {
+        return { responseText: "Hadiya Store filiali hisobotda topilmadi.", executedTools, modelMetadataBadge };
+      }
+
+      if (!consRes.success || consRes.error || consRes.errorMessage) {
+        const responseText = `⚠️ **BILLZ API Xatosi:**\n${consRes.errorMessage || consRes.error}\n\n*Hisobotni shakllantirish uchun BILLZ API javobida xatolik yuz berdi. Soxta yoki taxminiy ma'lumotlar ko'rsatilmaydi.*`;
+        return { responseText, executedTools, modelMetadataBadge };
+      }
+
+      const d = consRes.consolidatedData;
+      const responseText = `📅 Sana: ${d.displayDate}\n\n` +
+        `🏪 Filial:\n${d.branchName}\n\n` +
+        `💰 Savdo:\n${d.totalSales ? d.totalSales.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `🛒 Cheklar:\n${d.checksCount || 0} ta\n\n` +
+        `📦 Sotilgan mahsulotlar:\n${d.itemsSoldsCount || 0} ta\n\n` +
+        `💵 O'rtacha chek:\n${d.averageCheck ? d.averageCheck.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `💳 To'lovlar:\n` +
+        `• Naqd: ${d.payments.naqd ? d.payments.naqd.toLocaleString() + " so'm" : "0 so'm"}\n` +
+        `• Karta: ${d.payments.karta ? d.payments.karta.toLocaleString() + " so'm" : "0 so'm"}\n` +
+        `• Click: ${d.payments.click ? d.payments.click.toLocaleString() + " so'm" : "0 so'm"}\n` +
+        `• Payme: ${d.payments.payme ? d.payments.payme.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `↩️ Qaytarilgan mahsulot:\n${d.returnedProducts ? d.returnedProducts.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `📈 Sof savdo:\n${d.netSales ? d.netSales.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `⚠️ This report contains ONLY the Hadiya Store branch.`;
+
+      return { responseText, executedTools, modelMetadataBadge };
+    }
+
     if (lowerInput.includes('billz') || lowerInput.includes('nima gap') || lowerInput.includes('savdo') || lowerInput.includes('sales') || lowerInput.includes('mahsulot') || lowerInput.includes('katalog')) {
       const dateOpts = contextBuilder.parseUzbekDateOptions(userMessage);
       const res = await connectorRegistry.executeTool('billz_get_sales', dateOpts);
@@ -794,8 +841,47 @@ ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
 - If it is a RECEIPT, REPORT OR TABLE image: extract the real numbers into a markdown table. Never invent a figure you cannot read — write "o'qib bo'lmadi" instead.
 - NEVER claim you cannot see images. You have been given the image directly.
 ` : ''}
+- BILLZ CONSOLIDATED REPORTS (reports.consolidated) EXCLUSIVE RULES:
+  When a daily sales report is requested (e.g. "bugungi hisobot", "kechagi hisobot", "1-avgust hisoboti", "2026-08-01 hisoboti"):
+  1. You MUST filter statistics EXCLUSIVELY for the "Hadiya Store" branch. Never mix or show numbers from other branches!
+  2. If Hadiya Store branch is not found in the report result, output EXACTLY:
+     "Hadiya Store filiali hisobotda topilmadi."
+  3. If the BILLZ API returns an error, explain the API error clearly instead of generating fake or estimated information.
+  4. Never use mock data or estimate values.
+  5. Format the report cleanly as:
+     📅 Sana: [Sana]
+
+     🏪 Filial:
+     Hadiya Store
+
+     💰 Savdo:
+     [Savdo miqdori] so'm
+
+     🛒 Cheklar:
+     [Cheklar soni] ta
+
+     📦 Sotilgan mahsulotlar:
+     [Sotilgan mahsulotlar soni] ta
+
+     💵 O'rtacha chek:
+     [O'rtacha chek miqdori] so'm
+
+     💳 To'lovlar:
+     • Naqd: ...
+     • Karta: ...
+     • Click: ...
+     • Payme: ...
+
+     ↩️ Qaytarilgan mahsulot:
+     [Qaytarilgan mahsulot] so'm
+
+     📈 Sof savdo:
+     [Sof savdo] so'm
+
+     ⚠️ This report contains ONLY the Hadiya Store branch.
+
 - CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
-  Whenever billz_get_sales or billz_get_products tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
+  Whenever billz_get_sales or billz_get_products or billz_get_consolidated_report tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
   NEVER WRITE DISCLAIMERS like "ma'lumotlar olinmagan", "imkoniyat mavjud emas", "qo'shimcha so'rov jo'nating", or "ma'lumotlar olinmadi"!`
                 },
                 {

@@ -238,6 +238,201 @@ class BillzClientService {
     }
   }
 
+  /**
+   * Helper to convert natural language date inputs into exact UTC dateBegin and dateEnd (00:00:00Z)
+   */
+  parseDateToUtcRange(inputStr = 'bugun') {
+    const lower = (inputStr || '').toLowerCase().trim();
+    const today = new Date();
+
+    let targetYear = today.getUTCFullYear();
+    let targetMonth = today.getUTCMonth();
+    let targetDay = today.getUTCDate();
+
+    if (lower.includes('kecha') || lower.includes('yesterday')) {
+      const yesterday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1));
+      targetYear = yesterday.getUTCFullYear();
+      targetMonth = yesterday.getUTCMonth();
+      targetDay = yesterday.getUTCDate();
+    } else if (lower.includes('bugun') || lower.includes('today')) {
+      // today UTC
+    } else {
+      // ISO Format e.g. 2026-08-01
+      const isoMatch = lower.match(/\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/);
+      if (isoMatch) {
+        targetYear = parseInt(isoMatch[1], 10);
+        targetMonth = parseInt(isoMatch[2], 10) - 1;
+        targetDay = parseInt(isoMatch[3], 10);
+      } else {
+        const MONTHS = {
+          'yanvar': 0, 'fevral': 1, 'mart': 2, 'aprel': 3, 'may': 4, 'iyun': 5,
+          'iyul': 6, 'avgust': 7, 'sentabr': 8, 'sentyabr': 8, 'oktabr': 9, 'oktyabr': 9,
+          'noyabr': 10, 'dekabr': 11
+        };
+        const dmMatch = lower.match(/(\d{1,2})[-_\s]*(chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b(?:[-_\s]*(20\d{2}))?/);
+        if (dmMatch) {
+          targetDay = parseInt(dmMatch[1], 10);
+          targetMonth = MONTHS[dmMatch[3]];
+          if (dmMatch[4]) targetYear = parseInt(dmMatch[4], 10);
+        }
+      }
+    }
+
+    const start = new Date(Date.UTC(targetYear, targetMonth, targetDay, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(targetYear, targetMonth, targetDay + 1, 0, 0, 0, 0));
+
+    const monthNames = ['Avgust', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+    const displayMonth = monthNames[targetMonth] || 'Avgust';
+
+    return {
+      dateBegin: start.toISOString(),
+      dateEnd: end.toISOString(),
+      displayDate: `${targetDay}-${displayMonth} ${targetYear}`
+    };
+  }
+
+  /**
+   * BILLZ Consolidated Reports API (JSON-RPC 2.0)
+   * Method: reports.consolidated
+   * Endpoint: POST https://api.billz.uz/v1/
+   *
+   * Filters EXCLUSIVELY for the "Hadiya Store" branch.
+   */
+  async getConsolidatedReport(options = {}) {
+    const rawToken = process.env.BILLZ_TOKEN || this.secretToken;
+    let token = await this.getAccessToken();
+    if (!token) token = rawToken;
+
+    let { dateBegin, dateEnd, currency = 'UZS', date, query } = options;
+
+    if (!dateBegin || !dateEnd) {
+      const parsed = this.parseDateToUtcRange(date || query || options.userMessage || 'bugun');
+      dateBegin = parsed.dateBegin;
+      dateEnd = parsed.dateEnd;
+      options.displayDate = parsed.displayDate;
+    }
+
+    const requestPayload = {
+      jsonrpc: '2.0',
+      method: 'reports.consolidated',
+      params: {
+        dateBegin,
+        dateEnd,
+        currency
+      },
+      id: '1200'
+    };
+
+    try {
+      const res = await fetch('https://api.billz.uz/v1/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      const resJson = await res.json().catch(() => null);
+
+      if (!res.ok || (resJson && resJson.error)) {
+        const errObj = resJson && resJson.error ? resJson.error : { code: res.status, message: res.statusText || 'API Error' };
+        return {
+          success: false,
+          isRealData: true,
+          error: `BILLZ API Error (${errObj.code}): ${errObj.message}`,
+          errorMessage: `BILLZ Consolidated Reports API xatosi (${errObj.code}): ${errObj.message}`,
+          requestPayload,
+          dateBegin,
+          dateEnd
+        };
+      }
+
+      const resultData = resJson.result || resJson.data || resJson;
+
+      // Extract branch list
+      let branches = [];
+      if (Array.isArray(resultData)) {
+        branches = resultData;
+      } else if (resultData && typeof resultData === 'object') {
+        branches = resultData.branches || resultData.shops || resultData.items || resultData.stores || [];
+        if (!branches.length) {
+          // Check if object keys are branch objects
+          branches = Object.values(resultData).filter(v => typeof v === 'object' && v !== null);
+        }
+      }
+
+      // STRICT FILTERING FOR "Hadiya Store" (or "Store Hadiya" as match alias)
+      let hadiyaBranch = branches.find(b => {
+        const name = String(b.name || b.shop_name || b.branch_name || b.title || '').toLowerCase().trim();
+        return name === 'hadiya store' || name === 'store hadiya' || b.shop_id === this.storeHadiyaId || b.id === this.storeHadiyaId;
+      });
+
+      if (!hadiyaBranch) {
+        return {
+          success: false,
+          isRealData: true,
+          notFound: true,
+          errorMessage: "Hadiya Store filiali hisobotda topilmadi.",
+          requestPayload,
+          dateBegin,
+          dateEnd
+        };
+      }
+
+      // Format strictly metrics belonging ONLY to Hadiya Store
+      const totalSales = hadiyaBranch.total_sales || hadiyaBranch.sales_total || hadiyaBranch.total_revenue || hadiyaBranch.revenue || hadiyaBranch.sales || 0;
+      const checksCount = hadiyaBranch.checks_count || hadiyaBranch.receipts_count || hadiyaBranch.orders_count || hadiyaBranch.checks || 0;
+      const itemsSoldsCount = hadiyaBranch.items_sold_count || hadiyaBranch.products_count || hadiyaBranch.items_sold || hadiyaBranch.qty || 0;
+      const averageCheck = hadiyaBranch.average_check || hadiyaBranch.avg_check || (checksCount > 0 ? Math.round(totalSales / checksCount) : 0);
+      const returnedProducts = hadiyaBranch.returned_products || hadiyaBranch.returns || hadiyaBranch.returned_amount || 0;
+      const netSales = hadiyaBranch.net_sales || (totalSales - returnedProducts);
+
+      const payments = hadiyaBranch.payments || {
+        naqd: hadiyaBranch.cash || hadiyaBranch.naqd || 0,
+        karta: hadiyaBranch.card || hadiyaBranch.karta || 0,
+        click: hadiyaBranch.click || 0,
+        payme: hadiyaBranch.payme || 0
+      };
+
+      return {
+        success: true,
+        isRealData: true,
+        method: 'reports.consolidated',
+        dateBegin,
+        dateEnd,
+        displayDate: options.displayDate || dateBegin.split('T')[0],
+        branchName: "Hadiya Store",
+        consolidatedData: {
+          displayDate: options.displayDate || dateBegin.split('T')[0],
+          branchName: "Hadiya Store",
+          totalSales,
+          formattedTotalSales: `${totalSales.toLocaleString()} so'm`,
+          checksCount,
+          itemsSoldsCount,
+          averageCheck,
+          formattedAverageCheck: `${averageCheck.toLocaleString()} so'm`,
+          payments,
+          returnedProducts,
+          formattedReturnedProducts: `${returnedProducts.toLocaleString()} so'm`,
+          netSales,
+          formattedNetSales: `${netSales.toLocaleString()} so'm`
+        },
+        rawBranchData: hadiyaBranch
+      };
+
+    } catch (err) {
+      return {
+        success: false,
+        isRealData: true,
+        error: err.message,
+        errorMessage: `BILLZ API Ulanish Xatosi: ${err.message}`,
+        dateBegin,
+        dateEnd
+      };
+    }
+  }
+
   // Get Store Hadiya Real Sales & Transacted Items for ANY Period (Single Day, Multi-Day, 7-Week, 1-Month)
   async getSales(options = {}) {
     const token = await this.getAccessToken();

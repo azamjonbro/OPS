@@ -362,6 +362,19 @@ class BillzConnector extends BaseConnector {
     const startTime = Date.now();
     const billzClient = require('../services/billzClientService');
 
+    if (toolName === 'billz_get_consolidated_report' || toolName === 'reports.consolidated') {
+      const res = await billzClient.getConsolidatedReport(params || {});
+      return {
+        success: res.success,
+        isRealData: res.isRealData,
+        data: res.consolidatedData || res.data || res,
+        health: res.health,
+        errorDiagnostic: res.errorDiagnostic || res.error,
+        errorMessage: res.errorMessage,
+        executionMs: Date.now() - startTime
+      };
+    }
+
     if (toolName === 'billz_get_sales') {
       const res = await billzClient.getSales(params?.date || 'today');
       return {

@@ -157,6 +157,11 @@ class ContextBuilder {
 
     if (isBillzRelevant) {
       plannedCalls.push({
+        tool: 'billz_get_consolidated_report',
+        params: { userMessage, date: userMessage },
+        label: 'BILLZ Consolidated Reports API (Hadiya Store Branch Only)'
+      });
+      plannedCalls.push({
         tool: 'billz_get_sales',
         params: dateOpts,
         label: `Direct Live Store Hadiya Billz POS Sales Summary (${dateOpts.label || dateOpts.date})`
