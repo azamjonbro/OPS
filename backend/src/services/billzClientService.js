@@ -358,122 +358,146 @@ class BillzClientService {
     };
   }
 
-  // Get Store Hadiya Real Sales & Transacted Items for ANY Period (Single Day, Multi-Day, 7-Week, 1-Month)
-  async getSales(options = {}) {
+  /**
+   * Walks GET /v3/order-search (api-admin.billz.ai) for one shop and date range,
+   * returning every non-deleted order. This is the real transaction log — confirmed
+   * against the account's own API docs and live-tested (order_type: SALE vs RETURN,
+   * RETURN rows carry a negative total_price and a parent_id back to the original sale).
+   *
+   * The previous implementation inferred "sold today" from a product's `updated_at`
+   * timestamp on the catalog endpoint — but that field also changes on restock, price
+   * edits, and background syncs, so it was counting newly-arrived inventory as sales.
+   */
+  async _fetchRealOrders(startDate, endDate) {
     const token = await this.getAccessToken();
-    const health = await this.healthCheck();
+    if (!token) return { orders: [], error: 'no_token' };
 
-    if (!token || !health.connected) {
+    const orders = [];
+    const pageSize = 200;
+    const maxPages = 25; // 5,000 orders — far beyond a single shop's daily/weekly volume.
+
+    for (let page = 1; page <= maxPages; page++) {
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        limit: String(pageSize),
+        page: String(page),
+        shop_ids: this.storeHadiyaId
+      });
+
+      const res = await fetch(`https://api-admin.billz.ai/v3/order-search?${params.toString()}`, {
+        headers: { accept: 'application/json', Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return { orders, error: `http_${res.status}` };
+
+      const data = await res.json().catch(() => null);
+      if (!data) return { orders, error: 'bad_json' };
+
+      const pageOrders = (data.orders_sorted_by_date_list || []).flatMap((d) => d.orders || []);
+      orders.push(...pageOrders);
+
+      const total = data.count || 0;
+      if (pageOrders.length < pageSize || orders.length >= total) break;
+    }
+
+    return { orders, error: null };
+  }
+
+  // Get Store Hadiya Real Sales for ANY Period (Single Day, Multi-Day, 7-Week, 1-Month)
+  async getSales(options = {}) {
+    const health = await this.healthCheck();
+    if (!health.connected) {
       return { success: false, isRealData: false, health, errorDiagnostic: health.errorDiagnostic };
     }
 
-    try {
-      let targetDateStr = typeof options === 'string' ? options : (options.date || 'today');
-      let daysCount = typeof options === 'object' && options.daysCount ? options.daysCount : 0;
-      let label = typeof options === 'object' && options.label ? options.label : null;
+    let targetDateStr = typeof options === 'string' ? options : (options.date || 'today');
+    let daysCount = typeof options === 'object' && options.daysCount ? options.daysCount : 0;
+    let label = typeof options === 'object' && options.label ? options.label : null;
 
-      if (targetDateStr === 'last_7_days' || targetDateStr.includes('7_day') || targetDateStr.includes('7_kun')) {
-        daysCount = 7;
-      }
+    if (targetDateStr === 'last_7_days' || targetDateStr.includes('7_day') || targetDateStr.includes('7_kun')) {
+      daysCount = 7;
+    }
+    if (targetDateStr === 'today') {
+      targetDateStr = new Date().toISOString().split('T')[0];
+    } else if (targetDateStr === 'yesterday') {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      targetDateStr = d.toISOString().split('T')[0];
+    }
 
-      if (targetDateStr === 'today') {
-        targetDateStr = new Date().toISOString().split('T')[0];
-      } else if (targetDateStr === 'yesterday') {
-        const d = new Date();
-        d.setDate(d.getDate() - 1);
-        targetDateStr = d.toISOString().split('T')[0];
-      }
+    let startDate = targetDateStr;
+    let endDate = targetDateStr;
+    if (daysCount > 0) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - (daysCount - 1));
+      startDate = start.toISOString().split('T')[0];
+      endDate = end.toISOString().split('T')[0];
+    }
 
-      const res = await fetch(`${this.baseUrl}/api/v2/products?limit=250`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const rawData = await res.json();
-      const rawProducts = rawData.products || [];
-
-      const targetItems = [];
-      let grandTotalRevenue = 0;
-      let storeHadiyaInventoryValue = 0;
-      const storeHadiyaActiveStockItems = [];
-
-      for (const p of rawProducts) {
-        if (!p.updated_at) continue;
-
-        // Strictly exclude Tsar Bomba from Store Hadiya
-        if (p.name.toLowerCase().includes('tsar bomba')) continue;
-
-        const hadiyaPriceObj = (p.shop_prices || []).find(sp => sp.shop_name === 'Store Hadiya' || sp.shop_id === this.storeHadiyaId);
-        const hadiyaStockObj = (p.shop_measurement_values || []).find(sm => sm.shop_name === 'Store Hadiya' || sm.shop_id === this.storeHadiyaId);
-
-        if (hadiyaPriceObj || hadiyaStockObj) {
-          const itemPrice = hadiyaPriceObj ? hadiyaPriceObj.retail_price : 0;
-          const itemStock = hadiyaStockObj ? hadiyaStockObj.active_measurement_value : 0;
-
-          if (itemStock > 0) {
-            storeHadiyaInventoryValue += (itemPrice * itemStock);
-            storeHadiyaActiveStockItems.push({
-              name: p.name,
-              sku: p.sku || 'N/A',
-              price: itemPrice,
-              stock: itemStock,
-              formattedPrice: `${itemPrice.toLocaleString()} UZS`
-            });
-          }
-
-          let isMatch = false;
-          if (daysCount > 0) {
-            const itemTime = Date.parse(p.updated_at.replace(' ', 'T'));
-            const cutoffMs = Date.now() - (daysCount * 86400 * 1000);
-            if (!isNaN(itemTime) && itemTime >= cutoffMs) {
-              isMatch = true;
-            }
-          } else {
-            if (p.updated_at.startsWith(targetDateStr)) isMatch = true;
-          }
-
-          if (isMatch) {
-            grandTotalRevenue += itemPrice;
-            targetItems.push({
-              name: p.name,
-              sku: p.sku || 'N/A',
-              price: itemPrice,
-              formattedPrice: `${itemPrice.toLocaleString()} UZS`,
-              stockInStoreHadiya: itemStock,
-              status: itemStock === 0 ? 'SOTILIB TUGAGAN (Sold Out)' : 'MAVJUD',
-              updatedAt: p.updated_at
-            });
-          }
-        }
-      }
-
-      const totalRevenue = grandTotalRevenue;
-      const displayItems = targetItems;
-
+    const { orders, error } = await this._fetchRealOrders(startDate, endDate);
+    if (error) {
       return {
-        success: true,
-        isRealData: true,
+        success: false,
+        isRealData: false,
         health,
-        salesSummary: {
-          storeName: 'Store Hadiya',
-          reportPeriod: label || (daysCount > 0 ? `Oxirgi ${daysCount} kunlik savdo hisoboti` : targetDateStr),
-          requestedDate: targetDateStr,
-          requestedDaysCount: daysCount || 1,
-          totalRevenueUZS: totalRevenue,
-          formattedTotalRevenue: `${totalRevenue.toLocaleString()} UZS`,
-          transactedItemsCount: displayItems.length,
-          transactedItems: displayItems,
-          totalStoreCatalogCount: rawData.count || 1522,
-          totalStoreHadiyaActiveInventoryValue: `${(storeHadiyaInventoryValue || 274525000).toLocaleString()} UZS`,
-          dataAvailableStatus: displayItems.length > 0 
-            ? `Billz POS 2.0 API: ${targetDateStr} sanasida ${displayItems.length} ta sotuv harakati qayd etilgan.`
-            : `Billz POS 2.0 API: ${targetDateStr} sanasida POS kassa orqali 0 ta sotuv amalga oshirilgan (0 UZS tushum).`
+        errorDiagnostic: {
+          httpStatus: error.startsWith('http_') ? error.replace('http_', '') : 'N/A',
+          errorCode: error,
+          errorMessage: "Billz v3/order-search dan real savdo ma'lumotini olib bo'lmadi",
+          endpoint: 'https://api-admin.billz.ai/v3/order-search'
         }
       };
-    } catch (err) {
-      return { success: false, isRealData: false, health, errorDiagnostic: health.errorDiagnostic };
     }
+
+    const live = orders.filter((o) => !o.deleted);
+    const sales = live.filter((o) => o.order_type === 'SALE');
+    const returns = live.filter((o) => o.order_type === 'RETURN');
+
+    const grossRevenue = sales.reduce((sum, o) => sum + (o.order_detail.total_price || 0), 0);
+    const returnedAmount = returns.reduce((sum, o) => sum + Math.abs(o.order_detail.total_price || 0), 0);
+    const netRevenue = grossRevenue - returnedAmount;
+    const checksCount = sales.length;
+    const itemsSoldsCount = sales.reduce((sum, o) =>
+      sum + (o.order_detail.total_products_measurement_value || 0) + (o.order_detail.total_sets_measurement_value || 0), 0);
+    const averageCheck = checksCount > 0 ? Math.round(grossRevenue / checksCount) : 0;
+
+    const transactedItems = sales.map((o) => ({
+      orderNumber: o.order_number,
+      customerName: o.order_detail.customer && o.order_detail.customer.name ? o.order_detail.customer.name.trim() : 'Noma\'lum mijoz',
+      cashier: o.order_detail.user ? o.order_detail.user.name : '',
+      totalPrice: o.order_detail.total_price,
+      formattedTotalPrice: `${(o.order_detail.total_price || 0).toLocaleString()} UZS`,
+      itemsCount: (o.order_detail.total_products_measurement_value || 0) + (o.order_detail.total_sets_measurement_value || 0),
+      soldAt: o.display_sold_at || o.sold_at
+    }));
+
+    return {
+      success: true,
+      isRealData: true,
+      health,
+      salesSummary: {
+        storeName: 'Store Hadiya',
+        reportPeriod: label || (daysCount > 0 ? `Oxirgi ${daysCount} kunlik savdo hisoboti` : targetDateStr),
+        requestedDate: targetDateStr,
+        requestedDaysCount: daysCount || 1,
+        totalRevenueUZS: grossRevenue,
+        formattedTotalRevenue: `${grossRevenue.toLocaleString()} UZS`,
+        netRevenueUZS: netRevenue,
+        formattedNetRevenue: `${netRevenue.toLocaleString()} UZS`,
+        returnedAmountUZS: returnedAmount,
+        formattedReturnedAmount: `${returnedAmount.toLocaleString()} UZS`,
+        checksCount,
+        averageCheckUZS: averageCheck,
+        formattedAverageCheck: `${averageCheck.toLocaleString()} UZS`,
+        transactedItemsCount: itemsSoldsCount,
+        transactedItems,
+        returnedOrdersCount: returns.length,
+        dataAvailableStatus: checksCount > 0
+          ? `Billz v3/order-search: ${startDate}${startDate !== endDate ? ' — ' + endDate : ''} oralig'ida ${checksCount} ta real chek qayd etilgan.`
+          : `Billz v3/order-search: ${startDate}${startDate !== endDate ? ' — ' + endDate : ''} oralig'ida hech qanday sotuv chegi topilmadi (0 UZS tushum).`
+      }
+    };
   }
 }
 
