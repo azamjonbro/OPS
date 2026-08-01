@@ -84,19 +84,32 @@ html.light .border-white\/10 {
   border-color: rgba(99, 102, 241, 0.15) !important;
 }
 
-html.light .text-white,
+/* Base text color overrides (EXCLUDING active white text elements) */
 html.light .text-gray-100,
 html.light .text-gray-200 {
-  color: #0F172A !important;
+  color: #0F172A;
 }
 
 html.light .text-gray-300,
 html.light .text-gray-400 {
-  color: #475569 !important;
+  color: #475569;
 }
 
 html.light .text-gray-500 {
-  color: #64748B !important;
+  color: #64748B;
+}
+
+/* STRICT RULE: All active buttons, active tabs, user chat bubbles, and gradient elements MUST have PURE WHITE TEXT */
+html.light .text-white,
+html.light .bg-indigo-600,
+html.light .bg-indigo-600 *,
+html.light .bg-gradient-to-r.from-indigo-600 *,
+html.light .bg-gradient-to-r.from-indigo-600,
+html.light .bg-gradient-to-r.from-emerald-600,
+html.light .bg-gradient-to-r.from-emerald-600 *,
+html.light .bg-gradient-to-r.from-purple-600,
+html.light .bg-gradient-to-r.from-purple-600 * {
+  color: #FFFFFF !important;
 }
 
 /* Markdown tables in light mode */
@@ -131,10 +144,6 @@ html.light .bg-indigo-600 {
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25) !important;
 }
 
-html.light .bg-indigo-600 * {
-  color: #FFFFFF !important;
-}
-
 /* Input pill in light mode */
 html.light .bg-\[\#171922\].rounded-full,
 html.light input.bg-\[\#171922\],
@@ -153,21 +162,23 @@ html.light aside .bg-\[\#1E2029\],
 html.light aside .bg-\[\#161820\],
 html.light aside .bg-\[\#1A1D26\],
 html.light aside .bg-\[\#171A24\] {
-  background-color: #E2E8F0 !important;
-  border-color: rgba(99, 102, 241, 0.2) !important;
-  color: #0F172A !important;
+  background-color: #F1F5F9 !important;
+  border-color: rgba(99, 102, 241, 0.15) !important;
+  color: #1E293B !important;
 }
 
 html.light aside div.bg-\[\#1E2029\]:hover,
 html.light aside div.bg-\[\#161820\]:hover,
 html.light aside div.bg-\[\#1A1D26\]:hover {
-  background-color: #CBD5E1 !important;
+  background-color: #EEF2FF !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #4338CA !important;
 }
 
 html.light aside .text-gray-300,
 html.light aside .text-gray-400,
 html.light aside .text-gray-500 {
-  color: #334155 !important;
+  color: #475569 !important;
 }
 
 /* Bottom input area container in light mode */
