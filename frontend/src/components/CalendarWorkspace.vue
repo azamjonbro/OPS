@@ -607,6 +607,10 @@ export default {
   },
   async mounted() {
     await this.fetchEvents();
+    window.addEventListener('calendar-updated', this.fetchEvents);
+  },
+  beforeUnmount() {
+    window.removeEventListener('calendar-updated', this.fetchEvents);
   },
   methods: {
     async fetchEvents() {
@@ -683,6 +687,10 @@ export default {
       this.isModalOpen = true;
     },
     async saveModalEvent() {
+      if (!this.modalForm.title || !this.modalForm.title.trim()) {
+        alert('Iltimos, event sarlavhasini (Title) kiriting.');
+        return;
+      }
       try {
         if (this.isEditMode && this.editingId) {
           await calendarService.updateEvent(this.editingId, this.modalForm);
@@ -692,7 +700,8 @@ export default {
         this.isModalOpen = false;
         await this.fetchEvents();
       } catch (e) {
-        alert('Event saqlashda xatolik yuz berdi');
+        const msg = (e.response && e.response.data && e.response.data.error) ? e.response.data.error : e.message;
+        alert('Event saqlashda xatolik yuz berdi: ' + msg);
       }
     },
     async toggleStatus(evt) {

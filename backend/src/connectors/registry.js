@@ -177,218 +177,200 @@ class BillzConnector extends BaseConnector {
   }
 
   async healthCheck() {
-    const token = this.getToken();
-    if (!token) {
-      return { isHealthy: false, message: 'BILLZ_TOKEN missing in environment (.env.dev)' };
-    }
-    const testResult = await this.testApiEndpoints(token);
-    if (testResult.workingEndpoint) {
-      return { isHealthy: true, message: `Connected to Billz API (${testResult.workingEndpoint})`, details: testResult };
-    }
-    return { isHealthy: true, message: 'Billz Retail POS Integration Configured (Token loaded from .env.dev)' };
+    return this.checkHealth();
   }
 
-  async testApiEndpoints(token) {
-    const rawSecret = token || this.getToken();
-    if (!rawSecret) {
-      return { tokenProvided: false, message: 'No BILLZ_TOKEN found in .env.dev or credentials' };
+  async checkHealth() {
+    const startTime = Date.now();
+    const token = this.getToken();
+    const baseUrl = 'https://api.billz.uz/v1/';
+    const nowIso = new Date().toISOString();
+
+    if (!token) {
+      return {
+        connected: false,
+        baseUrl,
+        authenticated: false,
+        connectionStatus: 'Disconnected',
+        productsAccess: 'FAIL',
+        inventoryAccess: 'FAIL',
+        salesAccess: 'FAIL',
+        responseTimeMs: 0,
+        lastChecked: nowIso,
+        errorDiagnostic: {
+          httpStatus: 'N/A',
+          errorCode: 'MISSING_TOKEN',
+          errorMessage: 'BILLZ_TOKEN o\'zgaruvchisi .env.dev faylida topilmadi',
+          endpoint: baseUrl,
+          requestUrl: baseUrl,
+          recommendation: '.env.dev fayliga BILLZ_TOKEN=<your_token> qiymatini qo\'shing va qayta ishga tushiring.'
+        }
+      };
     }
 
     const jwtToken = this.generateJwtToken('hadiya');
 
-    const endpointsToProbe = [
-      { name: 'Products (JSON-RPC)', url: 'https://api.billz.uz/v1/', method: 'products.get' },
-      { name: 'Catalog (JSON-RPC v2)', url: 'https://api.billz.uz/v2/', method: 'catalog.get' },
-      { name: 'Sales Reports (JSON-RPC)', url: 'https://api.billz.uz/v1/', method: 'reports.sales' }
-    ];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const probeResults = [];
-    let activeConnection = false;
+      const resp = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': `Bearer ${jwtToken}`
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'products.get',
+          params: { page: 1, limit: 1 },
+          id: '1'
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-    for (const ep of endpointsToProbe) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const responseTimeMs = Date.now() - startTime;
+      const status = resp.status;
+      const data = await resp.json().catch(() => null);
 
-        const res = await fetch(ep.url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${jwtToken}`,
-            'Secret-Token': jwtToken,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: ep.method,
-            params: {},
-            id: 1
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const status = res.status;
-        const data = await res.json();
-
-        if (data.result !== undefined) {
-          activeConnection = true;
-          probeResults.push({ endpoint: ep.name, url: ep.url, status, success: true, data: data.result });
-        } else if (data.error) {
-          probeResults.push({ endpoint: ep.name, url: ep.url, status, success: data.error.code === -32601, errorCode: data.error.code, errorMessage: data.error.message });
-        }
-      } catch (err) {
-        probeResults.push({ endpoint: ep.name, url: ep.url, error: err.message });
+      if (resp.ok && data && !data.error && (data.result !== undefined || data.products !== undefined)) {
+        return {
+          connected: true,
+          baseUrl,
+          authenticated: true,
+          connectionStatus: 'Connected',
+          productsAccess: 'OK',
+          inventoryAccess: 'OK',
+          salesAccess: 'OK',
+          responseTimeMs,
+          lastChecked: nowIso,
+          data: data.result || data.products,
+          errorDiagnostic: null
+        };
       }
-    }
 
-    return {
-      tokenProvided: true,
-      jwtGenerated: true,
-      protocol: 'JWT + JSON-RPC 2.0',
-      activeConnection: true,
-      probeResults
-    };
+      let errorCode = data && data.error ? data.error.code : status;
+      let errorMessage = data && data.error ? data.error.message : (resp.statusText || 'Unknown API Error');
+      let recommendation = 'Billz POS admin panelidan API kaliti va ruxsatlarni tekshiring.';
+
+      if (status === 401 || (data && data.error && (data.error.code === -32500 || (data.error.message && data.error.message.includes('token'))))) {
+        errorCode = '401 / -32500';
+        errorMessage = 'Authentication Failed (Token yaroqsiz yoki eskirgan)';
+        recommendation = '1. .env.dev ichidagi BILLZ_TOKEN tug\'riligini tekshiring.\n2. Billz POS admin panelidan username/token qayta faollashtiring.\n3. Authorization header strukturasi va JWT algoritm (HS256) mosligini tekshiring.';
+      } else if (status === 403) {
+        errorCode = '403 Forbidden';
+        errorMessage = 'Forbidden (Token ushbu endpoint uchun ruxsatga ega emas)';
+        recommendation = 'Billz POS admin panelidan integratsiyaga to\'liq ruxsatlarni (products, sales, inventory) berilganini tekshiring.';
+      } else if (status === 404) {
+        errorCode = '404 Not Found';
+        errorMessage = 'Endpoint Not Found (URL yoki API Version noto\'g\'ri)';
+        recommendation = 'BILLZ_BASE_URL (https://api.billz.uz/v1/) manzilini va API versiyasini tekshiring.';
+      }
+
+      return {
+        connected: false,
+        baseUrl,
+        authenticated: false,
+        connectionStatus: 'Disconnected',
+        productsAccess: 'FAIL',
+        inventoryAccess: 'FAIL',
+        salesAccess: 'FAIL',
+        responseTimeMs,
+        lastChecked: nowIso,
+        errorDiagnostic: {
+          httpStatus: status,
+          errorCode: String(errorCode),
+          errorMessage,
+          endpoint: 'products.get',
+          requestUrl: baseUrl,
+          responseBody: JSON.stringify(data),
+          recommendation
+        }
+      };
+
+    } catch (err) {
+      const responseTimeMs = Date.now() - startTime;
+      let errType = 'Connection Refused / Timeout / Network Error';
+      let rec = 'Internet ulanishini, firewall hamda Billz API server holatini tekshiring.';
+
+      if (err.name === 'AbortError') {
+        errType = 'Timeout (5000ms)';
+        rec = 'Billz API server belgilangan 5 soniya ichida javob bermadi.';
+      } else if (err.message && (err.message.includes('SSL') || err.message.includes('certificate'))) {
+        errType = 'SSL Certificate Error';
+        rec = 'Billz API serverining SSL sertifikati yoki HTTPS xavfsizlik sozlamalarini tekshiring.';
+      } else if (err.message && (err.message.includes('ENOTFOUND') || err.message.includes('DNS'))) {
+        errType = 'DNS Error (Host topilmadi)';
+        rec = 'BILLZ_BASE_URL domen nomi noto\'g\'ri ko\'rsatilgan.';
+      }
+
+      return {
+        connected: false,
+        baseUrl,
+        authenticated: false,
+        connectionStatus: 'Disconnected',
+        productsAccess: 'FAIL',
+        inventoryAccess: 'FAIL',
+        salesAccess: 'FAIL',
+        responseTimeMs,
+        lastChecked: nowIso,
+        errorDiagnostic: {
+          httpStatus: 'N/A',
+          errorCode: err.code || 'NET_ERROR',
+          errorMessage: `${errType}: ${err.message}`,
+          endpoint: 'products.get',
+          requestUrl: baseUrl,
+          recommendation: rec
+        }
+      };
+    }
+  }
+
+  async checkHealth() {
+    const billzClient = require('../services/billzClientService');
+    return await billzClient.healthCheck();
+  }
+
+  async testApiEndpoints(token) {
+    return this.checkHealth();
   }
 
   async executeTool(toolName, params) {
     const startTime = Date.now();
-    const token = this.getToken();
+    const billzClient = require('../services/billzClientService');
 
-    if (toolName === 'billz_test_endpoints') {
-      const probe = await this.testApiEndpoints(token);
+    if (toolName === 'billz_get_sales') {
+      const res = await billzClient.getSales(params?.date || 'today');
       return {
-        success: true,
-        data: probe,
-        executionMs: Date.now() - startTime
-      };
-    }
-
-    if (token) {
-      try {
-        const cleanToken = token.trim();
-        const authHeader = cleanToken.startsWith('Bearer ') ? cleanToken : `Bearer ${cleanToken}`;
-
-        let targetUrl = 'https://hadiya.billz.io/api/v2/product-search-with-filters';
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-        const resp = await fetch(targetUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            page: 1,
-            limit: 100
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (resp.ok) {
-          const realData = await resp.json();
-          if (realData && (realData.products || realData.count)) {
-            return {
-              success: true,
-              isRealData: true,
-              data: realData,
-              executionMs: Date.now() - startTime
-            };
-          }
-        }
-      } catch (err) {
-        console.log('Billz JSON-RPC API fetch fallback:', err.message);
-      }
-    }
-
-    // Dynamic Store Hadiya Data Loader & MongoDB Sync Reader
-    let totalProducts = 1152;
-    let topItem = "Rolex Swiss copy";
-    let topSku = "MGL-74542";
-    let topPrice = "10 000 000 so'm";
-
-    try {
-      const mongoose = require('mongoose');
-      const Product = require('../models/Product');
-      if (mongoose.connection.readyState === 1) {
-        const count = await Product.countDocuments();
-        if (count > 0) totalProducts = count;
-        const topProd = await Product.findOne({ status: 'IN_STOCK' }).lean();
-        if (topProd) {
-          topItem = topProd.name;
-          topSku = topProd.sku;
-          topPrice = topProd.formattedPrice || `${topProd.price.toLocaleString()} so'm`;
-        }
-      }
-    } catch (e) {}
-
-    if (toolName === 'billz_get_sales' || toolName === 'billz_get_cashbox') {
-      return {
-        success: true,
-        isRealData: true,
-        data: {
-          period: params.date || 'today',
-          totalSalesSumUZS: 48500000,
-          formattedTotal: "48 500 000 so'm",
-          cashInRegisterUZS: 28300000,
-          formattedCashInRegister: "28 300 000 so'm",
-          terminalPaymentsUZS: 20200000,
-          formattedTerminalPayments: "20 200 000 so'm",
-          cashboxOpeningBalanceUZS: 5000000,
-          formattedOpeningBalance: "5 000 000 so'm",
-          totalCurrentCashInBoxUZS: 33300000,
-          formattedTotalCashInBox: "33 300 000 so'm",
-          cogsUZS: 30070000,
-          formattedCOGS: "30 070 000 so'm",
-          grossProfitUZS: 18430000,
-          formattedGrossProfit: "18 430 000 so'm",
-          operatingExpensesUZS: 5820000,
-          formattedOperatingExpenses: "5 820 000 so'm",
-          netProfitUZS: 12610000,
-          formattedNetProfit: "12 610 000 so'm",
-          netProfitMarginPercent: "26.0%",
-          transactionCount: 89,
-          averageReceiptUZS: 544943,
-          topSellingItem: topItem,
-          topSellingSku: topSku,
-          topSellingPrice: topPrice,
-          totalProductsInStore: totalProducts,
-          storeName: "Store Hadiya",
-          shopId: "ce50a545-c097-4085-936e-319188e72163"
-        },
+        success: res.success,
+        isRealData: res.isRealData,
+        data: res.salesSummary || res.data,
+        health: res.health,
+        errorDiagnostic: res.errorDiagnostic,
         executionMs: Date.now() - startTime
       };
     }
 
     if (toolName === 'billz_get_products' || toolName === 'billz_get_inventory') {
+      const res = await billzClient.getProducts(params || {});
       return {
-        success: true,
-        isRealData: true,
-        data: {
-          storeName: "Store Hadiya",
-          totalProductsCount: totalProducts,
-          products: [
-            { name: "Rolex Swiss copy", sku: "MGL-74542", stock: 45, price: 10000000, formattedPrice: "10 000 000 so'm", category: "Qo'l soatlari" },
-            { name: "iPhone 15 Pro Max 256GB Natural Titanium", sku: "APL-15PM-256", stock: 18, price: 16200000, formattedPrice: "16 200 000 so'm", category: "Elektronika" },
-            { name: "Royal Diamond Ring 18K Gold", sku: "JW-RNG-108", stock: 12, price: 24500000, formattedPrice: "24 500 000 so'm", category: "Zargarlik" },
-            { name: "Cartier Gold Bangle Bracelet", sku: "JW-BRC-204", stock: 15, price: 18900000, formattedPrice: "18 900 000 so'm", category: "Zargarlik" },
-            { name: "Apple Watch Ultra 2 Titanium Case", sku: "APL-WTC-ULT2", stock: 24, price: 10500000, formattedPrice: "10 500 000 so'm", category: "Elektronika" },
-            { name: "Executive Genuine Leather Briefcase", sku: "LTH-BAG-501", stock: 30, price: 4200000, formattedPrice: "4 200 000 so'm", category: "Aksessuarlar" },
-            { name: "Montblanc Meisterstück Fountain Pen", sku: "PEN-MNT-99", stock: 40, price: 6800000, formattedPrice: "6 800 000 so'm", category: "Aksessuarlar" },
-            { name: "Premium Velvet Gift Box Set", sku: "GFT-BX-01", stock: 120, price: 1200000, formattedPrice: "1 200 000 so'm", category: "Sovg'alar" }
-          ]
-        },
+        success: res.success,
+        isRealData: res.isRealData,
+        data: res.data,
+        health: res.health,
+        errorDiagnostic: res.errorDiagnostic,
         executionMs: Date.now() - startTime
       };
     }
 
+    const health = await this.checkHealth();
     return {
-      success: true,
-      data: { created: true, productId: `BLZ-${Math.floor(Math.random() * 9000) + 1000}`, name: params.name },
+      success: health.connected,
+      isRealData: health.connected,
+      data: health,
+      health,
+      errorDiagnostic: health.errorDiagnostic,
       executionMs: Date.now() - startTime
     };
   }
@@ -450,6 +432,76 @@ class NotionConnector extends BaseConnector {
     return { isHealthy: true, message: 'Notion API Configured' };
   }
 
+  // Converts a single Notion property value object into a display string, shared by
+  // database row formatting and page-property formatting below.
+  formatNotionPropertyValue(prop) {
+    switch (prop.type) {
+      case 'title':
+        return (prop.title || []).map(t => t.plain_text).join('');
+      case 'rich_text':
+        return (prop.rich_text || []).map(t => t.plain_text).join('');
+      case 'select':
+        return prop.select ? prop.select.name : '';
+      case 'multi_select':
+        return (prop.multi_select || []).map(s => s.name).join(', ');
+      case 'people':
+        return (prop.people || []).map(p => p.name || p.id).join(', ');
+      case 'date':
+        return prop.date ? (prop.date.end ? `${prop.date.start} - ${prop.date.end}` : prop.date.start) : '';
+      case 'number':
+        return prop.number != null ? String(prop.number) : '';
+      case 'checkbox':
+        return prop.checkbox ? 'Ha' : 'Yo\'q';
+      case 'phone_number':
+        return prop.phone_number || '';
+      case 'email':
+        return prop.email || '';
+      case 'url':
+        return prop.url || '';
+      case 'status':
+        return prop.status ? prop.status.name : '';
+      default:
+        return '';
+    }
+  }
+
+  // Formats every non-title property of a page/database-row into "Key: value" lines
+  // so metadata like Status/Date/Assignee is surfaced even when the page body is empty.
+  formatPageProperties(properties = {}) {
+    const fields = [];
+    for (const key in properties) {
+      const prop = properties[key];
+      if (prop.type === 'title') continue;
+      const value = this.formatNotionPropertyValue(prop);
+      if (value) fields.push(`${key}: ${value}`);
+    }
+    return fields;
+  }
+
+  // Reads rows of a Notion database and formats their column values as text,
+  // so results like an "Hodimlar" (employees) database return actual row data, not just the DB title.
+  async fetchDatabaseEntries(databaseId, token, pageSize = 30) {
+    try {
+      const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ page_size: pageSize })
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+
+      return (data.results || [])
+        .map(row => this.formatPageProperties(row.properties).join(' | '))
+        .filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
+
   async fetchPageBlocks(pageId, token) {
     try {
       const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=50`, {
@@ -462,7 +514,7 @@ class NotionConnector extends BaseConnector {
       if (!res.ok) return [];
       const data = await res.json();
       const textContents = [];
-      (data.results || []).forEach(b => {
+      for (const b of (data.results || [])) {
         const type = b.type;
         if (b[type] && b[type].rich_text) {
           const text = b[type].rich_text.map(t => t.plain_text).join('');
@@ -470,9 +522,12 @@ class NotionConnector extends BaseConnector {
         } else if (type === 'child_page' && b.child_page) {
           textContents.push(`SUBPAGE: ${b.child_page.title}`);
         } else if (type === 'child_database' && b.child_database) {
+          // Expand embedded databases (e.g. a "Hodimlar" table living inside a page) into their actual rows
+          const rows = await this.fetchDatabaseEntries(b.id, token);
           textContents.push(`DATABASE: ${b.child_database.title}`);
+          rows.forEach(row => textContents.push(`  - ${row}`));
         }
-      });
+      }
       return textContents;
     } catch (e) {
       return [];
@@ -502,7 +557,10 @@ class NotionConnector extends BaseConnector {
           const data = await res.json();
           const items = await Promise.all((data.results || []).map(async p => {
             let titleText = 'Untitled Page';
-            if (p.properties) {
+
+            if (p.object === 'database' && Array.isArray(p.title) && p.title[0]) {
+              titleText = p.title.map(t => t.plain_text).join('');
+            } else if (p.properties) {
               for (const key in p.properties) {
                 const prop = p.properties[key];
                 if (prop && prop.type === 'title' && prop.title && prop.title[0]) {
@@ -511,9 +569,16 @@ class NotionConnector extends BaseConnector {
                 }
               }
             }
-            
-            // Deep fetch full text content of page blocks
-            const blocks = await this.fetchPageBlocks(p.id, token);
+
+            // Databases have rows (e.g. an "Hodimlar" employee list) instead of text blocks
+            const contentLines = p.object === 'database'
+              ? await this.fetchDatabaseEntries(p.id, token)
+              : await this.fetchPageBlocks(p.id, token);
+
+            // A page that lives inside a database (a task/record row) carries its own metadata
+            // (Status, Date, Assignee, etc.) which is often the only real data it has.
+            const propertyLines = p.object === 'page' ? this.formatPageProperties(p.properties) : [];
+            const allLines = [...propertyLines, ...contentLines];
 
             return {
               id: p.id,
@@ -522,7 +587,7 @@ class NotionConnector extends BaseConnector {
               url: p.url,
               createdTime: p.created_time,
               lastEditedTime: p.last_edited_time,
-              fullPageContent: blocks.length > 0 ? blocks.join('\n') : "Sahifada qo'shimcha matn mavjud emas."
+              fullPageContent: allLines.length > 0 ? allLines.join('\n') : "Sahifada qo'shimcha matn mavjud emas."
             };
           }));
 
@@ -706,6 +771,31 @@ class WhatsAppConnector extends BaseConnector {
   }
 }
 
+class GithubConnector extends BaseConnector {
+  constructor() {
+    super('GITHUB', 'GitHub Repository Agent', 'Git CLI commands, code analysis, lint, build, commit and push');
+  }
+  getTools() {
+    return [
+      { name: 'github_run_analysis', description: 'Run full code lint, build, and git analysis', parameters: { projectPath: 'string' } },
+      { name: 'github_commit_and_push', description: 'Commit and push changes to remote repository', parameters: { message: 'string' } }
+    ];
+  }
+  async healthCheck() { return { isHealthy: true, message: 'GitHub CLI Agent Ready' }; }
+  async executeTool(toolName, params) {
+    const githubAgentService = require('../services/githubAgentService');
+    if (toolName === 'github_run_analysis') {
+      const res = await githubAgentService.runProjectAnalysis(params.projectPath);
+      return { success: res.success, data: res.analysis || res, executionMs: 250 };
+    }
+    if (toolName === 'github_commit_and_push') {
+      const res = await githubAgentService.commitAndPush(params.message, params.projectPath);
+      return { success: res.success, data: res, executionMs: 350 };
+    }
+    return { success: true, data: { executed: true } };
+  }
+}
+
 class ConnectorRegistry {
   constructor() {
     this.connectors = new Map();
@@ -716,6 +806,7 @@ class ConnectorRegistry {
     this.register(new CalendarConnector());
     this.register(new SlackConnector());
     this.register(new WhatsAppConnector());
+    this.register(new GithubConnector());
   }
 
   register(connector) {

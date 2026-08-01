@@ -173,6 +173,7 @@ const createEvent = async (req, res) => {
     mockDb.calendarEvents.unshift(eventPayload);
 
     // Audit log
+    if (!mockDb.auditLogs) mockDb.auditLogs = [];
     mockDb.auditLogs.unshift({
       id: `log-${Date.now()}`,
       connector: 'CALENDAR',

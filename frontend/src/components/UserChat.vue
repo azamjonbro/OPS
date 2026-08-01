@@ -6,7 +6,6 @@
     @dragleave.prevent="onDragLeave"
     @drop.prevent="onDropFile"
   >
-    <!-- FULL-SCREEN DRAG & DROP OVERLAY -->
     <div v-if="isDraggingFile" class="fixed inset-0 z-50 bg-[#0B0C0E]/90 flex flex-col items-center justify-center p-6 border-4 border-dashed border-indigo-500 rounded-3xl backdrop-blur-sm transition-all duration-300 pointer-events-none">
       <div class="w-20 h-20 rounded-3xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 mb-4 animate-bounce">
         <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16,16 +15,13 @@
       <h2 class="text-2xl font-bold text-white tracking-tight">Faylni shu yerga tashlang (Drop File Here)</h2>
       <p class="text-sm text-gray-400 mt-2">Rasm, PDF, Excel, CSV va hisobotlarni tahlil qilish uchun yuklang</p>
     </div>
-
-    <!-- Hidden File Input -->
     <input type="file" ref="fileInput" @change="onFileInputChange" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.xml" />
 
-    <!-- Mobile Navigation Drawer Overlay -->
     <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 z-40 bg-black/60 md:hidden"></div>
 
-    <!-- Sidebar (Desktop & Mobile Drawer) -->
+
     <aside :class="['w-72 border-r border-[#1F222A] bg-[#111317] flex flex-col justify-between p-4 z-40 transition-all duration-300 md:static fixed inset-y-0 left-0 h-full overflow-hidden', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
-      <!-- App Title & New Chat Action Header -->
+
       <div class="flex items-center justify-between px-2 pb-3 border-b border-[#1F222A] shrink-0">
         <div class="flex items-center gap-3 group cursor-pointer">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30 shrink-0 group-hover:scale-105 transition-transform duration-300">
@@ -197,33 +193,33 @@
     <main class="flex-1 flex flex-col justify-between h-full bg-[#0B0C0E] relative">
       <!-- Header Bar -->
       <header class="h-16 border-b border-[#1F222A] flex items-center justify-between px-4 sm:px-6 bg-[#111317] z-20">
-        <div class="flex items-center gap-3">
-          <button @click="isMobileMenuOpen = true" class="p-2 rounded-xl bg-[#1A1D26] text-gray-300 md:hidden">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <button @click="isMobileMenuOpen = true" class="p-2 rounded-xl bg-[#1A1D26] text-gray-300 md:hidden shrink-0">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
-          <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span class="text-xs font-bold text-gray-200 hidden sm:inline">Store Hadiya Executive AI</span>
-            <span class="text-[10px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30 font-semibold shadow-sm">GPT-4o + Claude 3.5</span>
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
+            <span class="text-xs font-bold text-gray-200 truncate">Store Hadiya Executive AI</span>
+            <span class="text-[10px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30 font-semibold shadow-sm hidden md:inline-flex shrink-0">GPT-4o + Claude 3.5</span>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <!-- Schedule Automations Trigger Button -->
-          <button @click="isScheduleOpen = true" class="text-xs font-bold text-emerald-300 hover:text-white bg-gradient-to-r from-emerald-950/60 to-teal-950/60 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/30 hover:border-emerald-500/60 px-3.5 py-2 rounded-2xl transition-all shadow-lg shadow-emerald-950/30 flex items-center gap-2">
-            <div class="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button @click="isScheduleOpen = true" class="text-xs font-bold text-emerald-300 hover:text-white bg-gradient-to-r from-emerald-950/60 to-teal-950/60 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/30 hover:border-emerald-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-emerald-950/30 flex items-center gap-1.5">
+            <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
             </div>
             <span class="hidden sm:inline">Avtomatlashtirish</span>
-            <span class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30">{{ schedules.length }}</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30 font-bold">{{ schedules.length }}</span>
           </button>
 
           <!-- Admin Panel Button -->
-          <button @click="$emit('switch-view', 'admin')" class="text-xs font-bold text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-500/30 hover:border-indigo-500/60 px-3.5 py-2 rounded-2xl transition-all shadow-lg shadow-indigo-950/30 flex items-center gap-2">
-            <div class="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button @click="$emit('switch-view', 'admin')" class="text-xs font-bold text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-500/30 hover:border-indigo-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-indigo-950/30 flex items-center gap-1.5">
+            <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+              <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
@@ -517,33 +513,62 @@
                 </span>
               </div>
 
-              <!-- Message Content -->
-              <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {{ msg.content }}
+              <!-- Message Content with Markdown Parsing -->
+              <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body" v-html="renderMarkdown(msg.content)"></div>
+
+              <!-- Interactive Action Confirmation Card (Allow / Cancel) -->
+              <div v-if="msg.requiresApproval || (msg.content && (msg.content.includes('Biroz kuting') || msg.content.includes('ko\'rib chiqaman')))" class="mt-3 bg-gradient-to-r from-[#171922] via-[#1D212F] to-[#171922] border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                    🛡️
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-bold text-white tracking-wide">Tizim Amali Uchun Ruxsat So'ralmoqda</h4>
+                    <p class="text-[11px] text-gray-300">Notion workspace va Billz 2.0 API orqali barcha ma'lumotlar olinib, real hisobot shakllantirilsinmi?</p>
+                  </div>
+                </div>
+
+                <!-- Action Confirmation Buttons -->
+                <div class="flex items-center gap-2 pt-1">
+                  <button 
+                    @click="confirmActionAndContinue(msg)" 
+                    class="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>✅ Ruxsat berish (Allow & Continue)</span>
+                  </button>
+
+                  <button 
+                    @click="cancelAction(msg)" 
+                    class="px-4 py-2 rounded-xl bg-[#222530] hover:bg-[#2C3040] text-gray-300 font-semibold text-xs border border-[#343848] transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>❌ Bekor qilish</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Gemini-style Interpreting Loading Indicator -->
+        <!-- Gemini-style Interactive Progress Indicator -->
         <div v-if="isLoading" class="flex items-center gap-3 pt-2">
-          <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-xs shrink-0">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-lg shadow-indigo-500/20">
+            <svg class="w-4 h-4 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
           </div>
-          <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl px-4 py-2.5 text-xs text-indigo-300 flex items-center gap-2.5">
-            <span class="flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+          <div class="bg-[#14161C] border border-indigo-500/30 rounded-2xl px-4 py-2.5 text-xs text-indigo-300 flex items-center gap-2.5 shadow-xl">
+            <span class="flex items-center gap-1.5 shrink-0">
+              <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+              <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
             </span>
-            <span class="font-medium tracking-wide">Interpreting User Input...</span>
+            <span class="font-semibold tracking-wide text-indigo-200 transition-all duration-300">{{ loadingStepText || "📡 Billz 2.0 POS API serveridan Store Hadiya ma'lumotlari olinmoqda..." }}</span>
           </div>
         </div>
       </div>
 
       <!-- Gemini Style Floating Input Pill Footer -->
-      <footer class="p-4 sm:p-6 bg-[#0B0C0E]">
+      <footer class="p-4 sm:p-6 bg-[#0B0C0E] mb-[76px] md:mb-0 relative z-30">
         <div class="max-w-3xl w-full mx-auto space-y-2">
 
           <!-- ATTACHED FILE PREVIEW CARD -->
@@ -929,9 +954,15 @@
 <script>
 import axios from 'axios';
 import { nextTick } from 'vue';
+import { marked } from 'marked';
 import { VoiceController, RECORDING_STATE } from '../services/voiceController';
 import { API_BASE } from '../services/api';
 import CalendarWorkspace from './CalendarWorkspace.vue';
+
+marked.setOptions({
+  gfm: true,
+  breaks: true
+});
 
 export default {
   components: {
@@ -952,7 +983,9 @@ export default {
       previewImageSrc: null,
 
       // File Drag & Drop & Attachment States
-      isDraggingFile: false,
+      isLoading: false,
+      loadingStepText: '',
+      loadingTimer: null,
       attachedFile: null,
 
       // Delete Modal Confirmation States
@@ -1340,6 +1373,7 @@ export default {
 
       this.scrollToBottom();
       this.isLoading = true;
+      this.startLoadingSteps();
 
       try {
         const res = await axios.post(`${API_BASE}/api/chat/message`, {
@@ -1354,6 +1388,10 @@ export default {
           content: res.data.assistantResponse,
           toolCalls: JSON.stringify(res.data.executedTools || [])
         });
+
+        if (res.data.executedTools && res.data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
+          window.dispatchEvent(new CustomEvent('calendar-updated'));
+        }
         
         await this.fetchConversations();
         this.fetchSchedules();
@@ -1366,8 +1404,66 @@ export default {
         });
       } finally {
         this.isLoading = false;
+        this.stopLoadingSteps();
         this.scrollToBottom();
       }
+    },
+    async confirmActionAndContinue(msg) {
+      if (this.isLoading) return;
+      msg.requiresApproval = false;
+
+      const userMsgIdx = this.messages.findIndex(m => m.id === msg.id);
+      let userPrompt = "Kechagi va oxirgi kiritilgan barcha qo'shimchalarni Notion va MongoDB bazasidan o'qib ber";
+      if (userMsgIdx > 0 && this.messages[userMsgIdx - 1] && this.messages[userMsgIdx - 1].role === 'user') {
+        userPrompt = this.messages[userMsgIdx - 1].content;
+      }
+
+      this.isLoading = true;
+      this.startLoadingSteps();
+
+      try {
+        const res = await axios.post(`${API_BASE}/api/chat/message`, {
+          conversationId: this.activeConvId,
+          content: userPrompt,
+          confirmed: true
+        });
+
+        msg.content = res.data.assistantResponse;
+        msg.toolCalls = JSON.stringify(res.data.executedTools || []);
+        
+        await this.fetchConversations();
+        this.fetchSchedules();
+        this.scrollToBottom();
+      } catch (err) {
+        msg.content = "Xatolik yuz berdi: Backend server bilan ulanishni tekshiring.";
+      } finally {
+        this.isLoading = false;
+        this.stopLoadingSteps();
+        this.scrollToBottom();
+      }
+    },
+    cancelAction(msg) {
+      msg.requiresApproval = false;
+      msg.content = "❌ So'rov foydalanuvchi tomonidan bekor qilindi.";
+    },
+    startLoadingSteps() {
+      const steps = [
+        "📡 Billz 2.0 POS API serveriga ulanilmoqda...",
+        "📦 Store Hadiya 1,522 ta mahsulot va narxlari o'qilmoqda...",
+        "📊 Tanlangan davr sotuv tushumlari va qoldiqlar tahlil qilinmoqda...",
+        "🧠 Dual Ensemble GPT-4o executive hisobot shakllantirmoqda..."
+      ];
+      let idx = 0;
+      this.loadingStepText = steps[0];
+      if (this.loadingTimer) clearInterval(this.loadingTimer);
+      this.loadingTimer = setInterval(() => {
+        idx = (idx + 1) % steps.length;
+        this.loadingStepText = steps[idx];
+      }, 1100);
+    },
+    stopLoadingSteps() {
+      if (this.loadingTimer) clearInterval(this.loadingTimer);
+      this.loadingTimer = null;
     },
     parseTools(toolCalls) {
       if (!toolCalls) return [];
@@ -1377,8 +1473,6 @@ export default {
         return [];
       }
     },
-
-    // --- DRAG & DROP AND FILE ATTACHMENT HANDLERS ---
     onDragOver(e) {
       this.isDraggingFile = true;
     },
@@ -1461,7 +1555,100 @@ export default {
         }
         this.pendingDeleteId = null;
       }
+    },
+    renderMarkdown(content) {
+      if (!content) return '';
+      try {
+        return marked.parse(content);
+      } catch (err) {
+        return content;
+      }
     }
   }
 };
 </script>
+
+<style>
+.markdown-body {
+  color: #E2E8F0;
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  color: #FFFFFF;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-body h1 { font-size: 1.25rem; border-bottom: 1px solid #2D3748; padding-bottom: 0.25rem; }
+.markdown-body h2 { font-size: 1.1rem; }
+.markdown-body h3 { font-size: 0.95rem; }
+.markdown-body p {
+  margin-bottom: 0.75rem;
+}
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-body li {
+  margin-bottom: 0.25rem;
+}
+.markdown-body a {
+  color: #818CF8;
+  text-decoration: underline;
+}
+.markdown-body a:hover {
+  color: #A5B4FC;
+}
+.markdown-body code {
+  background-color: #1E222D;
+  color: #F472B6;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.375rem;
+  font-family: monospace;
+  font-size: 0.8em;
+}
+.markdown-body pre {
+  background-color: #0F1117;
+  border: 1px solid #1F222A;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+.markdown-body pre code {
+  background-color: transparent;
+  color: #E2E8F0;
+  padding: 0;
+}
+.markdown-body blockquote {
+  border-left: 3px solid #6366F1;
+  padding-left: 0.75rem;
+  color: #94A3B8;
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid #2D3748;
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+}
+.markdown-body th {
+  background-color: #1A1D26;
+  font-weight: 600;
+}
+</style>

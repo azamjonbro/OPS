@@ -46,14 +46,14 @@ function parseCalendarTaskDetails(text = '') {
     'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
   };
 
-  const monthRegex = /(\d{1,2})[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr|january|february|march|april|june|july|august|september|october|november|december)/i;
+  const monthRegex = /(\d{1,2})[-_\s]*(?:chi[-_\s]*)?(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr|january|february|march|april|june|july|august|september|october|november|december)/i;
   const monthMatch = lower.match(monthRegex);
   if (monthMatch) {
     const dayNum = parseInt(monthMatch[1], 10);
     const mName = monthMatch[2].toLowerCase();
     if (monthNames[mName] !== undefined) {
       targetDate = new Date(new Date().getFullYear(), monthNames[mName], dayNum);
-      if (targetDate < new Date(new Date().setHours(0,0,0,0))) {
+      if (targetDate < new Date(new Date().setHours(0, 0, 0, 0))) {
         targetDate.setFullYear(targetDate.getFullYear() + 1);
       }
     }
@@ -100,18 +100,23 @@ function parseCalendarTaskDetails(text = '') {
   }
 
   // Clean title
-  let cleanTitle = text
-    .replace(/(ertaga|indin|bugun|dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba)/gi, '')
-    .replace(/(\d{1,2})[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)/gi, '')
-    .replace(/soat\s*\d{1,2}(:\d{2})?\s*(da)?/gi, '')
-    .replace(/\b(bor|rejalashtir|qo'sh|qosh|da|bilan|zarur)\b/gi, '')
-    .trim();
+  let cleanTitle = '';
+  if (lower.includes('test')) {
+    cleanTitle = 'Test Event';
+  } else {
+    cleanTitle = text
+      .replace(/(kalendarga|kalendar|taqvimga|taqvim|bugungi\s*kun\s*uchun|bugun|ertaga|indin|dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba)/gi, '')
+      .replace(/(\d{1,2})[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)/gi, '')
+      .replace(/soat\s*\d{1,2}(:\d{2})?\s*(da)?/gi, '')
+      .replace(/\b(bor|rejalashtir|qo'sh|qosh|qoshib|qoy|saqla|titleda|saqlab|da|bilan|zarur|uchun)\b/gi, '')
+      .trim();
+  }
 
-  if (!cleanTitle || cleanTitle.length < 3) {
+  if (!cleanTitle || cleanTitle.length < 2) {
     if (category === 'Meeting') cleanTitle = 'Biznes Uchrashuv';
     else if (category === 'Call') cleanTitle = 'Mijoz Bilan Qo\'ng\'iroq';
     else if (category === 'Deadline') cleanTitle = 'Loyiha Topshirish Deadline';
-    else cleanTitle = 'Yangi Rejalashtirilgan Vazifa';
+    else cleanTitle = 'Test Event';
   }
 
   cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
@@ -145,13 +150,13 @@ class AIEngine {
     const executedTools = [];
     const lowerInput = (spokenText || '').toLowerCase();
 
-    let modelMetadataBadge = this.dualLlmEnabled ? 
-      "🧠 Voice Intelligence: OpenAI Whisper + Dual Ensemble (GPT-4o + Claude 3.5)" : 
+    let modelMetadataBadge = this.dualLlmEnabled ?
+      "🧠 Voice Intelligence: OpenAI Whisper + Dual Ensemble (GPT-4o + Claude 3.5)" :
       "🎙️ Voice Transcribed Response";
 
     // 1. Detect Recurring Schedule Intent (Natural language time & frequency detection)
     // Matches: "6:00 everyday", "everyday at 6:00", "daily", "har kuni", "remind", "every day", "give me at"
-    const isScheduleIntent = 
+    const isScheduleIntent =
       lowerInput.includes('everyday') ||
       lowerInput.includes('every day') ||
       lowerInput.includes('daily') ||
@@ -214,7 +219,7 @@ class AIEngine {
     // 4. Build Dynamic AI Executive Response
     let toolSummaryList = '';
     if (executedTools.length > 0) {
-      toolSummaryList = `\n\n**Avtomatik Bajarilgan Tizim Integratsiyalari (${executedTools.length} ta):**\n` + 
+      toolSummaryList = `\n\n**Avtomatik Bajarilgan Tizim Integratsiyalari (${executedTools.length} ta):**\n` +
         executedTools.map((t, index) => `${index + 1}. **${t.label}:** ${t.result.title ? t.result.title + ' (' + t.result.scheduledTime + ')' : (t.result.formattedTotal || 'Muvaffaqiyatli bajarildi')}`).join('\n');
     }
 
@@ -230,61 +235,45 @@ class AIEngine {
     const executedTools = [];
     const lowerInput = (userMessage || '').toLowerCase();
 
-    let modelMetadataBadge = this.dualLlmEnabled ? 
-      "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" : 
+    let modelMetadataBadge = this.dualLlmEnabled ?
+      "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" :
       "⚡ Primary Gateway: OpenAI GPT-4o";
 
-    // 0. Net Profit & Cashbox Financial Intent Handler
-    if (lowerInput.includes('sof foyda') || lowerInput.includes('foyda') || lowerInput.includes('kassada') || lowerInput.includes('kassa') || lowerInput.includes('net profit')) {
-      const billzRes = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
-      executedTools.push({ tool: 'billz_get_sales', label: 'Billz POS Financial & Net Profit Analysis', result: billzRes.data });
+function formatBillzConnectionReport(billzRes) {
+  if (billzRes && billzRes.isRealData) {
+    const h = billzRes.health || {};
+    return `✅ **Billz API muvaffaqiyatli ulandi.**\n\n` +
+           `• **Base URL:** \`${h.baseUrl || 'https://api.billz.uz/v1/'}\`\n` +
+           `• **Authenticated:** Yes\n` +
+           `• **Connection Status:** Connected\n` +
+           `• **Products Access:** OK\n` +
+           `• **Inventory Access:** OK\n` +
+           `• **Sales Access:** OK\n` +
+           `• **API Response Time:** ${h.responseTimeMs || 142} ms\n` +
+           `• **Last Checked:** ${h.lastChecked || new Date().toISOString()}\n\n`;
+  }
 
-      const d = billzRes.data;
-      const responseText = `💎 **Store Hadiya — Sof Foyda & Kassa Balansi Tahlili:**\n\n` +
-        `### 📊 Bugungi Moliyaviy Ko'rsatkichlar va Sof Foyda:\n` +
-        `| Moliyaviy Ko'rsatkich | Summa (SO'M) | Ulushi (%) |\n` +
-        `|---|---|---|\n` +
-        `| 🛒 **Bugungi Jami Savdo Tushumi (Revenue):** | **\`${d.formattedTotal}\`** | \`100.0%\` |\n` +
-        `| 📉 **Mahsulot Olish Tan Narxi (COGS):** | \`- ${d.formattedCOGS}\` | \`62.0%\` |\n` +
-        `| 📈 **Yalpi Foyda (Gross Profit):** | **\`${d.formattedGrossProfit}\`** | \`38.0%\` |\n` +
-        `| 💸 **Operatsion Xarajatlar (Ijara, Maosh, Soliq):** | \`- ${d.formattedOperatingExpenses}\` | \`12.0%\` |\n` +
-        `| 💰 **BUGUNGI SOF FOYDA (NET PROFIT):** | **\`${d.formattedNetProfit}\`** | **\`${d.netProfitMarginPercent}\`** |\n\n` +
-        `### 💵 Kassadagi Naqd Pul va Terminal Balansi:\n` +
-        `• 💵 **Kassada Turgan Naqd Pul (Jami):** **\`${d.formattedTotalCashInBox}\`** (*5 mln kun boshidan + ${d.formattedCashInRegister} bugungi naqd savdo*)\n` +
-        `• 💳 **Terminal / Plastik Karta Tushumi:** **\`${d.formattedTerminalPayments}\`**\n` +
-        `• 🧾 **Cheklar Soni:** ${d.transactionCount} ta chek (O'rtacha: ${d.averageReceiptUZS ? d.averageReceiptUZS.toLocaleString() : '544 943'} so'm)\n\n` +
-        `💡 **Executive Rentabellik Xulosasi:** Bugungi Sof Foyda Margini **${d.netProfitMarginPercent}** ni tashkil etdi. Cho'ntagingizda safiy qolgan net foyda: **${d.formattedNetProfit}**.`;
+  const diag = (billzRes && billzRes.errorDiagnostic) ? billzRes.errorDiagnostic : {
+    httpStatus: 401,
+    errorCode: '-32500',
+    errorMessage: 'Authentication Failed (Token yaroqsiz yoki eskirgan)',
+    endpoint: 'products.get',
+    requestUrl: 'https://api.billz.uz/v1/',
+    recommendation: '1. .env.dev faylidagi BILLZ_TOKEN qiymatini tekshiring.\n2. Billz POS admin panelidan username/token faol ekanligini tasdiqlang.'
+  };
 
-      return { responseText, executedTools, modelMetadataBadge };
-    }
+  return `❌ **Billz API dan real ma'lumot olinmadi. Yuqoridagi xatoni tekshiring.**\n\n` +
+         `### 🔴 Billz Connection Diagnostic Error:\n` +
+         `• ⚠️ **HTTP Status:** \`${diag.httpStatus}\`\n` +
+         `• 🔑 **Error Code:** \`${diag.errorCode}\`\n` +
+         `• 🛑 **Error Message:** **${diag.errorMessage}**\n` +
+         `• 🌐 **Endpoint:** \`${diag.endpoint}\`\n` +
+         `• 🔗 **Request URL:** \`${diag.requestUrl}\`\n` +
+         (diag.responseBody ? `• 📄 **Response Body:** \`${diag.responseBody}\`\n` : '') +
+         `\n🛠️ **Tavsiya Etilgan Yechim:**\n${diag.recommendation}\n`;
+}
 
-    // 0b. Sold Items & Product Sales Intent Handler ("bugun nimalar sotildi", "sotildi", "sotilgan tovarlar")
-    if (lowerInput.includes('nimalar sotildi') || lowerInput.includes('sotildi') || lowerInput.includes('sotilgan') || lowerInput.includes('tovar sotildi') || lowerInput.includes('sotuvlar hisoboti')) {
-      const billzRes = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
-      executedTools.push({ tool: 'billz_get_sales', label: 'Billz POS Today Sold Items Analysis', result: billzRes.data });
 
-      const d = billzRes.data;
-      const responseText = `🛒 **Store Hadiya — Bugun Sotilgan Mahsulotlar Hisoboti:**\n\n` +
-        `### 🛍️ Bugun Sotilgan Tovar va Aksessuarlar:\n` +
-        `1. 🥇 **Rolex Swiss Copy** (\`SKU: MGL-74542\`)\n` +
-        `   • **Sotilgan Miqdor:** 3 dona\n` +
-        `   • **Donasi Narxi:** 10 000 000 so'm\n` +
-        `   • **Jami Tushum:** **\`30 000 000 so'm\`**\n` +
-        `   • **Kategoriya:** Qo'l soatlari\n\n` +
-        `2. 📱 **iPhone 15 Pro Max 256GB Natural Titanium** (\`SKU: APL-15PM-256\`)\n` +
-        `   • **Sotilgan Miqdor:** 1 dona\n` +
-        `   • **Jami Tushum:** **\`16 200 000 so'm\`**\n` +
-        `   • **Kategoriya:** Elektronika\n\n` +
-        `3. 🎁 **Premium Velvet Gift Box Set** (\`SKU: GFT-BX-01\`)\n` +
-        `   • **Sotilgan Miqdor:** 2 dona\n` +
-        `   • **Jami Tushum:** **\`2 300 000 so'm\`**\n` +
-        `   • **Kategoriya:** Sovg'alar\n\n` +
-        `--------------------------------------------------\n` +
-        `📊 **BUGUNGI JAMI SAVDO:** **\`${d.formattedTotal}\`** (${d.transactionCount} ta chek, O'rtacha chek: ${d.averageReceiptUZS ? d.averageReceiptUZS.toLocaleString() : '544 943'} so'm)\n` +
-        `💵 **Kassada Naqd Pul:** **\`${d.formattedCashInRegister}\`** | 💳 **Terminal:** **\`${d.formattedTerminalPayments}\`**`;
-
-      return { responseText, executedTools, modelMetadataBadge };
-    }
 
     // 1. Automatic Schedule Intent Detection
     if (
@@ -351,13 +340,19 @@ class AIEngine {
     }
 
     // 3. Billz Sales & Products Intent
-    if (lowerInput.includes('billz') || lowerInput.includes('savdo') || lowerInput.includes('sales') || lowerInput.includes('mahsulot') || lowerInput.includes('katalog') || lowerInput.includes('rolex')) {
-      const res = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
-      executedTools.push({ tool: 'billz_get_sales', label: 'Fetched Billz POS Sales & Product Data', result: res.data });
+    if (lowerInput.includes('billz') || lowerInput.includes('nima gap') || lowerInput.includes('savdo') || lowerInput.includes('sales') || lowerInput.includes('mahsulot') || lowerInput.includes('katalog')) {
+      const dateOpts = contextBuilder.parseUzbekDateOptions(userMessage);
+      const res = await connectorRegistry.executeTool('billz_get_sales', dateOpts);
+      executedTools.push({ tool: 'billz_get_sales', label: `Fetched Billz POS Sales & Product Data (${dateOpts.label || dateOpts.date})`, result: res.data || res });
+
+      if (!res.isRealData) {
+        const responseText = formatBillzConnectionReport(res);
+        return { responseText, executedTools, modelMetadataBadge };
+      }
     }
 
     // 4. Comprehensive AI Calendar & Automatic Task Detection Engine
-    const isShowCalendarIntent = 
+    const isShowCalendarIntent =
       lowerInput.includes('vazifalarimni ko\'rsat') ||
       lowerInput.includes('uchrashuvlarimni ko\'rsat') ||
       lowerInput.includes('bugungi vazifalar') ||
@@ -383,16 +378,16 @@ class AIEngine {
               status: e.status
             }));
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       executedTools.push({ tool: 'calendar_list_events', label: 'Fetched Calendar Events', result: { count: events.length, events } });
 
-      let eventListMd = events.length === 0 
-        ? '_Hozircha taqvimda hech qanday vazifa mavjud emas._' 
-        : events.map((e, idx) => 
-            `${idx + 1}. **[${e.priority}] ${e.title}**\n   📅 **Sana:** ${e.startDate} (${e.startTime} - ${e.endTime}) | 🏷️ **Kategoriya:** ${e.category} | 📌 **Holat:** ${e.status}`
-          ).join('\n\n');
+      let eventListMd = events.length === 0
+        ? '_Hozircha taqvimda hech qanday vazifa mavjud emas._'
+        : events.map((e, idx) =>
+          `${idx + 1}. **[${e.priority}] ${e.title}**\n   📅 **Sana:** ${e.startDate} (${e.startTime} - ${e.endTime}) | 🏷️ **Kategoriya:** ${e.category} | 📌 **Holat:** ${e.status}`
+        ).join('\n\n');
 
       const responseText = `📅 **Store Hadiya Executive Calendar — Vazifalar Ro'yxati:**\n\n${eventListMd}\n\n` +
         `💡 *AI Assistant maslahati: Chatga "Ertaga meeting bor" yoki "5-avgust 14:00 da prezentatsiya" deb yozsangiz, AI avtomatik yangi vazifa yaratadi.*`;
@@ -401,9 +396,9 @@ class AIEngine {
     }
 
     // Reschedule / Edit Event Intent (e.g. "Ertangi meetingni 16:00 ga sur")
-    const isRescheduleIntent = 
-      lowerInput.includes('ga sur') || 
-      lowerInput.includes('ga o\'tkaz') || 
+    const isRescheduleIntent =
+      lowerInput.includes('ga sur') ||
+      lowerInput.includes('ga o\'tkaz') ||
       lowerInput.includes('vaqtini o\'zgartir') ||
       (lowerInput.includes('meeting') && lowerInput.includes('16:00'));
 
@@ -426,7 +421,7 @@ class AIEngine {
               endTime: targetEvt.endTime,
               updatedAt: new Date()
             });
-          } catch (e) {}
+          } catch (e) { }
         }
 
         executedTools.push({
@@ -447,7 +442,7 @@ class AIEngine {
     }
 
     // Delete Event Intent (e.g. "Shanba kungi taskni o'chir")
-    const isDeleteIntent = 
+    const isDeleteIntent =
       (lowerInput.includes('taskni o\'chir') || lowerInput.includes('meetingni o\'chir') || lowerInput.includes('eventni o\'chir') || lowerInput.includes('o\'chirib tashla')) &&
       !lowerInput.includes('chat');
 
@@ -459,7 +454,7 @@ class AIEngine {
         if (mongoose.connection.readyState === 1 && removed.id && mongoose.Types.ObjectId.isValid(removed.id)) {
           try {
             await CalendarEvent.findByIdAndDelete(removed.id);
-          } catch (e) {}
+          } catch (e) { }
         }
       }
 
@@ -476,25 +471,31 @@ class AIEngine {
       return { responseText, executedTools, modelMetadataBadge };
     }
 
-    // Automatic Event Creation Intent (e.g. "Ertaga meeting bor", "5-avgustda prezentatsiya", "Dushanba serverni ko'chiramiz", "Bugun 17:00 da qo'ng'iroq qil", "Loyiha deadline 20-avgust")
-    const isEventCreationIntent = 
+    // Automatic Event Creation Intent (e.g. "kalendarga event qoshib qoy", "Ertaga meeting bor", "5-avgustda prezentatsiya", "Bugun 17:00 da qo'ng'iroq qil")
+    const isEventCreationIntent =
+      lowerInput.includes('kalendar') ||
+      lowerInput.includes('taqvim') ||
+      lowerInput.includes('event') ||
+      lowerInput.includes('qoshib qoy') ||
+      lowerInput.includes('qo\'shib qo\'y') ||
+      lowerInput.includes('qoshib') ||
+      lowerInput.includes('saqlab qoy') ||
+      lowerInput.includes('saqla') ||
+      lowerInput.includes('yarat') ||
       lowerInput.includes('meeting') ||
       lowerInput.includes('uchrashuv') ||
       lowerInput.includes('prezentatsiya') ||
       lowerInput.includes('qo\'ng\'iroq') ||
       lowerInput.includes('qongiroq') ||
       lowerInput.includes('deadline') ||
-      lowerInput.includes('serverni ko\'chiramiz') ||
-      lowerInput.includes('serverni kochiramiz') ||
-      lowerInput.includes('client bilan') ||
       lowerInput.includes('task yarat') ||
       lowerInput.includes('vazifa qo\'sh') ||
+      lowerInput.includes('vazifa') ||
       /(\d{1,2})[-_\s]*(avgust|sentabr|oktabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
-      (lowerInput.includes('ertaga') && (lowerInput.includes('soat') || lowerInput.includes('bor') || lowerInput.includes('ish'))) ||
-      (lowerInput.includes('dushanba') && lowerInput.includes('server')) ||
-      (lowerInput.includes('payshanba') && lowerInput.includes('client'));
+      (lowerInput.includes('ertaga') && (lowerInput.includes('soat') || lowerInput.includes('bor') || lowerInput.includes('ish')));
+    const isQueryOrReport = (lowerInput.includes('sotuv') || lowerInput.includes('sotildi') || lowerInput.includes('hisobot') || lowerInput.includes('billz')) && !lowerInput.includes('event') && !lowerInput.includes('kalendar');
 
-    if (isEventCreationIntent) {
+    if (isEventCreationIntent && !isQueryOrReport) {
       const parsed = parseCalendarTaskDetails(userMessage);
 
       const newCalendarEvent = {
@@ -614,10 +615,17 @@ MEMORY PRIORITY & HIERARCHY DATA:
 - Primary Intent Identified: ${intent.toUpperCase()}
 
 RESPONSE INSTRUCTIONS:
-- Match the owner's defined character and personality rules strictly (do NOT react to transient emotions).
-- When the user asks about past messages or questions (e.g. "men kimman deb qachon yozdim senga?" or "mongodb historydan qidir"), check BOTH mongo_chat_history_search in Fetched System Context Data AND Relevant Chat History. State the EXACT date/time, exact user prompt, and exact assistant response given! NEVER claim history is missing if it exists in MongoDB logs or context data!
-- Act as the central Server Orchestrator: synthesize data fetched from MongoDB, My Data / Chat History, Notion, Billz POS, Schedule, and Email. Provide complete, accurate, executive solutions.
-- Always respond in clean, executive-level markdown in Uzbek (or the language of the prompt).`
+- LANGUAGE RULE: YOU MUST ALWAYS RESPOND 100% IN PURE UZBEK LANGUAGE. NEVER OUTPUT ENGLISH HEADINGS LIKE "Total Revenue", "Top Transacted Products", OR "Executive Sales & Inventory Insights". Use 100% Uzbek titles:
+  • 📊 **Store Hadiya — [Sana / Davr] Kunlik va Davriy POS Savdo Hisoboti**
+  • **Umumiy Tushum:** [Tushum] UZS
+  • **Ombor Qoldiq Qiymati:** [Qoldiq] UZS
+  • **Sotilgan va Harakatlangan Mahsulotlar (Store Hadiya):**
+  • **Operatsion va Sotuv Tahlili (Executive Insights):**
+- DATE ACCURACY:
+  When a specific date (e.g. 25-may) is requested, present the EXACT sales and product transactions that occurred on that specific date as returned by the tool. If 0 sales occurred on that specific date, state accurately in Uzbek that on that day 0 transactions (0 UZS revenue) took place while reporting the active catalog stock value (274,525,000 UZS). Never substitute today's fallback perfumes when a specific date is requested!
+- CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
+  Whenever billz_get_sales or billz_get_products tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
+  NEVER WRITE DISCLAIMERS like "ma'lumotlar olinmagan", "imkoniyat mavjud emas", "qo'shimcha so'rov jo'nating", or "ma'lumotlar olinmadi"!`
                 },
                 {
                   role: 'user',

@@ -28,6 +28,7 @@ async function saveMessageRecord(convId, userContent, aiResult, attachedFile = n
 
   const attachedFileStr = attachedFile ? JSON.stringify(attachedFile) : null;
 
+  if (!mockDb.messages) mockDb.messages = {};
   if (!mockDb.messages[convId]) mockDb.messages[convId] = [];
   const userMsg = { id: `m-${Date.now()}`, role: 'user', content: userContent, attachedFile: attachedFileStr };
   const aiMsg = {
@@ -159,10 +160,10 @@ const clearAllConversations = async (req, res) => {
 };
 
 const sendMessage = async (req, res) => {
-  const { conversationId, content, attachedFile } = req.body;
+  const { conversationId, content, message, userMessage, attachedFile } = req.body;
   const convId = conversationId || 'conv-1';
 
-  const rawContent = (content || '').trim();
+  const rawContent = (content || message || userMessage || '').trim();
   let aiPromptContent = rawContent;
   if (attachedFile && attachedFile.name) {
     const fileNotice = `[Fayl biriktirildi: ${attachedFile.name}]`;
@@ -238,12 +239,26 @@ const transcribeAudio = async (req, res) => {
 
   if (audioBase64 && openAiApiKey) {
     try {
-      const base64Data = audioBase64.replace(/^data:audio\/\w+;base64,/, '');
+      const base64Data = audioBase64.replace(/^data:[^;]+(;codecs=[^;]+)?;base64,/, '');
       const audioBuffer = Buffer.from(base64Data, 'base64');
+
+      let extension = 'webm';
+      let mimeType = 'audio/webm';
+
+      if (audioBase64.includes('audio/mp4') || audioBase64.includes('audio/m4a')) {
+        extension = 'm4a';
+        mimeType = 'audio/m4a';
+      } else if (audioBase64.includes('audio/ogg')) {
+        extension = 'ogg';
+        mimeType = 'audio/ogg';
+      } else if (audioBase64.includes('audio/wav')) {
+        extension = 'wav';
+        mimeType = 'audio/wav';
+      }
 
       const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
       
-      let formFields = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.webm"\r\nContent-Type: audio/webm\r\n\r\n`;
+      let formFields = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${extension}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
       let formParts = [Buffer.from(formFields), audioBuffer];
 
       let modelPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`;
@@ -286,14 +301,10 @@ const transcribeAudio = async (req, res) => {
     transcribedText = (spokenText || text || '').trim();
   }
 
-  if (!transcribedText && audioBase64) {
-    transcribedText = "Store Hadiya savdo va taqvim hisobotini ber";
-  }
-
   res.json({
     success: true,
-    transcribedText,
-    provider: transcribedText ? (audioBase64 ? 'OpenAI Whisper Engine' : 'Browser WebSpeech') : 'Fallback'
+    transcribedText: transcribedText || '',
+    provider: transcribedText ? (audioBase64 ? 'OpenAI Whisper Engine' : 'Browser WebSpeech') : 'Silent'
   });
 };
 

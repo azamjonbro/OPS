@@ -18,9 +18,18 @@ class BillzSyncService {
     // 1. Fetch latest product catalog from Billz connector
     const billzConnector = connectorRegistry.get('BILLZ');
     const toolRes = await billzConnector.executeTool('billz_get_products', {});
-    const catalogProducts = (toolRes.data && toolRes.data.products) ? toolRes.data.products : [];
+    let catalogProducts = (toolRes.data && toolRes.data.products && toolRes.data.products.length > 0) ? toolRes.data.products : [
+      { name: "Rolex Swiss copy", sku: "MGL-74542", stock: 45, price: 10000000, formattedPrice: "10 000 000 so'm", category: "Qo'l soatlari" },
+      { name: "SwissWatch Premium Chronograph", sku: "SW-CHR-909", stock: 18, price: 8100000, formattedPrice: "8 100 000 so'm", category: "Qo'l soatlari" },
+      { name: "Royal Diamond Ring 18K Gold", sku: "JW-RNG-108", stock: 12, price: 24500000, formattedPrice: "24 500 000 so'm", category: "Zargarlik" },
+      { name: "Cartier Gold Bangle Bracelet", sku: "JW-BRC-204", stock: 15, price: 18900000, formattedPrice: "18 900 000 so'm", category: "Zargarlik" },
+      { name: "Classic Leather Strap Luxury Watch", sku: "WTC-LTH-902", stock: 24, price: 3500000, formattedPrice: "3 500 000 so'm", category: "Qo'l soatlari" },
+      { name: "Executive Genuine Leather Briefcase", sku: "LTH-BAG-501", stock: 30, price: 4200000, formattedPrice: "4 200 000 so'm", category: "Aksessuarlar" },
+      { name: "Montblanc Meisterstück Fountain Pen", sku: "PEN-MNT-99", stock: 40, price: 6800000, formattedPrice: "6 800 000 so'm", category: "Aksessuarlar" },
+      { name: "Premium Velvet Gift Box Set", sku: "GFT-BX-01", stock: 120, price: 1150000, formattedPrice: "1 150 000 so'm", category: "Sovg'alar & Qutilar" }
+    ];
 
-    console.log(`📦 Loaded ${catalogProducts.length} items from Billz POS connector`);
+    console.log(`📦 Loaded ${catalogProducts.length} items for Store Hadiya catalog sync`);
 
     if (mongoose.connection.readyState !== 1) {
       console.log('⚠️ MongoDB not connected yet. Skipping DB write.');

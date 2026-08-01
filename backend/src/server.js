@@ -50,6 +50,20 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/calendar', calendarRoutes);
+// Billz Integration Endpoints
+const connectorRegistry = require('./connectors/registry');
+app.get('/api/integrations/billz/health', async (req, res) => {
+  const billzConnector = connectorRegistry.get('BILLZ');
+  const health = await billzConnector.checkHealth();
+  res.json(health);
+});
+
+app.get('/api/integrations/billz/sales', async (req, res) => {
+  const { date, daysCount, period } = req.query;
+  const billzClient = require('./services/billzClientService');
+  const salesData = await billzClient.getSales({ date: date || '2026-05-25', daysCount: daysCount ? parseInt(daysCount, 10) : 0, label: period });
+  res.json(salesData);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Node.js Express Backend (MVC Architecture) running on http://localhost:${PORT}`);
