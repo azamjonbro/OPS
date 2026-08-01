@@ -17,9 +17,12 @@ export class VoiceController {
     // Services
     this.transcriptBuffer = new TranscriptBuffer();
     this.speechService = new SpeechService(this.transcriptBuffer, {
-      lang: options.lang || 'uz-UZ',
+      lang: options.lang || 'en-US',
       onStatusChange: (status) => {
         this.onVoiceStatusUpdate(status);
+      },
+      onError: (message) => {
+        this.onError(message);
       }
     });
 
@@ -126,6 +129,9 @@ export class VoiceController {
     }
 
     this._stopAudioContext();
+    // Release the microphone once the blob is captured, otherwise the browser keeps
+    // showing the "recording" indicator until the whole page is closed.
+    this._releaseMicrophone();
     this.onVoiceStatusUpdate(VOICE_STATUS.READY_TO_SEND);
   }
 
@@ -270,13 +276,20 @@ export class VoiceController {
     }
   }
 
-  _destroyMediaStream() {
+  _releaseMicrophone() {
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop());
       this.mediaStream = null;
     }
+  }
+
+  // Full teardown: also drops the transcript subscription, so only call this when the
+  // controller is being discarded (cancel / unmount), never on finish().
+  _destroyMediaStream() {
+    this._releaseMicrophone();
     if (this.unsubscribeTranscript) {
       this.unsubscribeTranscript();
+      this.unsubscribeTranscript = null;
     }
   }
 }

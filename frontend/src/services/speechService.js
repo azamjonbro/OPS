@@ -20,9 +20,10 @@ export class SpeechService {
     this.buffer = transcriptBuffer;
     this.options = options;
     this.speechRecognition = null;
-    this.lang = options.lang || (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'uz-UZ');
+    this.lang = options.lang || 'en-US';
     this.status = VOICE_STATUS.LISTENING;
     this.onStatusChange = options.onStatusChange || (() => {});
+    this.onError = options.onError || (() => {});
   }
 
   setLanguage(newLang) {
@@ -91,12 +92,24 @@ export class SpeechService {
 
       this.speechRecognition.onerror = (e) => {
         console.warn('Speech recognition notice:', e.error);
-        if (e.error === 'language-not-supported' || e.error === 'not-allowed') {
+
+        // Permission was refused (or the tab lost mic access) — retrying in another
+        // language cannot help and would loop forever, so stop and surface it.
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          this.shouldBeListening = false;
+          this.onError('Mikrofonga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.');
+          return;
+        }
+
+        // Uzbek is not in every browser's speech model; fall back once so dictation
+        // still works instead of silently producing nothing.
+        if (e.error === 'language-not-supported') {
+          const fallbackLang = this.lang && this.lang.startsWith('uz') ? 'ru-RU' : 'en-US';
+          this.lang = fallbackLang;
           try {
-            const fallbackLang = this.lang === 'uz-UZ' ? 'ru-RU' : 'en-US';
-            this.lang = fallbackLang;
             this.speechRecognition.lang = fallbackLang;
           } catch (err) {}
+          this.onError(`"${this.lang}" tili qo'llab-quvvatlanmadi, ${fallbackLang} ga o'tildi.`);
         }
       };
 

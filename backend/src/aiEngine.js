@@ -4,78 +4,138 @@ const contextBuilder = require('./services/contextBuilder');
 const memoryUpdater = require('./services/memoryUpdater');
 const mongoose = require('mongoose');
 const CalendarEvent = require('./models/CalendarEvent');
+const Schedule = require('./models/Schedule');
+
+const UZ_MONTHS = {
+  yanvar: 0, fevral: 1, mart: 2, aprel: 3, may: 4, iyun: 5,
+  iyul: 6, avgust: 7, sentabr: 8, sentyabr: 8, oktabr: 9, oktyabr: 9, noyabr: 10, dekabr: 11,
+  january: 0, february: 1, march: 2, april: 3, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+};
+
+const UZ_WEEKDAYS = [
+  ['yakshanba', 0], ['dushanba', 1], ['seshanba', 2], ['chorshanba', 3],
+  ['payshanba', 4], ['juma', 5], ['shanba', 6]
+];
+
+// Local date key — toISOString() would roll back a day for any local time before 05:00
+// in UTC+5, filing "bugun" events under yesterday.
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 function getNextWeekday(dayOfWeek) {
   const today = new Date();
   const result = new Date(today);
   const diff = (dayOfWeek + 7 - today.getDay()) % 7;
+  // "juma" said on a Friday means the coming Friday, not today.
   result.setDate(today.getDate() + (diff === 0 ? 7 : diff));
   return result;
 }
 
-function parseCalendarTaskDetails(text = '') {
-  const lower = text.toLowerCase();
-  let targetDate = new Date();
-
-  // Days offset logic
-  if (lower.includes('ertaga')) {
-    targetDate.setDate(targetDate.getDate() + 1);
-  } else if (lower.includes('indin') || lower.includes('inshoat')) {
-    targetDate.setDate(targetDate.getDate() + 2);
-  } else if (lower.includes('dushanba')) {
-    targetDate = getNextWeekday(1);
-  } else if (lower.includes('seshanba')) {
-    targetDate = getNextWeekday(2);
-  } else if (lower.includes('chorshanba')) {
-    targetDate = getNextWeekday(3);
-  } else if (lower.includes('payshanba')) {
-    targetDate = getNextWeekday(4);
-  } else if (lower.includes('juma')) {
-    targetDate = getNextWeekday(5);
-  } else if (lower.includes('shanba')) {
-    targetDate = getNextWeekday(6);
-  } else if (lower.includes('yakshanba')) {
-    targetDate = getNextWeekday(0);
-  }
-
-  // Uzbek & English Month-Day parser (e.g. 5-avgust, 20-avgust, 15 avgust)
-  const monthNames = {
-    'yanvar': 0, 'fevral': 1, 'mart': 2, 'aprel': 3, 'may': 4, 'iyun': 5,
-    'iyul': 6, 'avgust': 7, 'sentabr': 8, 'oktabr': 9, 'noyabr': 10, 'dekabr': 11,
-    'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
-    'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
-  };
-
-  const monthRegex = /(\d{1,2})[-_\s]*(?:chi[-_\s]*)?(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr|january|february|march|april|june|july|august|september|october|november|december)/i;
-  const monthMatch = lower.match(monthRegex);
+/**
+ * Resolves the day the owner meant. Precedence mirrors how the sentence reads: an
+ * explicit calendar date beats a named weekday, which beats a relative offset.
+ */
+function resolveTargetDate(lower) {
+  // "5-avgust", "20 avgust 2026"
+  const monthMatch = lower.match(
+    /\b(\d{1,2})[-_\s]*(?:chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr|january|february|march|april|june|july|august|september|october|november|december)\b(?:[-_\s]*(20\d{2}))?/
+  );
   if (monthMatch) {
     const dayNum = parseInt(monthMatch[1], 10);
-    const mName = monthMatch[2].toLowerCase();
-    if (monthNames[mName] !== undefined) {
-      targetDate = new Date(new Date().getFullYear(), monthNames[mName], dayNum);
-      if (targetDate < new Date(new Date().setHours(0, 0, 0, 0))) {
-        targetDate.setFullYear(targetDate.getFullYear() + 1);
-      }
+    const monthIdx = UZ_MONTHS[monthMatch[2]];
+    if (monthIdx !== undefined && dayNum >= 1 && dayNum <= 31) {
+      const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+      const year = monthMatch[3] ? parseInt(monthMatch[3], 10) : todayStart.getFullYear();
+      const target = new Date(year, monthIdx, dayNum);
+      // Planning is forward-looking: a bare date already past means next year.
+      if (!monthMatch[3] && target < todayStart) target.setFullYear(year + 1);
+      return target;
     }
   }
 
-  // Time extraction
-  let timeStr = '10:00';
-  const timeMatch = lower.match(/(\d{1,2}:\d{2})/);
-  if (timeMatch) {
-    timeStr = timeMatch[1];
-  } else {
-    const hourOnlyMatch = lower.match(/soat\s*(\d{1,2})/i) || lower.match(/(\d{1,2})\s*da\b/i);
-    if (hourOnlyMatch) {
-      let h = parseInt(hourOnlyMatch[1], 10);
-      if (h < 8) h += 12; // e.g. 5 da -> 17:00
-      timeStr = `${h.toString().padStart(2, '0')}:00`;
+  // "3 kundan keyin", "2 haftadan keyin"
+  const relMatch = lower.match(/\b(\d{1,2})\s*(kun|hafta|oy)(?:dan)?\s*(?:key[iy]n|so'ng|song)\b/);
+  if (relMatch) {
+    const n = parseInt(relMatch[1], 10);
+    const d = new Date();
+    if (relMatch[2] === 'kun') d.setDate(d.getDate() + n);
+    else if (relMatch[2] === 'hafta') d.setDate(d.getDate() + n * 7);
+    else d.setMonth(d.getMonth() + n);
+    return d;
+  }
+
+  for (const [name, idx] of UZ_WEEKDAYS) {
+    // "shanba" is a suffix of "yakshanba"/"dushanba"/"seshanba"/"chorshanba"/"payshanba",
+    // so require a word boundary on both sides.
+    if (new RegExp(`\\b${name}\\b`).test(lower)) return getNextWeekday(idx);
+  }
+
+  if (/\bindin(ga)?\b/.test(lower)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    return d;
+  }
+  if (/\bertaga?\b/.test(lower)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+  if (/\bkeyingi\s*hafta\b/.test(lower)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d;
+  }
+
+  return new Date();
+}
+
+/**
+ * Reads a wall-clock time the way a person would: an explicit "14:30" wins, then an
+ * hour qualified by a part of the day, then a bare part of the day.
+ */
+function resolveStartTime(lower) {
+  const explicit = lower.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (explicit) {
+    const h = Math.min(23, parseInt(explicit[1], 10));
+    const m = Math.min(59, parseInt(explicit[2], 10));
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  const isMorning = /\b(ertalab|tongda|tong|erta\s*bilan)\b/.test(lower);
+  const isMidday = /\b(tushda|tushlik|peshin)\b/.test(lower);
+  const isEvening = /\b(kechqurun|kechasi|oqshom|kech)\b/.test(lower);
+
+  const hourMatch = lower.match(/\bsoat\s*(\d{1,2})\b/) || lower.match(/\b(\d{1,2})\s*(?:da|larda)\b/);
+  if (hourMatch) {
+    let h = parseInt(hourMatch[1], 10);
+    if (h >= 0 && h <= 23) {
+      if (isEvening && h < 12) h += 12;
+      else if (isMidday && h < 12) h += 12;
+      else if (!isMorning && h < 8) h += 12; // "soat 5 da" -> 17:00
+      return `${String(Math.min(23, h)).padStart(2, '0')}:00`;
     }
   }
 
-  // End time calculation (+1 hour)
-  let endHour = parseInt(timeStr.split(':')[0], 10) + 1;
-  let endTimeStr = `${endHour.toString().padStart(2, '0')}:${timeStr.split(':')[1] || '00'}`;
+  if (isMorning) return '09:00';
+  if (isMidday) return '13:00';
+  if (isEvening) return '19:00';
+  return '10:00';
+}
+
+function parseCalendarTaskDetails(text = '') {
+  const lower = text.toLowerCase().replace(/[ʻ‘’`´]/g, "'");
+  const targetDate = resolveTargetDate(lower);
+
+  const timeStr = resolveStartTime(lower);
+  const [startH, startM] = timeStr.split(':');
+  // Clamp so a 23:30 start does not produce an invalid "24:30" end.
+  const endHour = Math.min(23, parseInt(startH, 10) + 1);
+  const endTimeStr = `${String(endHour).padStart(2, '0')}:${startM}`;
 
   // Priority
   let priority = 'Medium';
@@ -99,28 +159,34 @@ function parseCalendarTaskDetails(text = '') {
     category = 'Personal';
   }
 
-  // Clean title
-  let cleanTitle = '';
-  if (lower.includes('test')) {
-    cleanTitle = 'Test Event';
-  } else {
-    cleanTitle = text
-      .replace(/(kalendarga|kalendar|taqvimga|taqvim|bugungi\s*kun\s*uchun|bugun|ertaga|indin|dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba)/gi, '')
-      .replace(/(\d{1,2})[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)/gi, '')
-      .replace(/soat\s*\d{1,2}(:\d{2})?\s*(da)?/gi, '')
-      .replace(/\b(bor|rejalashtir|qo'sh|qosh|qoshib|qoy|saqla|titleda|saqlab|da|bilan|zarur|uchun)\b/gi, '')
-      .trim();
-  }
+  // Strip the scheduling scaffolding so the title keeps only what the event is *about*.
+  let cleanTitle = text
+    .replace(/\b(kalendarga|kalendar|taqvimga|taqvim|bugungi\s*kun\s*uchun|bugun|ertaga|ertagi|indinga|indin|keyingi\s*hafta|dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba)\b/gi, ' ')
+    .replace(/\b\d{1,2}[-_\s]*(?:chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b/gi, ' ')
+    .replace(/\b\d{1,2}\s*(kun|hafta|oy)(dan)?\s*(key[iy]n|so'ng|song)\b/gi, ' ')
+    .replace(/\bsoat\s*\d{1,2}(:\d{2})?\s*(da)?\b/gi, ' ')
+    .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
+    .replace(/\b(ertalab|tongda|tushda|tushlik|kechqurun|kechasi|oqshom)\b/gi, ' ')
+    // A bare hour left over from "kechqurun 7 da" / "9 larda".
+    .replace(/\b\d{1,2}\s*(?:da|larda)\b/gi, ' ')
+    .replace(/\bkun[iy]\b/gi, ' ')
+    .replace(/\b(bor|rejalashtir|rejalashtirib|qo'sh|qosh|qoshib|qo'shib|qoy|qo'y|saqla|saqlab|yarat|yaratib|eslat|eslatib|da|bilan|zarur|uchun|iltimos|menga)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '')
+    .trim();
 
-  if (!cleanTitle || cleanTitle.length < 2) {
+  if (cleanTitle.length < 2) {
+    // Nothing descriptive survived — name it after the kind of event it is.
     if (category === 'Meeting') cleanTitle = 'Biznes Uchrashuv';
     else if (category === 'Call') cleanTitle = 'Mijoz Bilan Qo\'ng\'iroq';
     else if (category === 'Deadline') cleanTitle = 'Loyiha Topshirish Deadline';
-    else cleanTitle = 'Test Event';
+    else if (category === 'Project') cleanTitle = 'Loyiha Ishi';
+    else if (category === 'Personal') cleanTitle = 'Shaxsiy Reja';
+    else cleanTitle = 'Rejalashtirilgan Vazifa';
   }
 
   cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-  const isoDate = targetDate.toISOString().split('T')[0];
+  const isoDate = toDateKey(targetDate);
 
   return {
     title: cleanTitle,
@@ -131,6 +197,67 @@ function parseCalendarTaskDetails(text = '') {
     priority,
     category
   };
+}
+
+const NOTION_CREATE_VERBS = /\b(qo'sh|qosh|qo'shib|qoshib|qo'shvor|yarat|yaratib|och|ochib|yoz|yozib|kirit|kiritib|create|add|new)\b/;
+
+/** True when the owner is asking to WRITE something into Notion (not just search it). */
+function isNotionWriteIntent(lower) {
+  const mentionsNotion = /\b(notion|notionga|notionda|notiondagi|workspace)\b/.test(lower);
+  return mentionsNotion && NOTION_CREATE_VERBS.test(lower);
+}
+
+/**
+ * Pulls the page name out of a request like:
+ *   notionga kirib yangi task deb "test space" qo'shib ko'r   -> test space
+ *   notionga yangi task deb test space qoshib kor             -> test space
+ */
+function extractNotionTaskTitle(text = '') {
+  const normalized = text.replace(/[ʻ‘’`´]/g, "'").trim();
+
+  // 1. An explicit quoted name always wins.
+  const quoted = normalized.match(/["“”'«]([^"“”'»]{2,})["“”'»]/);
+  if (quoted) return quoted[1].trim();
+
+  // 2. "... deb <nom> qo'shib ko'r" — the name sits between "deb" and the verb.
+  const afterDeb = normalized.match(/\bdeb\s+(.+?)(?=\s*\b(?:qo'sh|qosh|yarat|och|yoz|kirit|create|add)|$)/i);
+  if (afterDeb && afterDeb[1].trim().length > 1) return afterDeb[1].trim();
+
+  // 3. Otherwise strip the scaffolding and keep whatever the request was about.
+  const cleaned = normalized
+    .replace(/\b(notionga|notionda|notiondagi|notion|workspace)\b/gi, ' ')
+    .replace(/\b(kirib|kir|bor|borib|iltimos|menga|men|yangi|task|vazifa|sahifa|page|deb|nomli|nomida)\b/gi, ' ')
+    .replace(/\b(qo'shib|qoshib|qo'sh|qosh|yaratib|yarat|ochib|och|yozib|yoz|kiritib|kirit|ko'r|kor|qo'y|qoy|create|add|new)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '')
+    .trim();
+
+  return cleaned.length > 1 ? cleaned : 'Yangi Task';
+}
+
+/**
+ * Builds the OpenAI `user` message. Returns a plain string for text-only turns, or the
+ * multimodal content-block array when a file is attached so GPT-4o actually *sees* the
+ * screenshot instead of only being told its filename.
+ */
+function buildUserContent(userMessage, executedTools, attachedFile) {
+  const baseText = `User Input: "${userMessage}"\n\nFetched System Context Data: ${JSON.stringify(executedTools, null, 2)}`;
+
+  if (!attachedFile) return baseText;
+
+  if (attachedFile.isImage && attachedFile.dataUrl) {
+    return [
+      { type: 'text', text: `${baseText}\n\nBiriktirilgan rasm: "${attachedFile.name}". Rasmni diqqat bilan o'qib chiq va savolga o'sha rasmdagi aniq mazmun asosida javob ber.` },
+      { type: 'image_url', image_url: { url: attachedFile.dataUrl, detail: 'high' } }
+    ];
+  }
+
+  if (attachedFile.textContent) {
+    const truncNote = attachedFile.truncated ? '\n\n[Eslatma: fayl uzun bo\'lgani uchun faqat boshlang\'ich qismi berildi.]' : '';
+    return `${baseText}\n\nBiriktirilgan fayl "${attachedFile.name}" mazmuni:\n"""\n${attachedFile.textContent}\n"""${truncNote}`;
+  }
+
+  return `${baseText}\n\n"${attachedFile.name}" (${attachedFile.formattedSize}) fayli biriktirildi, lekin uning formati matnga o'girilmadi — mazmunini o'qiy olmading. Buni foydalanuvchiga ochiq ayt va matn ko'rinishida yuborishni yoki skrinshot tashlashni so'ra. Fayl mazmunini O'YLAB TOPMA.`;
 }
 
 class AIEngine {
@@ -146,7 +273,7 @@ class AIEngine {
     if (claudeKey) this.claudeKey = claudeKey;
   }
 
-  async processVoiceMemo(spokenText, mockDb, userId = 'user-1') {
+  async processVoiceMemo(spokenText, userId = 'user-1') {
     const executedTools = [];
     const lowerInput = (spokenText || '').toLowerCase();
 
@@ -180,19 +307,17 @@ class AIEngine {
       }
 
       const newScheduleItem = {
-        id: `sch-${Date.now()}`,
         title: 'Daily Billz POS Sales & Product Breakdown Report',
         prompt: spokenText,
         frequency: 'DAILY',
         scheduledTime: extractedTime,
         targetChannel: 'TELEGRAM & CHAT',
-        isEnabled: true,
-        createdAt: new Date()
+        isEnabled: true
       };
 
-      if (mockDb && mockDb.schedules) {
-        mockDb.schedules.unshift(newScheduleItem);
-      }
+      try {
+        await Schedule.create(newScheduleItem);
+      } catch (e) {}
 
       executedTools.push({
         tool: 'scheduler_create_automation',
@@ -231,9 +356,15 @@ class AIEngine {
     return { responseText, executedTools, modelMetadataBadge };
   }
 
-  async processUserMessage(userMessage, mockDb, userId = 'user-1') {
+  async processUserMessage(userMessage, { userId = 'user-1', onProgress = () => {}, attachedFile = null } = {}) {
     const executedTools = [];
     const lowerInput = (userMessage || '').toLowerCase();
+
+    // When the owner attaches a screenshot or document, the message is *about that file*.
+    // The keyword shortcuts below would misfire on it ("meeting" in a screenshot caption
+    // would silently create a calendar event), so they are skipped and the turn goes
+    // straight to the model with the file contents.
+    const hasAttachment = !!(attachedFile && (attachedFile.isImage || attachedFile.textContent || attachedFile.unreadable));
 
     let modelMetadataBadge = this.dualLlmEnabled ?
       "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" :
@@ -277,6 +408,7 @@ function formatBillzConnectionReport(billzRes) {
 
     // 1. Automatic Schedule Intent Detection
     if (
+      !hasAttachment && (
       lowerInput.includes('har kuni') ||
       lowerInput.includes('har kunlik') ||
       lowerInput.includes('eslatib tur') ||
@@ -285,26 +417,24 @@ function formatBillzConnectionReport(billzRes) {
       lowerInput.includes('everyday') ||
       lowerInput.includes('every day') ||
       lowerInput.includes('daily') ||
-      lowerInput.includes('vaqtda')
+      lowerInput.includes('vaqtda'))
     ) {
       let extractedTime = '06:00';
       const timeMatch = lowerInput.match(/(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm))/i);
       if (timeMatch) extractedTime = timeMatch[0];
 
       const newScheduleItem = {
-        id: `sch-${Date.now()}`,
         title: 'Daily Billz & Operations Automated Summary',
         prompt: userMessage,
         frequency: 'DAILY',
         scheduledTime: extractedTime,
         targetChannel: 'TELEGRAM & CHAT',
-        isEnabled: true,
-        createdAt: new Date()
+        isEnabled: true
       };
 
-      if (mockDb && mockDb.schedules) {
-        mockDb.schedules.unshift(newScheduleItem);
-      }
+      try {
+        await Schedule.create(newScheduleItem);
+      } catch (e) {}
 
       executedTools.push({
         tool: 'scheduler_create_automation',
@@ -322,7 +452,43 @@ function formatBillzConnectionReport(billzRes) {
       return { responseText, executedTools, modelMetadataBadge };
     }
 
-    // 2. Notion Workspace Intent
+    // 2a. Notion WRITE intent — "notionga ... qo'shib qo'y / yangi task yarat".
+    // This has to be handled before the calendar block, because the calendar keyword
+    // list contains generic verbs like "qoshib" and "yarat" and was swallowing every
+    // Notion creation request into a calendar event instead.
+    if (!hasAttachment && isNotionWriteIntent(lowerInput)) {
+      const taskTitle = extractNotionTaskTitle(userMessage);
+      const notionRes = await connectorRegistry.executeTool('notion_create_task', { title: taskTitle });
+
+      executedTools.push({
+        tool: 'notion_create_task',
+        label: notionRes.success ? 'Created Notion Page' : 'Notion Page Creation FAILED',
+        result: notionRes.data || {},
+        error: notionRes.error
+      });
+
+      if (!notionRes.success) {
+        return {
+          responseText: `❌ **Notion'da sahifa yaratib bo'lmadi.**\n\n` +
+            `• **Sarlavha:** ${taskTitle}\n` +
+            `• **Xatolik:** ${notionRes.error || "noma'lum"}\n\n` +
+            `🛠️ Tekshiring: \`.env.dev\` dagi \`NOTION_API_KEY\` faolmi va integratsiyaga kerakli sahifaga ruxsat (share) berilganmi.`,
+          executedTools,
+          modelMetadataBadge
+        };
+      }
+
+      return {
+        responseText: `✅ **Notion'da yangi sahifa yaratildi.**\n\n` +
+          `• **Sarlavha:** ${notionRes.data.title}\n` +
+          `• **Havola:** ${notionRes.data.url}\n\n` +
+          `Taqvimga hech narsa qo'shilmadi — bu faqat Notion yozuvi.`,
+        executedTools,
+        modelMetadataBadge
+      };
+    }
+
+    // 2b. Notion Workspace read intent
     if (
       lowerInput.includes('notion') ||
       lowerInput.includes('page') ||
@@ -352,34 +518,30 @@ function formatBillzConnectionReport(billzRes) {
     }
 
     // 4. Comprehensive AI Calendar & Automatic Task Detection Engine
-    const isShowCalendarIntent =
+    const isShowCalendarIntent = !hasAttachment && (
       lowerInput.includes('vazifalarimni ko\'rsat') ||
       lowerInput.includes('uchrashuvlarimni ko\'rsat') ||
       lowerInput.includes('bugungi vazifalar') ||
       lowerInput.includes('keyingi haftadagi') ||
       lowerInput.includes('mavjud tasklar') ||
       lowerInput.includes('taqvimni ko\'rsat') ||
-      lowerInput.includes('calendar eventlar');
+      lowerInput.includes('calendar eventlar'));
 
     if (isShowCalendarIntent) {
-      let events = mockDb.calendarEvents || [];
-      if (mongoose.connection.readyState === 1) {
-        try {
-          const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
-          if (dbEvts && dbEvts.length > 0) {
-            events = dbEvts.map(e => ({
-              id: e._id.toString(),
-              title: e.title,
-              startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
-              startTime: e.startTime,
-              endTime: e.endTime,
-              priority: e.priority,
-              category: e.category,
-              status: e.status
-            }));
-          }
-        } catch (e) { }
-      }
+      let events = [];
+      try {
+        const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
+        events = dbEvts.map(e => ({
+          id: e._id.toString(),
+          title: e.title,
+          startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+          startTime: e.startTime,
+          endTime: e.endTime,
+          priority: e.priority,
+          category: e.category,
+          status: e.status
+        }));
+      } catch (e) { }
 
       executedTools.push({ tool: 'calendar_list_events', label: 'Fetched Calendar Events', result: { count: events.length, events } });
 
@@ -396,44 +558,35 @@ function formatBillzConnectionReport(billzRes) {
     }
 
     // Reschedule / Edit Event Intent (e.g. "Ertangi meetingni 16:00 ga sur")
-    const isRescheduleIntent =
+    const isRescheduleIntent = !hasAttachment && (
       lowerInput.includes('ga sur') ||
       lowerInput.includes('ga o\'tkaz') ||
       lowerInput.includes('vaqtini o\'zgartir') ||
-      (lowerInput.includes('meeting') && lowerInput.includes('16:00'));
+      (lowerInput.includes('meeting') && lowerInput.includes('16:00')));
 
     if (isRescheduleIntent) {
       let newTime = '16:00';
       const timeMatch = lowerInput.match(/(\d{1,2}:\d{2})/);
       if (timeMatch) newTime = timeMatch[1];
 
-      let targetEvt = (mockDb.calendarEvents || [])[0];
+      let targetEvt = await CalendarEvent.findOne().sort({ createdAt: -1 }).catch(() => null);
       if (targetEvt) {
         targetEvt.startTime = newTime;
         const h = parseInt(newTime.split(':')[0], 10) + 1;
         targetEvt.endTime = `${h.toString().padStart(2, '0')}:${newTime.split(':')[1] || '00'}`;
         targetEvt.updatedAt = new Date();
-
-        if (mongoose.connection.readyState === 1 && targetEvt.id && mongoose.Types.ObjectId.isValid(targetEvt.id)) {
-          try {
-            await CalendarEvent.findByIdAndUpdate(targetEvt.id, {
-              startTime: targetEvt.startTime,
-              endTime: targetEvt.endTime,
-              updatedAt: new Date()
-            });
-          } catch (e) { }
-        }
+        await targetEvt.save().catch(() => {});
 
         executedTools.push({
           tool: 'calendar_update_event',
           label: 'Updated Calendar Event Time',
-          result: { eventId: targetEvt.id, newStartTime: targetEvt.startTime, title: targetEvt.title }
+          result: { eventId: targetEvt._id.toString(), newStartTime: targetEvt.startTime, title: targetEvt.title }
         });
 
         const responseText = `📅 **Uchrashuv vaqti muvaffaqiyatli o'zgartirildi!**\n\n` +
           `• **Vazifa:** ${targetEvt.title}\n` +
           `• **Yangi Vaqt:** Soat ${targetEvt.startTime} da\n` +
-          `• **Sana:** ${targetEvt.startDate}\n` +
+          `• **Sana:** ${targetEvt.startDate ? new Date(targetEvt.startDate).toISOString().split('T')[0] : ''}\n` +
           `• **Prioritet:** ${targetEvt.priority}\n\n` +
           `✅ Google Calendar hamda MongoDB ma'lumotlar bazasi avtomatik yangilandi.`;
 
@@ -442,20 +595,15 @@ function formatBillzConnectionReport(billzRes) {
     }
 
     // Delete Event Intent (e.g. "Shanba kungi taskni o'chir")
-    const isDeleteIntent =
+    const isDeleteIntent = !hasAttachment &&
       (lowerInput.includes('taskni o\'chir') || lowerInput.includes('meetingni o\'chir') || lowerInput.includes('eventni o\'chir') || lowerInput.includes('o\'chirib tashla')) &&
       !lowerInput.includes('chat');
 
     if (isDeleteIntent) {
       let deletedTitle = 'Belgilangan uchrashuv';
-      if (mockDb.calendarEvents && mockDb.calendarEvents.length > 0) {
-        const removed = mockDb.calendarEvents.shift();
+      const removed = await CalendarEvent.findOneAndDelete({}, { sort: { createdAt: -1 } }).catch(() => null);
+      if (removed) {
         deletedTitle = removed.title;
-        if (mongoose.connection.readyState === 1 && removed.id && mongoose.Types.ObjectId.isValid(removed.id)) {
-          try {
-            await CalendarEvent.findByIdAndDelete(removed.id);
-          } catch (e) { }
-        }
       }
 
       executedTools.push({
@@ -472,7 +620,7 @@ function formatBillzConnectionReport(billzRes) {
     }
 
     // Automatic Event Creation Intent (e.g. "kalendarga event qoshib qoy", "Ertaga meeting bor", "5-avgustda prezentatsiya", "Bugun 17:00 da qo'ng'iroq qil")
-    const isEventCreationIntent =
+    const isEventCreationIntent = !hasAttachment && (
       lowerInput.includes('kalendar') ||
       lowerInput.includes('taqvim') ||
       lowerInput.includes('event') ||
@@ -492,10 +640,15 @@ function formatBillzConnectionReport(billzRes) {
       lowerInput.includes('vazifa qo\'sh') ||
       lowerInput.includes('vazifa') ||
       /(\d{1,2})[-_\s]*(avgust|sentabr|oktabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
-      (lowerInput.includes('ertaga') && (lowerInput.includes('soat') || lowerInput.includes('bor') || lowerInput.includes('ish')));
+      (lowerInput.includes('ertaga') && (lowerInput.includes('soat') || lowerInput.includes('bor') || lowerInput.includes('ish'))));
     const isQueryOrReport = (lowerInput.includes('sotuv') || lowerInput.includes('sotildi') || lowerInput.includes('hisobot') || lowerInput.includes('billz')) && !lowerInput.includes('event') && !lowerInput.includes('kalendar');
 
-    if (isEventCreationIntent && !isQueryOrReport) {
+    // If the owner named a different destination (Notion, Telegram, e-mail), a generic
+    // verb like "qo'shib qo'y" belongs to that system, not to the calendar.
+    const namesOtherDestination = /\b(notion|notionga|notionda|telegram|telegramga|email|emailga|pochta|gmail)\b/.test(lowerInput) &&
+      !/\b(kalendar|kalendarga|taqvim|taqvimga)\b/.test(lowerInput);
+
+    if (isEventCreationIntent && !isQueryOrReport && !namesOtherDestination) {
       const parsed = parseCalendarTaskDetails(userMessage);
 
       const newCalendarEvent = {
@@ -517,31 +670,26 @@ function formatBillzConnectionReport(billzRes) {
         updatedAt: new Date()
       };
 
-      // Save directly to MongoDB Database if connected
-      if (mongoose.connection.readyState === 1) {
-        try {
-          const dbEvt = await CalendarEvent.create({
-            title: newCalendarEvent.title,
-            description: newCalendarEvent.description,
-            startDate: new Date(newCalendarEvent.startDate),
-            endDate: new Date(newCalendarEvent.endDate),
-            startTime: newCalendarEvent.startTime,
-            endTime: newCalendarEvent.endTime,
-            priority: newCalendarEvent.priority,
-            category: newCalendarEvent.category,
-            status: newCalendarEvent.status,
-            createdBy: newCalendarEvent.createdBy,
-            source: newCalendarEvent.source,
-            googleCalendarSynced: true
-          });
-          newCalendarEvent.id = dbEvt._id.toString();
-        } catch (e) {
-          console.error('Mongo save error in AI engine:', e.message);
-        }
+      // Save directly to MongoDB Database
+      try {
+        const dbEvt = await CalendarEvent.create({
+          title: newCalendarEvent.title,
+          description: newCalendarEvent.description,
+          startDate: new Date(newCalendarEvent.startDate),
+          endDate: new Date(newCalendarEvent.endDate),
+          startTime: newCalendarEvent.startTime,
+          endTime: newCalendarEvent.endTime,
+          priority: newCalendarEvent.priority,
+          category: newCalendarEvent.category,
+          status: newCalendarEvent.status,
+          createdBy: newCalendarEvent.createdBy,
+          source: newCalendarEvent.source,
+          googleCalendarSynced: true
+        });
+        newCalendarEvent.id = dbEvt._id.toString();
+      } catch (e) {
+        console.error('Mongo save error in AI engine:', e.message);
       }
-
-      if (!mockDb.calendarEvents) mockDb.calendarEvents = [];
-      mockDb.calendarEvents.unshift(newCalendarEvent);
 
       executedTools.push({
         tool: 'calendar_create_event',
@@ -569,7 +717,8 @@ function formatBillzConnectionReport(billzRes) {
 
     // V2 Intent Classification & Context Builder Pipeline
     const intent = intentClassifier.classify(userMessage);
-    const v2Context = await contextBuilder.buildContext(userMessage, intent);
+    onProgress({ phase: 'intent', label: `Niyat aniqlandi: ${intent}`, intent });
+    const v2Context = await contextBuilder.buildContext(userMessage, intent, onProgress);
 
     // Merge tools from intent classifier context builder if present
     if (v2Context.executedTools && v2Context.executedTools.length > 0) {
@@ -585,6 +734,7 @@ function formatBillzConnectionReport(billzRes) {
     if (openAiApiKey) {
       const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
       for (const modelName of modelsToTry) {
+        onProgress({ phase: 'llm', label: `${modelName} hisobot shakllantirmoqda`, model: modelName });
         try {
           const openAiResp = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -615,6 +765,16 @@ MEMORY PRIORITY & HIERARCHY DATA:
 - Primary Intent Identified: ${intent.toUpperCase()}
 
 RESPONSE INSTRUCTIONS:
+- STRUCTURED OUTPUT RULE (VERY IMPORTANT):
+  • Any set of records with repeating fields (savdolar, mahsulotlar, qoldiqlar, tranzaksiyalar, vazifalar, narxlar) MUST be output as a GitHub-flavoured markdown table with a header row and a \`|---|\` separator row. Do NOT use bullet lists for tabular data.
+  • Put raw numbers in table cells (masalan \`1250000\`), without "UZS", spaces or thousand separators, so the table can be pasted straight into Excel and summed. Write units in the column header instead: \`| Mahsulot | Soni | Summa (UZS) |\`.
+  • Add a final \`Jami\` row when the column is additive.
+- MULTIPLE ANSWER VARIANTS RULE:
+  If you offer 2 or 3 different options, plans or answers, NEVER merge them into one table or one paragraph. Render EACH variant as its own block:
+    ### Variant 1 — <qisqa nom>
+    <o'sha variantning O'Z alohida markdown jadvali>
+    **Qachon ishlatiladi:** <1 qator izoh>
+  Then close with a short \`**Tavsiyam:**\` line naming which variant you recommend and why.
 - LANGUAGE RULE: YOU MUST ALWAYS RESPOND 100% IN PURE UZBEK LANGUAGE. NEVER OUTPUT ENGLISH HEADINGS LIKE "Total Revenue", "Top Transacted Products", OR "Executive Sales & Inventory Insights". Use 100% Uzbek titles:
   • 📊 **Store Hadiya — [Sana / Davr] Kunlik va Davriy POS Savdo Hisoboti**
   • **Umumiy Tushum:** [Tushum] UZS
@@ -623,13 +783,24 @@ RESPONSE INSTRUCTIONS:
   • **Operatsion va Sotuv Tahlili (Executive Insights):**
 - DATE ACCURACY:
   When a specific date (e.g. 25-may) is requested, present the EXACT sales and product transactions that occurred on that specific date as returned by the tool. If 0 sales occurred on that specific date, state accurately in Uzbek that on that day 0 transactions (0 UZS revenue) took place while reporting the active catalog stock value (274,525,000 UZS). Never substitute today's fallback perfumes when a specific date is requested!
+${hasAttachment ? `
+ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
+- Answer about the attached file itself. Ignore the Billz/Notion context data unless the owner's question actually needs it.
+- If it is a SCREENSHOT OF A CUSTOMER CHAT (Instagram DM, Telegram, WhatsApp, comment):
+  1. First read out what the customer actually wrote and what they want (narx, o'lcham, yetkazib berish, shikoyat, chegirma...).
+  2. Then give a READY-TO-SEND reply message in the SAME LANGUAGE the customer used, inside a markdown code block so it can be copied as-is.
+  3. Keep the reply in Store Hadiya's voice: polite, short, concrete, always moving toward closing the sale (narxni ayt, mavjudligini tasdiqla, keyingi qadamni taklif qil).
+  4. If more than one approach makes sense (masalan yumshoq vs qat'iy narx pozitsiyasi), give each variant separately with its own heading and a short "Qachon ishlatiladi" izohi.
+- If it is a RECEIPT, REPORT OR TABLE image: extract the real numbers into a markdown table. Never invent a figure you cannot read — write "o'qib bo'lmadi" instead.
+- NEVER claim you cannot see images. You have been given the image directly.
+` : ''}
 - CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
   Whenever billz_get_sales or billz_get_products tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
   NEVER WRITE DISCLAIMERS like "ma'lumotlar olinmagan", "imkoniyat mavjud emas", "qo'shimcha so'rov jo'nating", or "ma'lumotlar olinmadi"!`
                 },
                 {
                   role: 'user',
-                  content: `User Input: "${userMessage}"\n\nFetched System Context Data: ${JSON.stringify(executedTools, null, 2)}`
+                  content: buildUserContent(userMessage, executedTools, attachedFile)
                 }
               ],
               temperature: 0.7

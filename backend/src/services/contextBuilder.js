@@ -2,8 +2,29 @@ const OwnerMemory = require('../models/ownerMemoryModel');
 const ChatHistory = require('../models/chatHistoryModel');
 const connectorRegistry = require('../connectors/registry');
 
+const MONTH_INDEX = {
+  yanvar: 0, fevral: 1, mart: 2, aprel: 3, may: 4, iyun: 5,
+  iyul: 6, avgust: 7, sentabr: 8, sentyabr: 8, oktabr: 9, oktyabr: 9,
+  noyabr: 10, dekabr: 11
+};
+
+// toISOString() shifts to UTC, which reports the wrong day for any local time before
+// 05:00 in UTC+5 (Tashkent). Build the key from local parts instead.
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 class ContextBuilder {
-  async buildContext(userMessage, intent) {
+  async buildContext(userMessage, intent, onProgress = () => {}) {
     const contextData = {
       intent,
       persistentMemory: [],
@@ -11,6 +32,17 @@ class ContextBuilder {
       executedTools: [],
       ownerProfile: null
     };
+
+    // Runs a connector tool while reporting start/finish to the caller (SSE stream or noop).
+    const runTool = async (tool, params, label) => {
+      onProgress({ phase: 'tool:start', tool, label });
+      const startedAt = Date.now();
+      const res = await connectorRegistry.executeTool(tool, params);
+      onProgress({ phase: 'tool:done', tool, label, ms: Date.now() - startedAt, ok: !!(res && res.success) });
+      return res;
+    };
+
+    onProgress({ phase: 'memory', label: 'MongoDB xotira va profil o\'qilmoqda' });
 
     // 1. Fetch Persistent Memory & Owner Profile from MongoDB (General + Targeted Search)
     try {
@@ -59,21 +91,20 @@ class ContextBuilder {
           }).sort({ timestamp: -1 }).limit(10).lean();
 
           if (matchedLogs.length > 0) {
-            // Fetch assistant replies that followed these user messages
-            const enrichedHistory = [];
-            for (const log of matchedLogs) {
+            // Fetch the assistant reply that followed each matched user message (in parallel, not N+1)
+            const enrichedHistory = await Promise.all(matchedLogs.map(async (log) => {
               const reply = await ChatHistory.findOne({
                 conversationId: log.conversationId,
                 timestamp: { $gte: log.timestamp }
               }).sort({ timestamp: 1 }).lean();
 
-              enrichedHistory.push({
+              return {
                 userPrompt: log.content,
                 timestamp: log.timestamp,
                 formattedDate: new Date(log.timestamp).toLocaleString(),
                 assistantReply: reply ? reply.content : 'No reply found'
-              });
-            }
+              };
+            }));
 
             contextData.executedTools.push({
               tool: 'mongo_chat_history_search',
@@ -107,77 +138,74 @@ class ContextBuilder {
     const isGenericLookup = !isBillzRelevant && !isCalendarRelevant && userMessage.trim().split(/\s+/).length >= 2;
 
     const isNotionRelevant = hasExplicitNotionKeyword || isGenericLookup;
+    const isEmailRelevant = textLower.includes('email') || textLower.includes('pochta') || textLower.includes('mail') || textLower.includes('xabar yubor');
+    const dateOpts = isBillzRelevant ? this.parseUzbekDateOptions(userMessage) : null;
+
+    // Every relevant integration is independent, so fan them out instead of awaiting one at a time.
+    const plannedCalls = [];
+
     if (isNotionRelevant) {
       const searchQuery = isRecentQuery || textLower.includes('space') || textLower.includes('haqimda')
         ? ''
         : this.extractNotionQuery(userMessage);
-      const notionRes = await connectorRegistry.executeTool('notion_search_workspace', { query: searchQuery });
-      if (notionRes && notionRes.success) {
-        contextData.executedTools.push({
-          tool: 'notion_search_workspace',
-          label: isRecentQuery ? 'Queried Notion Workspace Recent Additions & Pages' : 'Queried Notion Workspace Pages & Databases (Personal Space, Focus & Businesses)',
-          result: notionRes.data
-        });
-      }
+      plannedCalls.push({
+        tool: 'notion_search_workspace',
+        params: { query: searchQuery },
+        label: isRecentQuery ? 'Queried Notion Workspace Recent Additions & Pages' : 'Queried Notion Workspace Pages & Databases (Personal Space, Focus & Businesses)'
+      });
     }
 
     if (isBillzRelevant) {
-      const dateOpts = this.parseUzbekDateOptions(userMessage);
-      const salesRes = await connectorRegistry.executeTool('billz_get_sales', dateOpts);
-      if (salesRes && salesRes.success) {
-        contextData.executedTools.push({
-          tool: 'billz_get_sales',
-          label: `Direct Live Store Hadiya Billz POS Sales Summary (${dateOpts.label || dateOpts.date})`,
-          result: salesRes.data
-        });
-      }
-
-      const prodRes = await connectorRegistry.executeTool('billz_get_products', { limit: 100 });
-      if (prodRes && prodRes.success) {
-        contextData.executedTools.push({
-          tool: 'billz_get_products',
-          label: 'Direct Live Store Hadiya Billz POS Products Catalog',
-          result: prodRes.data
-        });
-      }
+      plannedCalls.push({
+        tool: 'billz_get_sales',
+        params: dateOpts,
+        label: `Direct Live Store Hadiya Billz POS Sales Summary (${dateOpts.label || dateOpts.date})`
+      });
+      plannedCalls.push({
+        tool: 'billz_get_products',
+        params: { limit: 100 },
+        label: 'Direct Live Store Hadiya Billz POS Products Catalog'
+      });
     }
 
-    // Email Dispatcher Query (mail, email, pochta)
-    if (textLower.includes('email') || textLower.includes('pochta') || textLower.includes('mail') || textLower.includes('xabar yubor')) {
-      const emailRes = await connectorRegistry.executeTool('gmail_send_email', { to: 'admin@hadiya.uz', subject: 'Report Update', body: userMessage });
-      if (emailRes && emailRes.success) {
-        contextData.executedTools.push({ tool: 'gmail_send_email', label: 'Email Dispatcher Notification Status', result: emailRes.data });
-      }
+    if (isEmailRelevant) {
+      plannedCalls.push({
+        tool: 'gmail_send_email',
+        params: { to: 'admin@hadiya.uz', subject: 'Report Update', body: userMessage },
+        label: 'Email Dispatcher Notification Status'
+      });
     }
+
+    const settled = await Promise.all(
+      plannedCalls.map(call => runTool(call.tool, call.params, call.label).catch(() => null))
+    );
+
+    settled.forEach((res, i) => {
+      if (res && res.success) {
+        contextData.executedTools.push({ tool: plannedCalls[i].tool, label: plannedCalls[i].label, result: res.data });
+      }
+    });
 
     // Schedule / Calendar Query (meeting, schedule, reja, eslatma, avtomatlashtirish, taqvim, vazifa)
     if (isCalendarRelevant) {
-      const mongoose = require('mongoose');
       const CalendarEvent = require('../models/CalendarEvent');
-      const mockDb = require('../store');
+      onProgress({ phase: 'tool:start', tool: 'calendar_list_events', label: 'Taqvim vazifalari o\'qilmoqda' });
 
       let calendarEventsData = [];
-      if (mongoose.connection.readyState === 1) {
-        try {
-          const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 }).limit(10).lean();
-          if (dbEvts && dbEvts.length > 0) {
-            calendarEventsData = dbEvts.map(e => ({
-              title: e.title,
-              startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
-              startTime: e.startTime,
-              endTime: e.endTime,
-              priority: e.priority,
-              category: e.category,
-              status: e.status
-            }));
-          }
-        } catch (e) {}
-      }
+      try {
+        const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 }).limit(10).lean();
+        calendarEventsData = dbEvts.map(e => ({
+          title: e.title,
+          startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+          startTime: e.startTime,
+          endTime: e.endTime,
+          priority: e.priority,
+          category: e.category,
+          status: e.status
+        }));
+      } catch (e) {}
 
-      if (calendarEventsData.length === 0 && mockDb.calendarEvents) {
-        calendarEventsData = mockDb.calendarEvents;
-      }
-
+      onProgress({ phase: 'tool:done', tool: 'calendar_list_events', label: 'Taqvim vazifalari o\'qilmoqda', ok: true });
       contextData.executedTools.push({
         tool: 'calendar_list_events',
         label: 'Fetched Calendar Events from MongoDB',
@@ -209,68 +237,102 @@ class ContextBuilder {
     return cleaned.length > 1 ? cleaned : text;
   }
 
+  /**
+   * Turns a free-form Uzbek phrase into a Billz query window, the way a person reading
+   * the sentence would: a named day wins over a relative one, and a relative one wins
+   * over a bare period word.
+   *
+   * Returns either { date } for a single day or { daysCount, label } for a range.
+   */
   parseUzbekDateOptions(text) {
-    if (!text) return { date: '2026-07-30' };
-    const lower = text.toLowerCase();
+    if (!text) return { daysCount: 30, label: 'Oxirgi 30 kunlik savdolar' };
 
-    // Check for N weeks (7 haftalik / 7 hafta / 2 haftalik / haftalik):
-    const weekNumMatch = lower.match(/(\d{1,2})\s*hafta/i);
-    if (weekNumMatch) {
-      const weeks = parseInt(weekNumMatch[1], 10);
-      const days = weeks * 7;
-      return { daysCount: days, label: `Oxirgi ${weeks} haftalik (${days} kunlik) savdolar` };
+    // Normalise the several apostrophes Uzbek gets typed with (o'/oʻ/o‘/o`).
+    const lower = String(text).toLowerCase().replace(/[ʻ‘’`´]/g, "'");
+
+    // --- 1. Explicit calendar dates win outright ---
+    const isoMatch = lower.match(/\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/);
+    if (isoMatch) return { date: `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}` };
+
+    // "25-may", "25 -chi may", "5 avgust 2025"
+    const dayMonthMatch = lower.match(
+      /\b(\d{1,2})[-_\s]*(?:chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b(?:[-_\s]*(20\d{2}))?/
+    );
+    if (dayMonthMatch) {
+      const day = parseInt(dayMonthMatch[1], 10);
+      const month = MONTH_INDEX[dayMonthMatch[2]];
+      if (month !== undefined && day >= 1 && day <= 31) {
+        const today = startOfDay(new Date());
+        let year = dayMonthMatch[3] ? parseInt(dayMonthMatch[3], 10) : today.getFullYear();
+        let target = new Date(year, month, day);
+        // No explicit year and the date is still ahead of us: they meant last year's
+        // occurrence, because you cannot report on sales that have not happened yet.
+        if (!dayMonthMatch[3] && target > today) {
+          target = new Date(year - 1, month, day);
+        }
+        return { date: toDateKey(target) };
+      }
     }
 
-    if (lower.includes('haftalik') || lower.includes('1 hafta') || lower.includes('hafta')) {
+    // --- 2. Relative single days ---
+    const dayOffsets = [
+      [/\b(bugun|bugungi|today)\b/, 0, 'Bugungi savdolar'],
+      [/\b(kecha|kechagi|kechan?gi|yesterday)\b/, -1, 'Kechagi savdolar'],
+      [/\b(avvalgi\s*kun|olding?i\s*kun)\b/, -2, "Ikki kun oldingi savdolar"]
+    ];
+    for (const [re, offset] of dayOffsets) {
+      if (re.test(lower)) {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        return { date: toDateKey(d) };
+      }
+    }
+
+    // --- 3. Explicit numeric ranges ---
+    const dayNumMatch = lower.match(/\b(\d{1,3})\s*(?:ta\s*)?kun(?:lik|da|gi)?\b/);
+    if (dayNumMatch) {
+      const days = parseInt(dayNumMatch[1], 10);
+      if (days > 0) return { daysCount: days, label: `Oxirgi ${days} kunlik savdolar` };
+    }
+
+    const weekNumMatch = lower.match(/\b(\d{1,2})\s*(?:ta\s*)?hafta(?:lik|da|gi)?\b/);
+    if (weekNumMatch) {
+      const weeks = parseInt(weekNumMatch[1], 10);
+      if (weeks > 0) {
+        const days = weeks * 7;
+        return { daysCount: days, label: `Oxirgi ${weeks} haftalik (${days} kunlik) savdolar` };
+      }
+    }
+
+    const monthNumMatch = lower.match(/\b(\d{1,2})\s*(?:ta\s*)?oy(?:lik|da|gi)?\b/);
+    if (monthNumMatch) {
+      const months = parseInt(monthNumMatch[1], 10);
+      if (months > 0) {
+        const days = months * 30;
+        return { daysCount: days, label: `Oxirgi ${months} oylik (${days} kunlik) savdolar` };
+      }
+    }
+
+    // --- 4. Bare period words. Anchored with \b so that "qo'shib qo'y" no longer
+    // matches "oy" and silently turns a calendar request into a 30-day sales report. ---
+    if (/\b(shu|bu|joriy|o'tgan|otgan|so'nggi|songgi|oxirgi)?\s*hafta(lik|da|gi)?\b/.test(lower)) {
       return { daysCount: 7, label: 'Oxirgi 1 haftalik (7 kunlik) savdolar' };
     }
 
-    // Check for N months (1 oylik / 3 oylik / oylik):
-    const monthNumMatch = lower.match(/(\d{1,2})\s*oy/i);
-    if (monthNumMatch) {
-      const months = parseInt(monthNumMatch[1], 10);
-      const days = months * 30;
-      return { daysCount: days, label: `Oxirgi ${months} oylik (${days} kunlik) savdolar` };
+    if (/\b(shu|bu|joriy)\s*oy(lik|da|gi)?\b/.test(lower)) {
+      const now = new Date();
+      return { daysCount: now.getDate(), label: `Shu oyning boshidan beri (${now.getDate()} kun) savdolar` };
     }
 
-    if (lower.includes('oylik') || lower.includes('1 oy') || lower.includes('oy')) {
+    if (/\b(o'tgan|otgan|so'nggi|songgi|oxirgi)?\s*oy(lik|da|gi)?\b/.test(lower)) {
       return { daysCount: 30, label: 'Oxirgi 1 oylik (30 kunlik) savdolar' };
     }
 
-    const dayNumMatch = lower.match(/(\d{1,2})\s*kun/i);
-    if (dayNumMatch) {
-      const days = parseInt(dayNumMatch[1], 10);
-      return { daysCount: days, label: `Oxirgi ${days} kunlik savdolar` };
+    if (/\b(yil|yillik|year)\b/.test(lower)) {
+      return { daysCount: 365, label: 'Oxirgi 1 yillik (365 kunlik) savdolar' };
     }
 
-    const isoMatch = lower.match(/\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/);
-    if (isoMatch) return { date: isoMatch[0] };
-
-    const monthsMap = {
-      'yanvar': '01', 'fevral': '02', 'mart': '03', 'aprel': '04',
-      'may': '05', 'iyun': '06', 'iyul': '07', 'avgust': '08',
-      'sentabr': '09', 'oktabr': '10', 'noyabr': '11', 'dekabr': '12'
-    };
-
-    // Allows the Uzbek ordinal suffix "-chi" between the day number and month (e.g. "25 -chi may")
-    const dayMonthMatch = lower.match(/(\d{1,2})[-_\s]*(?:chi[-_\s]*)?(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)/i);
-    if (dayMonthMatch) {
-      const day = dayMonthMatch[1].padStart(2, '0');
-      const month = monthsMap[dayMonthMatch[2].toLowerCase()];
-      return { date: `2026-${month}-${day}` };
-    }
-
-    if (lower.includes('bugun') || lower.includes('today')) {
-      return { date: new Date().toISOString().split('T')[0] };
-    }
-
-    if (lower.includes('kecha') || lower.includes('yesterday')) {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      return { date: d.toISOString().split('T')[0] };
-    }
-
-    return { daysCount: 30, label: 'Oxirgi Billz POS ma\'lumotlari' };
+    return { daysCount: 30, label: 'Oxirgi 30 kunlik savdolar' };
   }
 }
 

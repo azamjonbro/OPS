@@ -7,7 +7,6 @@ router.post('/', calendarController.createEvent);
 router.put('/:id', calendarController.updateEvent);
 router.delete('/:id', calendarController.deleteEvent);
 
-router.post('/sync-google', calendarController.syncGoogleCalendar);
 router.get('/reminders', calendarController.getReminders);
 
 module.exports = router;

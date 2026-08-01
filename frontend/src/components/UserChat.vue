@@ -17,6 +17,24 @@
     </div>
     <input type="file" ref="fileInput" @change="onFileInputChange" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.xml" />
 
+    <!-- FLOATING SELECTION TOOLBAR (appears when text inside a message is selected) -->
+    <div
+      v-if="selectionToolbar"
+      :style="{ top: selectionToolbar.y + 'px', left: selectionToolbar.x + 'px' }"
+      class="fixed z-50 -translate-x-1/2 -translate-y-full flex items-center gap-1 bg-[#1A1D26] border border-[#2D3242] rounded-xl p-1 shadow-2xl"
+      @mousedown.prevent
+    >
+      <button @click="replyToSelection" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-indigo-300 hover:bg-indigo-600 hover:text-white transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6"/></svg>
+        Shu qismga javob
+      </button>
+      <div class="w-px h-4 bg-[#2D3242]"></div>
+      <button @click="copySelection" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-emerald-300 hover:bg-emerald-600 hover:text-white transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        Nusxalash
+      </button>
+    </div>
+
     <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 z-40 bg-black/60 md:hidden"></div>
 
 
@@ -387,7 +405,7 @@
       </div>
 
       <!-- Message History Container (WHEN IN CHAT VIEW MODE) -->
-      <div v-else ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
+      <div v-else ref="chatContainer" @mouseup="onTextSelected" @touchend="onTextSelected" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
         <!-- Welcome Screen -->
         <div v-if="messages.length === 0" class="h-full flex flex-col items-center justify-center text-center my-auto space-y-6 pt-6 pb-10">
           <!-- Glowing AI Hexagon Badge -->
@@ -469,10 +487,22 @@
         </div>
 
         <!-- Chat Messages -->
-        <div v-else v-for="msg in messages" :key="msg.id" class="space-y-3">
+        <div
+          v-else
+          v-for="msg in messages"
+          :key="msg.id"
+          :data-msg-id="msg.id"
+          :data-msg-role="msg.role"
+          class="space-y-3 group/msg"
+        >
           <!-- User Bubble -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
             <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2.5">
+              <!-- Quoted excerpt this message replies to -->
+              <div v-if="msg.replyTo" class="border-l-2 border-white/50 pl-2.5 py-0.5 text-[11px] text-indigo-100/90">
+                <div class="font-bold opacity-80 mb-0.5">{{ msg.replyTo.role === 'user' ? 'Siz' : 'Jarvis AI' }}</div>
+                <div class="line-clamp-3 italic">{{ msg.replyTo.snippet }}</div>
+              </div>
               <div v-if="msg.attachedFile" class="p-2.5 rounded-xl bg-black/30 border border-white/15 flex items-center gap-3">
                 <img 
                   v-if="msg.attachedFile.isImage" 
@@ -490,6 +520,16 @@
                 </div>
               </div>
               <div v-if="msg.content">{{ msg.content }}</div>
+            </div>
+            <!-- Hover actions -->
+            <div class="flex flex-col gap-1 self-end pb-1 pr-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+              <button @click="startReply(msg)" class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-300 hover:bg-[#1A1D26] transition" title="Javob berish (Reply)">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6"/></svg>
+              </button>
+              <button @click="copyMessage(msg)" class="p-1.5 rounded-lg text-gray-400 hover:text-emerald-300 hover:bg-[#1A1D26] transition" :title="copiedMsgId === msg.id ? 'Nusxalandi!' : 'Nusxalash'">
+                <svg v-if="copiedMsgId === msg.id" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
             </div>
           </div>
 
@@ -513,8 +553,30 @@
                 </span>
               </div>
 
+              <!-- Quoted excerpt this message replies to -->
+              <div v-if="msg.replyTo" class="border-l-2 border-indigo-500/60 pl-3 py-0.5 text-[11px] text-gray-400">
+                <div class="font-bold text-indigo-300 mb-0.5">{{ msg.replyTo.role === 'user' ? 'Siz' : 'Jarvis AI' }}</div>
+                <div class="line-clamp-3 italic">{{ msg.replyTo.snippet }}</div>
+              </div>
+
               <!-- Message Content with Markdown Parsing -->
-              <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body" v-html="renderMarkdown(msg.content)"></div>
+              <MarkdownMessage
+                :content="msg.content"
+                class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed"
+              />
+
+              <!-- Message Actions -->
+              <div class="flex items-center gap-1.5 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                <button @click="startReply(msg)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-indigo-300 hover:bg-[#1A1D26] border border-transparent hover:border-[#262A36] transition">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6"/></svg>
+                  Javob berish
+                </button>
+                <button @click="copyMessage(msg)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-gray-400 hover:text-emerald-300 hover:bg-[#1A1D26] border border-transparent hover:border-[#262A36] transition">
+                  <svg v-if="copiedMsgId === msg.id" class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  {{ copiedMsgId === msg.id ? 'Nusxalandi!' : 'Markdown nusxalash' }}
+                </button>
+              </div>
 
               <!-- Interactive Action Confirmation Card (Allow / Cancel) -->
               <div v-if="msg.requiresApproval || (msg.content && (msg.content.includes('Biroz kuting') || msg.content.includes('ko\'rib chiqaman')))" class="mt-3 bg-gradient-to-r from-[#171922] via-[#1D212F] to-[#171922] border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
@@ -571,6 +633,20 @@
       <footer class="p-4 sm:p-6 bg-[#0B0C0E] mb-[76px] md:mb-0 relative z-30">
         <div class="max-w-3xl w-full mx-auto space-y-2">
 
+          <!-- ACTIVE REPLY QUOTE BAR -->
+          <div v-if="replyTo" class="flex items-start justify-between gap-3 bg-[#161820] border-l-[3px] border-indigo-500 border-y border-r border-[#262A36] rounded-xl px-3.5 py-2 shadow-lg">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold text-indigo-300 flex items-center gap-1.5">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6M3 10l6-6"/></svg>
+                {{ replyTo.role === 'user' ? 'Sizning xabaringizga' : 'Jarvis AI javobiga' }} javob berilmoqda
+              </div>
+              <div class="text-[11px] text-gray-400 italic line-clamp-2 mt-0.5">{{ replyTo.snippet }}</div>
+            </div>
+            <button @click="cancelReply" class="p-1 text-gray-500 hover:text-red-400 transition shrink-0" title="Javobni bekor qilish">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
           <!-- ATTACHED FILE PREVIEW CARD -->
           <div v-if="attachedFile" class="flex items-center justify-between bg-[#1E1F24] border border-indigo-500/40 px-3.5 py-2 rounded-2xl w-fit shadow-lg mb-2">
             <div class="flex items-center gap-2.5">
@@ -617,7 +693,7 @@
             <!-- Live Recording Duration Timer Badge -->
             <div class="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full shrink-0">
               <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              <span class="font-mono text-xs font-bold text-red-400">00:{{ recordingSeconds < 10 ? '0' + recordingSeconds : recordingSeconds }}</span>
+              <span class="font-mono text-xs font-bold text-red-400">{{ formattedRecordingTime }}</span>
             </div>
 
             <!-- Center: Minimalist Waveform Spectrum -->
@@ -952,21 +1028,73 @@
 </template>
 
 <script>
-import axios from 'axios';
 import { nextTick } from 'vue';
-import { marked } from 'marked';
 import { VoiceController, RECORDING_STATE } from '../services/voiceController';
-import { API_BASE } from '../services/api';
+import { chatService } from '../services/chatService';
+import { scheduleService } from '../services/scheduleService';
 import CalendarWorkspace from './CalendarWorkspace.vue';
+import MarkdownMessage from './MarkdownMessage.vue';
 
-marked.setOptions({
-  gfm: true,
-  breaks: true
-});
+const MAX_TEXT_CHARS = 20000;
+const MAX_IMAGE_EDGE = 1568;
+const TEXT_EXTENSIONS = /\.(txt|md|csv|tsv|json|xml|ya?ml|log|html?|js|ts|css|sql)$/i;
+
+function isTextReadable(file) {
+  return file.type.startsWith('text/') ||
+    file.type === 'application/json' ||
+    file.type === 'application/xml' ||
+    TEXT_EXTENSIONS.test(file.name);
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Re-encodes an image so the long edge is at most MAX_IMAGE_EDGE. Falls back to the
+// original data URL if the browser cannot decode it (e.g. an exotic format).
+async function downscaleImage(file) {
+  const original = await readFileAsDataUrl(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('decode failed'));
+      el.src = original;
+    });
+
+    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(img.width, img.height));
+    if (scale === 1 && original.length < 1_500_000) return original;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // PNG screenshots of text re-encode much smaller as JPEG with no meaningful loss.
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch (err) {
+    return original;
+  }
+}
 
 export default {
   components: {
-    CalendarWorkspace
+    CalendarWorkspace,
+    MarkdownMessage
   },
   data() {
     return {
@@ -978,12 +1106,18 @@ export default {
       inputQuery: '',
       isLoading: false,
 
+      // Reply / quote & copy states
+      replyTo: null,
+      selectionToolbar: null,
+      copiedMsgId: null,
+
       // Image Lightbox Preview States
       isPreviewImageOpen: false,
       previewImageSrc: null,
 
       // File Drag & Drop & Attachment States
-      isLoading: false,
+      isDraggingFile: false,
+      dragDepth: 0,
       loadingStepText: '',
       loadingTimer: null,
       attachedFile: null,
@@ -1011,7 +1145,9 @@ export default {
       // Voice Controller & Modal States
       isVoiceRecordingActive: false,
       isTranscribingVoice: false,
-      selectedVoiceLang: 'en-US',
+      // Owner's choice: dictate in English. Whatever is picked in settings is
+      // remembered via saveUserLang().
+      selectedVoiceLang: localStorage.getItem('jarvis-voice-lang') || 'en-US',
       recordingState: RECORDING_STATE.IDLE,
       voiceStatusBadge: '🎤 Listening...',
       recordingSeconds: 0,
@@ -1029,6 +1165,15 @@ export default {
       }
     };
   },
+  computed: {
+    // The old inline template hardcoded a "00:" minute prefix, so anything over a
+    // minute displayed as 00:73.
+    formattedRecordingTime() {
+      const m = Math.floor(this.recordingSeconds / 60);
+      const s = this.recordingSeconds % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+  },
   watch: {
     messages: {
       deep: true,
@@ -1043,8 +1188,10 @@ export default {
     this.messages = [];
     this.fetchSchedules();
     this.fetchOwnerProfile();
+    document.addEventListener('mousedown', this.dismissSelectionToolbar);
   },
   beforeUnmount() {
+    document.removeEventListener('mousedown', this.dismissSelectionToolbar);
     if (this.voiceController) {
       this.voiceController.cancel();
     }
@@ -1058,9 +1205,9 @@ export default {
     },
     async fetchMemoryItems() {
       try {
-        const res = await axios.get(`${API_BASE}/api/chat/memory/items`);
-        if (res.data && res.data.items) {
-          this.memoryItems = res.data.items;
+        const data = await chatService.getMemoryItems();
+        if (data && data.items) {
+          this.memoryItems = data.items;
         }
       } catch (e) {}
     },
@@ -1081,7 +1228,7 @@ export default {
       if (!this.newDocTitle.trim() || !this.newDocContent.trim() || this.isUploadingMemory) return;
       this.isUploadingMemory = true;
       try {
-        await axios.post(`${API_BASE}/api/chat/memory/upload`, {
+        await chatService.uploadMemoryItem({
           title: this.newDocTitle.trim(),
           category: this.newDocCategory,
           content: this.newDocContent.trim(),
@@ -1099,7 +1246,7 @@ export default {
     },
     async deleteMemoryCard(id) {
       try {
-        await axios.delete(`${API_BASE}/api/chat/memory/items/${id}`);
+        await chatService.deleteMemoryItem(id);
         await this.fetchMemoryItems();
       } catch (e) {}
     },
@@ -1109,17 +1256,17 @@ export default {
     },
     async fetchOwnerProfile() {
       try {
-        const res = await axios.get(`${API_BASE}/api/chat/owner/profile`);
-        if (res.data && res.data.profile) {
-          this.ownerTitle = res.data.profile.title || this.ownerTitle;
-          this.ownerCharacterPrompt = res.data.profile.content || this.ownerCharacterPrompt;
+        const data = await chatService.getOwnerProfile();
+        if (data && data.profile) {
+          this.ownerTitle = data.profile.title || this.ownerTitle;
+          this.ownerCharacterPrompt = data.profile.content || this.ownerCharacterPrompt;
         }
       } catch (e) {}
     },
     async saveOwnerProfile() {
       this.isSavingOwnerProfile = true;
       try {
-        await axios.post(`${API_BASE}/api/chat/owner/profile`, {
+        await chatService.saveOwnerProfile({
           title: this.ownerTitle,
           content: this.ownerCharacterPrompt
         });
@@ -1161,30 +1308,35 @@ export default {
     },
     async fetchConversations() {
       try {
-        const res = await axios.get(`${API_BASE}/api/chat/conversations`);
-        this.conversations = res.data;
+        this.conversations = await chatService.getConversations();
       } catch (e) {}
     },
     async fetchMessages(convId) {
       this.activeConvId = convId;
       try {
-        const res = await axios.get(`${API_BASE}/api/chat/conversations/${convId}/messages`);
-        this.messages = res.data;
+        this.messages = await chatService.getMessages(convId);
         this.scrollToBottom();
       } catch (e) {}
     },
     async fetchSchedules() {
       try {
-        const res = await axios.get(`${API_BASE}/api/schedules`);
-        this.schedules = res.data;
+        this.schedules = await scheduleService.getSchedules();
       } catch (e) {}
     },
 
     // --- CHATGPT VOICE WORKFLOW CONTROLLER ---
     changeVoiceLang(lang) {
       this.selectedVoiceLang = lang;
+      this.saveUserLang();
+    },
+    // Bound to the language <select> in the settings modal. Without it the change
+    // handler resolved to undefined and every language switch threw.
+    saveUserLang() {
+      try {
+        localStorage.setItem('jarvis-voice-lang', this.selectedVoiceLang);
+      } catch (e) {}
       if (this.voiceController) {
-        this.voiceController.setLanguage(lang);
+        this.voiceController.setLanguage(this.selectedVoiceLang);
       }
     },
     openVoiceModal() {
@@ -1213,6 +1365,7 @@ export default {
         },
         onError: (err) => {
           console.warn('Voice Controller Notice:', err);
+          this.voiceStatusBadge = `⚠️ ${err}`;
         }
       });
 
@@ -1273,14 +1426,14 @@ export default {
         }) : null;
 
         if (base64Audio || textToSend) {
-          const trRes = await axios.post(`${API_BASE}/api/chat/transcribe-audio`, {
+          const trData = await chatService.transcribeAudio({
             spokenText: textToSend,
             audioBase64: base64Audio,
             lang: this.selectedVoiceLang
           });
 
-          if (trRes.data && trRes.data.transcribedText) {
-            textToSend = trRes.data.transcribedText;
+          if (trData && trData.transcribedText) {
+            textToSend = trData.transcribedText;
           }
         }
       } catch (err) {
@@ -1303,7 +1456,7 @@ export default {
     async createSchedule() {
       if (!this.newSchedule.title || !this.newSchedule.prompt) return;
       try {
-        await axios.post(`${API_BASE}/api/schedules`, this.newSchedule);
+        await scheduleService.createSchedule(this.newSchedule);
         this.newSchedule.title = '';
         this.newSchedule.prompt = '';
         this.fetchSchedules();
@@ -1311,22 +1464,19 @@ export default {
     },
     async toggleSchedule(id) {
       try {
-        await axios.post(`${API_BASE}/api/schedules/${id}/toggle`);
+        await scheduleService.toggleSchedule(id);
         this.fetchSchedules();
       } catch (e) {}
     },
     async deleteSchedule(id) {
       try {
-        await axios.delete(`${API_BASE}/api/schedules/${id}`);
+        await scheduleService.deleteSchedule(id);
         this.fetchSchedules();
       } catch (e) {}
     },
     async newChat() {
       try {
-        const res = await axios.post(`${API_BASE}/api/chat/conversations`, {
-          title: 'Yangi AI Muloqot'
-        });
-        const newConv = res.data;
+        const newConv = await chatService.createConversation('Yangi AI Muloqot');
         this.conversations.unshift(newConv);
         this.activeConvId = newConv.id;
         this.messages = [];
@@ -1348,17 +1498,19 @@ export default {
       if ((!this.inputQuery.trim() && !this.attachedFile) || this.isLoading) return;
       const text = this.inputQuery.trim();
       const fileToSend = this.attachedFile;
+      const replyToSend = this.replyTo;
       this.inputQuery = '';
       this.attachedFile = null;
+      this.replyTo = null;
       this.adjustTextareaHeight();
 
       if (!this.activeConvId) {
         try {
-          const res = await axios.post(`${API_BASE}/api/chat/conversations`, {
-            title: fileToSend ? `[Fayl] ${fileToSend.name}` : (text || 'Yangi AI Muloqot')
-          });
-          this.activeConvId = res.data.id;
-          this.conversations.unshift(res.data);
+          const newConv = await chatService.createConversation(
+            fileToSend ? `[Fayl] ${fileToSend.name}` : (text || 'Yangi AI Muloqot')
+          );
+          this.activeConvId = newConv.id;
+          this.conversations.unshift(newConv);
         } catch (e) {
           this.activeConvId = `conv-${Date.now()}`;
         }
@@ -1368,7 +1520,8 @@ export default {
         id: `user-${Date.now()}`,
         role: 'user',
         content: text,
-        attachedFile: fileToSend
+        attachedFile: fileToSend,
+        replyTo: replyToSend
       });
 
       this.scrollToBottom();
@@ -1376,20 +1529,21 @@ export default {
       this.startLoadingSteps();
 
       try {
-        const res = await axios.post(`${API_BASE}/api/chat/message`, {
+        const data = await chatService.sendMessage({
           conversationId: this.activeConvId,
           content: text,
-          attachedFile: fileToSend
+          attachedFile: fileToSend,
+          replyTo: replyToSend
         });
 
         this.messages.push({
           id: `ai-${Date.now()}`,
           role: 'assistant',
-          content: res.data.assistantResponse,
-          toolCalls: JSON.stringify(res.data.executedTools || [])
+          content: data.assistantResponse,
+          toolCalls: JSON.stringify(data.executedTools || [])
         });
 
-        if (res.data.executedTools && res.data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
+        if (data.executedTools && data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
           window.dispatchEvent(new CustomEvent('calendar-updated'));
         }
         
@@ -1422,15 +1576,15 @@ export default {
       this.startLoadingSteps();
 
       try {
-        const res = await axios.post(`${API_BASE}/api/chat/message`, {
+        const data = await chatService.sendMessage({
           conversationId: this.activeConvId,
           content: userPrompt,
           confirmed: true
         });
 
-        msg.content = res.data.assistantResponse;
-        msg.toolCalls = JSON.stringify(res.data.executedTools || []);
-        
+        msg.content = data.assistantResponse;
+        msg.toolCalls = JSON.stringify(data.executedTools || []);
+
         await this.fetchConversations();
         this.fetchSchedules();
         this.scrollToBottom();
@@ -1474,17 +1628,23 @@ export default {
       }
     },
     onDragOver(e) {
+      if (this.isDraggingFile) return;
       this.isDraggingFile = true;
     },
+    // dragenter/dragleave also fire when the pointer crosses child elements, so track
+    // nesting depth instead of clearing on the first leave (which made the overlay flicker).
     onDragEnter(e) {
+      this.dragDepth += 1;
       this.isDraggingFile = true;
     },
     onDragLeave(e) {
-      if (e.clientX === 0 || e.clientY === 0 || e.target === document.documentElement) {
+      this.dragDepth = Math.max(0, this.dragDepth - 1);
+      if (this.dragDepth === 0) {
         this.isDraggingFile = false;
       }
     },
     onDropFile(e) {
+      this.dragDepth = 0;
       this.isDraggingFile = false;
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
         this.processFile(e.dataTransfer.files[0]);
@@ -1500,24 +1660,45 @@ export default {
         this.processFile(e.target.files[0]);
       }
     },
-    processFile(file) {
+    async processFile(file) {
       const isImage = file.type.startsWith('image/');
-      const formattedSize = file.size > 1024 * 1024 
-        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB' 
+      const formattedSize = file.size > 1024 * 1024
+        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
         : Math.round(file.size / 1024) + ' KB';
 
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        this.attachedFile = {
-          name: file.name,
-          size: file.size,
-          formattedSize,
-          type: file.type,
-          isImage,
-          dataUrl: evt.target.result
-        };
+      const base = {
+        name: file.name,
+        size: file.size,
+        formattedSize,
+        type: file.type,
+        isImage
       };
-      reader.readAsDataURL(file);
+
+      try {
+        if (isImage) {
+          // Downscale before upload: a phone screenshot is several MB of base64 otherwise,
+          // and the vision model gains nothing above ~1568px on the long edge.
+          this.attachedFile = { ...base, dataUrl: await downscaleImage(file) };
+          return;
+        }
+
+        if (isTextReadable(file)) {
+          const text = await readFileAsText(file);
+          this.attachedFile = {
+            ...base,
+            textContent: text.slice(0, MAX_TEXT_CHARS),
+            truncated: text.length > MAX_TEXT_CHARS
+          };
+          return;
+        }
+
+        // Binary formats we cannot parse in the browser (PDF, DOCX, XLSX). Send the
+        // metadata only and flag it so the AI says so instead of inventing contents.
+        this.attachedFile = { ...base, unreadable: true };
+      } catch (err) {
+        console.warn('File read failed:', err);
+        this.attachedFile = { ...base, unreadable: true };
+      }
     },
     removeAttachedFile() {
       this.attachedFile = null;
@@ -1538,7 +1719,7 @@ export default {
       this.isDeleteModalOpen = false;
       if (this.isDeletingAll) {
         try {
-          await axios.delete(`${API_BASE}/api/chat/conversations`);
+          await chatService.clearAllConversations();
         } catch (e) {}
         this.conversations = [];
         this.messages = [];
@@ -1546,7 +1727,7 @@ export default {
       } else if (this.pendingDeleteId) {
         const id = this.pendingDeleteId;
         try {
-          await axios.delete(`${API_BASE}/api/chat/conversations/${id}`);
+          await chatService.deleteConversation(id);
         } catch (e) {}
         this.conversations = this.conversations.filter(c => c.id !== id);
         if (this.activeConvId === id) {
@@ -1556,12 +1737,98 @@ export default {
         this.pendingDeleteId = null;
       }
     },
-    renderMarkdown(content) {
-      if (!content) return '';
+    // --- REPLY / QUOTE & COPY ---
+    // The toolbar itself suppresses mousedown, so any other press means "dismiss".
+    dismissSelectionToolbar() {
+      if (this.selectionToolbar) this.selectionToolbar = null;
+    },
+    makeSnippet(text) {
+      const clean = String(text || '').replace(/\s+/g, ' ').trim();
+      return clean.length > 220 ? clean.slice(0, 220) + '…' : clean;
+    },
+    startReply(msg, snippet = null) {
+      this.replyTo = {
+        messageId: msg.id,
+        role: msg.role,
+        snippet: this.makeSnippet(snippet || msg.content)
+      };
+      this.selectionToolbar = null;
+      nextTick(() => {
+        const el = this.$refs.inputQueryRef;
+        if (el) el.focus();
+      });
+    },
+    cancelReply() {
+      this.replyTo = null;
+    },
+    onTextSelected() {
+      const selection = window.getSelection();
+      const text = selection ? selection.toString().trim() : '';
+      if (!text) {
+        this.selectionToolbar = null;
+        return;
+      }
+
+      // Only offer the toolbar for selections that live inside a rendered message.
+      const anchorEl = selection.anchorNode && (selection.anchorNode.nodeType === 1
+        ? selection.anchorNode
+        : selection.anchorNode.parentElement);
+      const msgEl = anchorEl && anchorEl.closest('[data-msg-id]');
+      if (!msgEl) {
+        this.selectionToolbar = null;
+        return;
+      }
+
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      this.selectionToolbar = {
+        text,
+        msgId: msgEl.dataset.msgId,
+        role: msgEl.dataset.msgRole,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 8
+      };
+    },
+    replyToSelection() {
+      if (!this.selectionToolbar) return;
+      const { msgId, role, text } = this.selectionToolbar;
+      this.startReply({ id: msgId, role, content: text }, text);
+      window.getSelection().removeAllRanges();
+    },
+    async copySelection() {
+      if (!this.selectionToolbar) return;
+      await this.writeClipboard(this.selectionToolbar.text);
+      this.selectionToolbar = null;
+      window.getSelection().removeAllRanges();
+    },
+    async copyMessage(msg) {
+      // Copies the raw markdown source, so pasting into Notion/Telegram keeps the structure.
+      const ok = await this.writeClipboard(msg.content || '');
+      if (ok) {
+        this.copiedMsgId = msg.id;
+        setTimeout(() => {
+          if (this.copiedMsgId === msg.id) this.copiedMsgId = null;
+        }, 2000);
+      }
+    },
+    async writeClipboard(text) {
       try {
-        return marked.parse(content);
+        await navigator.clipboard.writeText(text);
+        return true;
       } catch (err) {
-        return content;
+        // Clipboard API needs a secure context; fall back to the legacy path.
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          return ok;
+        } catch (e) {
+          return false;
+        }
       }
     }
   }

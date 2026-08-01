@@ -2,6 +2,28 @@
  * MCP Connectors Engine in pure JavaScript
  */
 
+const cache = require('../utils/cache');
+
+// Read-only tools worth caching, and how long their data stays fresh.
+// Anything absent from this map is treated as a write and always executes.
+const READ_TOOL_TTL_MS = {
+  billz_get_products: 5 * 60 * 1000,
+  billz_get_sales: 2 * 60 * 1000,
+  billz_get_inventory: 5 * 60 * 1000,
+  notion_search_workspace: 3 * 60 * 1000,
+  notion_list_pages: 3 * 60 * 1000,
+  calendar_list_events: 30 * 1000
+};
+
+// After a write succeeds, drop the cached reads it would have made stale.
+const WRITE_TOOL_INVALIDATES = {
+  calendar_create_event: ['calendar_list_events'],
+  calendar_update_event: ['calendar_list_events'],
+  calendar_delete_event: ['calendar_list_events'],
+  billz_create_product: ['billz_get_products', 'billz_get_inventory'],
+  notion_create_task: ['notion_search_workspace', 'notion_list_pages']
+};
+
 class BaseConnector {
   constructor(type, name, description) {
     this.type = type;
@@ -616,15 +638,16 @@ class NotionConnector extends BaseConnector {
             'Notion-Version': '2022-06-28',
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ page_size: 1 })
+          body: JSON.stringify({ page_size: 10, filter: { property: 'object', value: 'page' } })
         });
-        
+
         let parentPageId = '39f94798-4818-80a6-9bbe-d370077e539f';
         if (searchRes.ok) {
           const searchData = await searchRes.json();
-          if (searchData.results && searchData.results[0]) {
-            parentPageId = searchData.results[0].id;
-          }
+          // `parent: { page_id }` only accepts a page. Search returns databases too, so
+          // taking results[0] blindly would 400 whenever a database sorted first.
+          const firstPage = (searchData.results || []).find(r => r.object === 'page');
+          if (firstPage) parentPageId = firstPage.id;
         }
 
         const createRes = await fetch('https://api.notion.com/v1/pages', {
@@ -665,18 +688,34 @@ class NotionConnector extends BaseConnector {
             executionMs: Date.now() - startTime
           };
         }
-      } catch (e) {}
+
+        const errBody = await createRes.json().catch(() => ({}));
+        return {
+          success: false,
+          isRealData: false,
+          error: errBody.message || `Notion API ${createRes.status}`,
+          data: { title: params.title, httpStatus: createRes.status },
+          executionMs: Date.now() - startTime
+        };
+      } catch (e) {
+        return {
+          success: false,
+          isRealData: false,
+          error: e.message,
+          data: { title: params.title },
+          executionMs: Date.now() - startTime
+        };
+      }
     }
 
+    // A write that did not reach Notion must not report success — the old fallback
+    // invented a pageId and a notion.so URL, so the AI cheerfully confirmed tasks
+    // that were never created.
     return {
-      success: true,
-      data: {
-        pageId: `notion-${Math.floor(Math.random() * 899999) + 100000}`,
-        title: params.title || 'New Task',
-        priority: params.priority || 'High',
-        assignee: params.assignee || 'Aziz',
-        url: `https://notion.so/workspace/task-${Date.now()}`
-      },
+      success: false,
+      isRealData: false,
+      error: token ? 'Notion task creation failed' : 'NOTION_API_KEY sozlanmagan',
+      data: { title: params.title || 'New Task' },
       executionMs: Date.now() - startTime
     };
   }
@@ -823,13 +862,30 @@ class ConnectorRegistry {
 
   async executeTool(toolName, params) {
     const startTime = Date.now();
-    for (const connector of this.connectors.values()) {
-      const tools = connector.getTools();
-      if (tools.some((t) => t.name === toolName)) {
-        return await connector.executeTool(toolName, params);
-      }
+    const connector = this.findConnectorFor(toolName);
+    if (!connector) {
+      return { success: false, error: `Tool ${toolName} not found`, executionMs: Date.now() - startTime };
     }
-    return { success: false, error: `Tool ${toolName} not found`, executionMs: Date.now() - startTime };
+
+    const ttl = READ_TOOL_TTL_MS[toolName];
+
+    // Write tools bypass the cache and bust the reads they invalidate.
+    if (!ttl) {
+      const result = await connector.executeTool(toolName, params);
+      const invalidates = WRITE_TOOL_INVALIDATES[toolName];
+      if (invalidates) invalidates.forEach(prefix => cache.invalidate(prefix));
+      return result;
+    }
+
+    const key = `${toolName}:${JSON.stringify(params || {})}`;
+    return cache.wrap(key, ttl, () => connector.executeTool(toolName, params));
+  }
+
+  findConnectorFor(toolName) {
+    for (const connector of this.connectors.values()) {
+      if (connector.getTools().some((t) => t.name === toolName)) return connector;
+    }
+    return null;
   }
 }
 

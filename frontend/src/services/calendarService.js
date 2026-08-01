@@ -44,16 +44,6 @@ export const calendarService = {
     }
   },
 
-  async syncGoogleCalendar() {
-    try {
-      const response = await axios.post(`${CALENDAR_URL}/sync-google`);
-      return response.data;
-    } catch (err) {
-      console.error('Failed to sync Google Calendar:', err);
-      throw err;
-    }
-  },
-
   async getReminders() {
     try {
       const response = await axios.get(`${CALENDAR_URL}/reminders`);

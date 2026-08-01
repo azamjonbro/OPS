@@ -4,9 +4,24 @@ class BillzClientService {
   constructor() {
     this.baseUrl = process.env.BILLZ_BASE_URL || 'https://hadiya.billz.io';
     this.secretToken = process.env.BILLZ_TOKEN || '';
-    this.storeHadiyaId = 'ce50a545-c097-4085-936e-319188e72163';
+    this.storeHadiyaId = process.env.BILLZ_STORE_ID || 'ce50a545-c097-4085-936e-319188e72163';
+    this.storeHadiyaName = 'Store Hadiya';
     this.cachedAccessToken = null;
     this.tokenExpiryTime = 0;
+  }
+
+  /**
+   * Single source of truth for "is this one of our products?".
+   *
+   * Membership is decided by the STOCK record, not the price record: Billz keeps a
+   * shared price list, so 275 Swiss Watch items also carry a Store Hadiya price while
+   * their actual inventory sits in the Namangan/Toshkent branches. Only a
+   * shop_measurement_values entry means the product is really on our shelves.
+   */
+  belongsToStoreHadiya(rawProduct) {
+    return (rawProduct.shop_measurement_values || []).some(
+      (entry) => entry && (entry.shop_id === this.storeHadiyaId || entry.shop_name === this.storeHadiyaName)
+    );
   }
 
   // Get active BILLZ 2.0 Access Token via Auth Login API
@@ -153,18 +168,42 @@ class BillzClientService {
     }
 
     try {
-      const fetchLimit = params.limit || 100;
-      const res = await fetch(`${this.baseUrl}/api/v2/products?limit=${fetchLimit}`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const rawData = await res.json();
-      const rawProducts = rawData.products || [];
+      const pageSize = Math.min(params.limit || 100, 500);
+      // `all: true` walks the whole catalog; a plain limit only ever returned page 1,
+      // so the nightly Mongo sync saw 100 of ~1500 products and never noticed the rest
+      // going out of stock.
+      const wantAll = params.all === true;
+      const maxPages = wantAll ? 40 : 1;
+
+      let rawProducts = [];
+      let totalCount = 0;
+
+      for (let page = 1; page <= maxPages; page++) {
+        const res = await fetch(`${this.baseUrl}/api/v2/products?limit=${pageSize}&page=${page}`, {
+          headers: {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const rawData = await res.json();
+        const batch = rawData.products || [];
+        if (page === 1) totalCount = rawData.count || 0;
+
+        rawProducts = rawProducts.concat(batch);
+
+        // Stop on a short page (last one) or once the reported total is covered.
+        if (batch.length < pageSize) break;
+        if (totalCount && rawProducts.length >= totalCount) break;
+      }
+
+      // The Billz account holds three shops (Store Hadiya, Swiss Watch Namangan,
+      // Swiss Watch Toshkent). Only Store Hadiya belongs to this workspace; the rest
+      // used to flow through with price 0 / stock 0 and pollute the DB and AI reports.
+      const hadiyaProducts = rawProducts.filter(p => this.belongsToStoreHadiya(p));
+      const excludedCount = rawProducts.length - hadiyaProducts.length;
 
       // Format products strictly with Store Hadiya prices and stocks
-      const formattedProducts = rawProducts.map(p => {
+      const formattedProducts = hadiyaProducts.map(p => {
         const hadiyaPriceObj = (p.shop_prices || []).find(sp => sp.shop_name === 'Store Hadiya' || sp.shop_id === this.storeHadiyaId);
         const hadiyaStockObj = (p.shop_measurement_values || []).find(sm => sm.shop_name === 'Store Hadiya' || sm.shop_id === this.storeHadiyaId);
 
@@ -188,8 +227,9 @@ class BillzClientService {
         isRealData: true,
         health,
         data: {
-          totalCount: rawData.count || 1522,
+          totalCount: totalCount || formattedProducts.length,
           returnedCount: formattedProducts.length,
+          excludedCount,
           products: formattedProducts
         }
       };

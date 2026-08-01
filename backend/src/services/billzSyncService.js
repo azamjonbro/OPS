@@ -17,7 +17,8 @@ class BillzSyncService {
 
     // 1. Fetch latest product catalog from Billz connector
     const billzConnector = connectorRegistry.get('BILLZ');
-    const toolRes = await billzConnector.executeTool('billz_get_products', {});
+    // The nightly sync needs the whole catalog, not just the first page.
+    const toolRes = await billzConnector.executeTool('billz_get_products', { all: true, limit: 500 });
     let catalogProducts = (toolRes.data && toolRes.data.products && toolRes.data.products.length > 0) ? toolRes.data.products : [
       { name: "Rolex Swiss copy", sku: "MGL-74542", stock: 45, price: 10000000, formattedPrice: "10 000 000 so'm", category: "Qo'l soatlari" },
       { name: "SwissWatch Premium Chronograph", sku: "SW-CHR-909", stock: 18, price: 8100000, formattedPrice: "8 100 000 so'm", category: "Qo'l soatlari" },
@@ -29,7 +30,23 @@ class BillzSyncService {
       { name: "Premium Velvet Gift Box Set", sku: "GFT-BX-01", stock: 120, price: 1150000, formattedPrice: "1 150 000 so'm", category: "Sovg'alar & Qutilar" }
     ];
 
-    console.log(`📦 Loaded ${catalogProducts.length} items for Store Hadiya catalog sync`);
+    const excluded = (toolRes.data && toolRes.data.excludedCount) || 0;
+    console.log(`📦 Loaded ${catalogProducts.length} Store Hadiya items${excluded ? ` (${excluded} foreign-branch products skipped)` : ''}${toolRes.isRealData ? '' : ' — mock fallback, Billz API unavailable'}`);
+
+    // Billz contains 14 SKUs shared by different products. The Product collection is
+    // keyed by SKU, so without de-duplicating here the loop would write the same
+    // document twice per run and the second write would silently undo the first.
+    const seenSkus = new Set();
+    catalogProducts = catalogProducts.filter(item => {
+      const sku = item.sku;
+      if (!sku || sku === 'SKU_UNKNOWN') return false;
+      if (seenSkus.has(sku)) {
+        console.warn(`↩️ Duplicate SKU skipped: ${sku} ("${item.name}")`);
+        return false;
+      }
+      seenSkus.add(sku);
+      return true;
+    });
 
     if (mongoose.connection.readyState !== 1) {
       console.log('⚠️ MongoDB not connected yet. Skipping DB write.');
@@ -42,7 +59,11 @@ class BillzSyncService {
     for (const item of catalogProducts) {
       try {
         const sku = item.sku || `SKU-${Date.now()}`;
-        const newStock = Number(item.stock || 0);
+        // The live Billz client emits `stockInStoreHadiya`; only the local mock rows use
+        // `stock`. Reading `stock` alone silently wrote every real product in as 0 /
+        // OUT_OF_STOCK, which also poisoned the fast-seller alerts.
+        const rawStock = item.stockInStoreHadiya != null ? item.stockInStoreHadiya : item.stock;
+        const newStock = Number(rawStock || 0);
         const priceNum = Number(item.price || 0);
 
         let existing = await Product.findOne({ sku });

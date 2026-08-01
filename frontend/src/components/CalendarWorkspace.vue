@@ -16,7 +16,6 @@
             <div>
               <div class="flex items-center gap-2">
                 <h1 class="text-xl font-bold text-white tracking-tight">AI Executive Calendar</h1>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Google Calendar Synced</span>
               </div>
               <p class="text-xs text-gray-400">Rejalar, uchrashuvlar va AI tomonidan avtomatik taqvim topshiriqlari</p>
             </div>
@@ -47,18 +46,7 @@
 
         <!-- Right: Actions (Sync & Create) -->
         <div class="flex items-center gap-2">
-          <button 
-            @click="triggerGoogleSync" 
-            :disabled="isSyncing"
-            class="px-3.5 py-2 rounded-xl bg-[#161922] hover:bg-[#1E2330] border border-indigo-500/20 text-indigo-300 hover:text-white text-xs font-semibold transition flex items-center gap-2"
-          >
-            <svg :class="['w-4 h-4 text-indigo-400', isSyncing ? 'animate-spin' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            <span class="hidden sm:inline">{{ isSyncing ? 'Sinxronlanmoqda...' : 'Google Sync' }}</span>
-          </button>
-
-          <button 
+          <button
             @click="openCreateModal" 
             class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
           >
@@ -248,15 +236,36 @@
         </div>
 
         <!-- DAY VIEW & SELECTED EVENTS LIST -->
-        <div v-else-if="currentViewTab === 'day' || selectedDateKey" class="space-y-4">
-          <div class="flex items-center justify-between bg-[#111317] border border-[#1F222A] rounded-2xl p-4 shadow-xl">
-            <div class="flex items-center gap-3">
-              <span class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse"></span>
-              <h2 class="text-sm font-bold text-white">Kunlik Vazifalar Timeline ({{ selectedDateKey || todayDateKey }})</h2>
+        <!-- Rendered as a sibling (not v-else-if) so that clicking a day in Month/Week view
+             also reveals that day's full task list below the grid. -->
+        <div
+          v-if="currentViewTab === 'day' || selectedDateKey"
+          :class="['space-y-4', currentViewTab === 'day' ? '' : 'mt-6 pt-6 border-t border-[#1F222A]']"
+        >
+          <div class="flex items-center justify-between bg-[#111317] border border-[#1F222A] rounded-2xl p-4 shadow-xl gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse shrink-0"></span>
+              <div class="min-w-0">
+                <h2 class="text-sm font-bold text-white truncate">{{ selectedDayLabel }}</h2>
+                <p class="text-[11px] text-gray-400 font-mono">
+                  {{ selectedDayEvents.length }} ta vazifa
+                  <span v-if="selectedCategoryFilter !== 'All'"> ({{ selectedCategoryFilter }} filtri bo'yicha)</span>
+                </p>
+              </div>
             </div>
-            <button @click="openCreateModalWithDate(selectedDateKey || todayDateKey)" class="text-xs text-indigo-400 hover:text-white font-semibold flex items-center gap-1">
-              + Ushbu kunga task qo'shish
-            </button>
+            <div class="flex items-center gap-2 shrink-0">
+              <button @click="openCreateModalWithDate(selectedDateKey || todayDateKey)" class="text-xs text-indigo-400 hover:text-white font-semibold flex items-center gap-1">
+                + Ushbu kunga task qo'shish
+              </button>
+              <button
+                v-if="currentViewTab !== 'day' && selectedDateKey"
+                @click="selectedDateKey = ''"
+                class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#1F222A] transition"
+                title="Kun ko'rinishini yopish"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -436,6 +445,14 @@
 
           <!-- Footer Buttons -->
           <div class="pt-3 border-t border-[#1F222A] flex items-center justify-end gap-2">
+            <button
+              v-if="isEditMode"
+              type="button"
+              @click="deleteFromModal"
+              class="mr-auto px-4 py-2 rounded-xl bg-red-600/15 text-red-400 font-semibold border border-red-500/30 hover:bg-red-600 hover:text-white transition"
+            >
+              O'chirish
+            </button>
             <button type="button" @click="isModalOpen = false" class="px-4 py-2 rounded-xl bg-[#1F222A] text-gray-300 font-semibold hover:bg-[#2A2E3B] transition">
               Bekor qilish
             </button>
@@ -453,8 +470,28 @@
 
 <script>
 import calendarService from '../services/calendarService';
-import axios from 'axios';
-import { API_BASE } from '../services/api';
+import chatService from '../services/chatService';
+
+const MONTH_NAMES = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+
+// toISOString() converts to UTC first, which shifts the date by a day for every local
+// time before 05:00 in UTC+5. Calendar keys must be built from local date parts.
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// `new Date('2026-08-01')` parses as UTC midnight; splitting the parts keeps it local.
+function parseDateKey(key) {
+  const [y, m, d] = String(key).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function errorText(err) {
+  return (err && err.response && err.response.data && err.response.data.error) || (err && err.message) || 'Noma\'lum xatolik';
+}
 
 export default {
   name: 'CalendarWorkspace',
@@ -462,7 +499,7 @@ export default {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth();
-    const todayKey = today.toISOString().split('T')[0];
+    const todayKey = toDateKey(today);
 
     return {
       events: [],
@@ -478,9 +515,6 @@ export default {
       aiQuickAddText: '',
       isAiProcessing: false,
       
-      // Sync
-      isSyncing: false,
-
       // Modal State
       isModalOpen: false,
       isEditMode: false,
@@ -499,8 +533,7 @@ export default {
   },
   computed: {
     currentMonthName() {
-      const months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
-      return months[this.currentMonth];
+      return MONTH_NAMES[this.currentMonth];
     },
     filteredEvents() {
       if (this.selectedCategoryFilter === 'All') return this.events;
@@ -516,68 +549,39 @@ export default {
       return this.events.filter(e => e.priority === 'Urgent' || e.priority === 'High').length;
     },
     monthGridCells() {
+      // The grid always starts on the Monday on/before the 1st and runs whole weeks, so
+      // every cell is derived from a real Date — no manual month/year arithmetic that
+      // breaks at the January (month 0) and December (month 13) boundaries.
       const firstDay = new Date(this.currentYear, this.currentMonth, 1);
-      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
-      
-      let startingDay = firstDay.getDay() - 1; // Mon=0
-      if (startingDay < 0) startingDay = 6;
+      const leadingBlanks = (firstDay.getDay() + 6) % 7; // Mon = 0
+      const daysInMonth = new Date(this.currentYear, this.currentMonth + 1, 0).getDate();
+      const totalCells = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
 
       const cells = [];
-      const totalDays = lastDay.getDate();
-
-      // Prev month days
-      const prevMonthLastDay = new Date(this.currentYear, this.currentMonth, 0).getDate();
-      for (let i = startingDay - 1; i >= 0; i--) {
-        const d = prevMonthLastDay - i;
-        const dateKey = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      for (let i = 0; i < totalCells; i++) {
+        const cellDate = new Date(this.currentYear, this.currentMonth, i - leadingBlanks + 1);
+        const dateKey = toDateKey(cellDate);
         cells.push({
           dateKey,
-          dayNum: d,
-          isCurrentMonth: false,
-          isToday: false,
-          events: []
+          dayNum: cellDate.getDate(),
+          isCurrentMonth: cellDate.getMonth() === this.currentMonth,
+          isToday: dateKey === this.todayDateKey,
+          events: this.eventsByDate[dateKey] || []
         });
       }
-
-      // Current month days
-      for (let d = 1; d <= totalDays; d++) {
-        const monthStr = String(this.currentMonth + 1).padStart(2, '0');
-        const dayStr = String(d).padStart(2, '0');
-        const dateKey = `${this.currentYear}-${monthStr}-${dayStr}`;
-        const isToday = dateKey === this.todayDateKey;
-        const dayEvts = this.filteredEvents.filter(e => e.startDate === dateKey);
-
-        cells.push({
-          dateKey,
-          dayNum: d,
-          isCurrentMonth: true,
-          isToday,
-          events: dayEvts
-        });
-      }
-
-      // Next month padding
-      const remaining = (7 - (cells.length % 7)) % 7;
-      for (let d = 1; d <= remaining; d++) {
-        const nextMonth = this.currentMonth + 2;
-        const dateKey = `${this.currentYear}-${String(nextMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        cells.push({
-          dateKey,
-          dayNum: d,
-          isCurrentMonth: false,
-          isToday: false,
-          events: []
-        });
-      }
-
       return cells;
     },
+    // Bucket once per render instead of re-filtering the whole list for all 42 cells.
+    eventsByDate() {
+      return this.filteredEvents.reduce((acc, evt) => {
+        (acc[evt.startDate] = acc[evt.startDate] || []).push(evt);
+        return acc;
+      }, {});
+    },
     weekDaysList() {
-      const baseDate = new Date(this.selectedDateKey || this.todayDateKey);
-      const dayOfWeek = baseDate.getDay();
-      const diffToMon = (dayOfWeek + 6) % 7;
+      const baseDate = parseDateKey(this.selectedDateKey || this.todayDateKey);
       const monday = new Date(baseDate);
-      monday.setDate(baseDate.getDate() - diffToMon);
+      monday.setDate(baseDate.getDate() - ((baseDate.getDay() + 6) % 7));
 
       const dayNames = ['Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba', 'Yakshanba'];
       const result = [];
@@ -585,13 +589,13 @@ export default {
       for (let i = 0; i < 7; i++) {
         const curr = new Date(monday);
         curr.setDate(monday.getDate() + i);
-        const dateKey = curr.toISOString().split('T')[0];
-        const dayEvts = this.filteredEvents.filter(e => e.startDate === dateKey);
+        const dateKey = toDateKey(curr);
         result.push({
           dateKey,
           dayName: dayNames[i],
-          dateStr: `${curr.getDate()}-${this.currentMonthName.slice(0,3)}`,
-          events: dayEvts
+          // Label the day with its own month, not whichever month the grid is scrolled to.
+          dateStr: `${curr.getDate()}-${MONTH_NAMES[curr.getMonth()].slice(0, 3)}`,
+          events: this.eventsByDate[dateKey] || []
         });
       }
 
@@ -599,10 +603,22 @@ export default {
     },
     selectedDayEvents() {
       const key = this.selectedDateKey || this.todayDateKey;
-      return this.filteredEvents.filter(e => e.startDate === key);
+      return (this.eventsByDate[key] || [])
+        .slice()
+        .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+    },
+    selectedDayLabel() {
+      const key = this.selectedDateKey || this.todayDateKey;
+      const d = parseDateKey(key);
+      const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+      const suffix = key === this.todayDateKey ? ' — Bugun' : '';
+      return `${d.getDate()}-${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}, ${dayNames[d.getDay()]}${suffix}`;
     },
     upcomingReminders() {
-      return this.events.filter(e => e.status !== 'Completed');
+      // "Upcoming" means still ahead of us — past unfinished events are not reminders.
+      return this.events
+        .filter(e => e.status !== 'Completed' && e.startDate >= this.todayDateKey)
+        .sort((a, b) => (a.startDate + a.startTime).localeCompare(b.startDate + b.startTime));
     }
   },
   async mounted() {
@@ -640,6 +656,12 @@ export default {
     },
     selectCellDate(dateKey) {
       this.selectedDateKey = dateKey;
+      // Clicking a leading/trailing cell scrolls the grid to the month it belongs to.
+      const d = parseDateKey(dateKey);
+      if (d.getMonth() !== this.currentMonth || d.getFullYear() !== this.currentYear) {
+        this.currentMonth = d.getMonth();
+        this.currentYear = d.getFullYear();
+      }
     },
     getPriorityBadgeClass(p) {
       if (p === 'Urgent') return 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-rose-500/10';
@@ -698,10 +720,19 @@ export default {
           await calendarService.createEvent(this.modalForm);
         }
         this.isModalOpen = false;
+        // Keep the day panel pointed at the day the event actually landed on.
+        this.selectedDateKey = this.modalForm.startDate;
         await this.fetchEvents();
       } catch (e) {
-        const msg = (e.response && e.response.data && e.response.data.error) ? e.response.data.error : e.message;
-        alert('Event saqlashda xatolik yuz berdi: ' + msg);
+        alert('Event saqlashda xatolik yuz berdi: ' + errorText(e));
+      }
+    },
+    async deleteFromModal() {
+      const id = this.editingId;
+      if (!id) return;
+      await this.deleteEventItem(id);
+      if (!this.events.some(e => e.id === id)) {
+        this.isModalOpen = false;
       }
     },
     async toggleStatus(evt) {
@@ -709,37 +740,33 @@ export default {
       try {
         await calendarService.updateEvent(evt.id, { status: nextStatus });
         await this.fetchEvents();
-      } catch (e) {}
+      } catch (e) {
+        alert('Holatni yangilab bo\'lmadi: ' + errorText(e));
+      }
     },
     async deleteEventItem(id) {
-      if (!confirm("Ushbu eventni taqvimdan o'chirmoqchimisiz?")) return;
+      const evt = this.events.find(e => e.id === id);
+      const name = evt ? `"${evt.title}"` : 'ushbu event';
+      if (!confirm(`${name} taqvimdan o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.`)) return;
       try {
         await calendarService.deleteEvent(id);
         await this.fetchEvents();
-      } catch (e) {}
-    },
-    async triggerGoogleSync() {
-      this.isSyncing = true;
-      try {
-        await calendarService.syncGoogleCalendar();
-        await this.fetchEvents();
       } catch (e) {
-      } finally {
-        this.isSyncing = false;
+        alert('Eventni o\'chirib bo\'lmadi: ' + errorText(e));
       }
     },
     async submitAiQuickAdd() {
       if (!this.aiQuickAddText.trim()) return;
       this.isAiProcessing = true;
       try {
-        await axios.post(`${API_BASE}/api/chat/message`, {
+        await chatService.sendMessage({
           conversationId: 'conv-calendar-quick',
           content: this.aiQuickAddText
         });
         this.aiQuickAddText = '';
         await this.fetchEvents();
       } catch (e) {
-        console.error('AI Quick Add failed:', e);
+        alert('AI Quick Add bajarilmadi: ' + errorText(e));
       } finally {
         this.isAiProcessing = false;
       }

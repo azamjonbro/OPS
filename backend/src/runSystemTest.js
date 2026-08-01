@@ -16,10 +16,9 @@ async function runSystemTest() {
   console.log('Executed Tools:', res2.executedTools);
 
   console.log('\n--- TEST 3: User Automated Schedule Intent ---');
-  const mockDb = { schedules: [] };
-  const res3 = await aiEngine.processUserMessage('Har kuni soat 19:00 da Billz savdosini telegramga yuborib tur', mockDb);
+  const res3 = await aiEngine.processUserMessage('Har kuni soat 19:00 da Billz savdosini telegramga yuborib tur');
   console.log('AI Response 3:\n', res3.responseText);
-  console.log('Registered Schedule:', mockDb.schedules[0]);
+  console.log('Registered Schedule:', res3.executedTools.find(t => t.tool === 'scheduler_create_automation'));
 
   console.log('\n==================================================');
   console.log('✅ ALL TESTS EXECUTED SUCCESSFULLY!');

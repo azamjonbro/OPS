@@ -8,6 +8,7 @@ router.delete('/conversations', chatController.clearAllConversations);
 router.delete('/conversations/:id', chatController.deleteConversation);
 router.get('/conversations/:id/messages', chatController.getMessages);
 router.post('/message', chatController.sendMessage);
+router.post('/message/stream', chatController.streamMessage);
 router.post('/voice-message', chatController.sendVoiceMessage);
 router.post('/transcribe-audio', chatController.transcribeAudio);
 
