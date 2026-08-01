@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 flex flex-col h-full bg-canvas text-gray-100 overflow-hidden relative">
+  <div :class="['flex-1 flex flex-col h-full overflow-hidden relative transition-colors duration-200', isLightTheme ? 'bg-[#F4F6FB] text-slate-800' : 'bg-canvas text-gray-100']">
 
     <!-- DEDICATED DAY PLANNER PAGE (takes over the workspace) -->
     <DayPlanner
@@ -12,53 +12,54 @@
 
     <template v-else>
     <!-- TOP EXECUTIVE HEADER BAR -->
-    <header class="border-b border-line bg-surface p-4 sm:px-6 z-10 shrink-0">
+    <header :class="['border-b p-4 sm:px-6 z-10 shrink-0 backdrop-blur-xl transition-colors', isLightTheme ? 'bg-white/85 border-slate-200/80 shadow-sm' : 'bg-surface/90 border-line']">
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 max-w-7xl mx-auto">
         
         <!-- Left: Title & Quick Stats -->
         <div>
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0">
-              <Icon name="calendar" size="lg" />
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <h1 class="text-xl font-bold text-white tracking-tight">AI Executive Calendar</h1>
+                <h1 :class="['text-xl font-bold tracking-tight', isLightTheme ? 'text-slate-900' : 'text-white']">AI Executive Calendar</h1>
               </div>
-              <p class="text-xs text-gray-400">Rejalar, uchrashuvlar va AI tomonidan avtomatik taqvim topshiriqlari</p>
+              <p :class="['text-xs', isLightTheme ? 'text-slate-500' : 'text-gray-400']">Rejalar, uchrashuvlar va AI tomonidan avtomatik taqvim topshiriqlari</p>
             </div>
           </div>
         </div>
 
         <!-- Middle: View Switcher (Month / Week / Day) -->
-        <div class="flex items-center gap-1 bg-raised p-1 rounded-2xl border border-line self-start lg:self-auto">
+        <div :class="['flex items-center gap-1 p-1 rounded-2xl border self-start lg:self-auto shadow-sm', isLightTheme ? 'bg-slate-100 border-slate-200' : 'bg-raised border-line']">
           <button 
             @click="currentViewTab = 'month'" 
-            :class="['px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all', currentViewTab === 'month' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-hover']"
+            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'month' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
           >
             Month View
           </button>
           <button 
             @click="currentViewTab = 'week'" 
-            :class="['px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all', currentViewTab === 'week' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-hover']"
+            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'week' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
           >
             Week View
           </button>
           <button 
             @click="currentViewTab = 'day'" 
-            :class="['px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all', currentViewTab === 'day' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-hover']"
+            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'day' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
           >
             Day View
           </button>
         </div>
 
-        <!-- Right: Actions (Sync & Create) -->
+        <!-- Right: Actions (Create Event) -->
         <div class="flex items-center gap-2">
           <button
             @click="openCreateModal" 
-            class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
+            class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
           >
-            <Icon name="add" size="md" />
             <span>+ Event Yaratish</span>
           </button>
         </div>
@@ -66,7 +67,7 @@
       </div>
 
       <!-- Quick Category Filters & AI Input Banner -->
-      <div class="max-w-7xl mx-auto mt-4 pt-3 border-t border-line flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div :class="['max-w-7xl mx-auto mt-4 pt-3 border-t flex flex-col md:flex-row md:items-center justify-between gap-3', isLightTheme ? 'border-slate-200' : 'border-line']">
         <!-- Category Filters -->
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none text-xs">
           <button 
@@ -74,10 +75,10 @@
             :key="cat"
             @click="selectedCategoryFilter = cat"
             :class="[
-              'px-3 py-1 rounded-lg font-medium transition shrink-0 border',
+              'px-3 py-1 rounded-xl font-semibold transition shrink-0 border',
               selectedCategoryFilter === cat 
-                ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/60 font-semibold' 
-                : 'bg-card text-gray-400 border-line hover:bg-muted hover:text-white'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                : (isLightTheme ? 'bg-white text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600' : 'bg-card text-gray-400 border-line hover:bg-muted hover:text-white')
             ]"
           >
             {{ cat }}
@@ -85,117 +86,117 @@
         </div>
 
         <!-- Stats Bar -->
-        <div class="flex items-center gap-4 text-[11px] text-gray-400 font-mono shrink-0">
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> {{ completedCount }} Completed</span>
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400"></span> {{ pendingCount }} Pending</span>
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-400"></span> {{ urgentCount }} Urgent/High</span>
+        <div :class="['flex items-center gap-4 text-[11px] font-mono shrink-0', isLightTheme ? 'text-slate-600' : 'text-gray-400']">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> {{ completedCount }} Completed</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> {{ pendingCount }} Pending</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> {{ urgentCount }} Urgent/High</span>
         </div>
       </div>
     </header>
 
     <!-- AI QUICK ADD BAR -->
-    <div class="bg-card border-b border-line p-3 px-4 sm:px-6">
+    <div :class="['border-b p-3 px-4 sm:px-6 transition-colors', isLightTheme ? 'bg-white/90 border-slate-200' : 'bg-card border-line']">
       <div class="max-w-7xl mx-auto flex items-center gap-3">
-        <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
-          <Icon name="logo" size="md" />
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
         </div>
         <form @submit.prevent="submitAiQuickAdd" class="flex-1 flex items-center gap-2">
           <input 
             v-model="aiQuickAddText" 
             type="text" 
             placeholder="AI Quick Add: Tabiiy tilda yozing (masalan: 'Juma kuni soat 15:00 da investor bilan meeting')" 
-            class="flex-1 bg-canvas border border-line-strong focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 outline-none transition"
+            :class="[
+              'flex-1 rounded-xl px-4 py-2 text-xs outline-none transition border',
+              isLightTheme ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white' : 'bg-canvas border-line-strong text-white placeholder-gray-500 focus:border-indigo-500'
+            ]"
           />
           <button 
             type="submit" 
             :disabled="!aiQuickAddText.trim() || isAiProcessing"
-            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs transition shrink-0"
+            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md transition shrink-0"
           >
-            {{ isAiProcessing ? 'AI Tahlil...' : 'AI Add' }}
+            {{ isAiProcessing ? 'AI Tahlil...' : '+ AI Add' }}
           </button>
         </form>
       </div>
     </div>
 
     <!-- MAIN CALENDAR WORKSPACE AREA -->
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
       <div class="max-w-7xl mx-auto">
         
         <!-- MONTH VIEW -->
         <div v-if="currentViewTab === 'month'" class="space-y-4">
           <!-- Month Header Controls -->
-          <div class="flex items-center justify-between bg-surface border border-line rounded-2xl p-4 shadow-xl">
+          <div :class="['flex items-center justify-between border rounded-2xl p-4 shadow-sm transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-xl']">
             <div class="flex items-center gap-3">
-              <button @click="changeMonth(-1)" class="p-2 rounded-xl bg-muted hover:bg-hover text-gray-300 transition">
-                <Icon name="prev" size="md" />
+              <button @click="changeMonth(-1)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-muted hover:bg-hover text-gray-300']">
+                ‹
               </button>
-              <h2 class="text-lg font-bold text-white tracking-tight font-mono">{{ currentMonthName }} {{ currentYear }}</h2>
-              <button @click="changeMonth(1)" class="p-2 rounded-xl bg-muted hover:bg-hover text-gray-300 transition">
-                <Icon name="next" size="md" />
+              <h2 :class="['text-base sm:text-lg font-bold tracking-tight font-mono', isLightTheme ? 'text-slate-900' : 'text-white']">{{ currentMonthName }} {{ currentYear }}</h2>
+              <button @click="changeMonth(1)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-muted hover:bg-hover text-gray-300']">
+                ›
               </button>
             </div>
-            <button @click="goToToday" class="px-3.5 py-1.5 rounded-xl bg-muted hover:bg-hover text-xs font-semibold text-indigo-300 border border-indigo-500/20 transition">
+            <button @click="goToToday" :class="['px-3.5 py-1.5 rounded-xl text-xs font-bold transition border', isLightTheme ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 'bg-muted hover:bg-hover text-indigo-300 border-indigo-500/20']">
               Bugun (Today)
             </button>
           </div>
 
           <!-- Month Grid -->
-          <div class="bg-surface border border-line rounded-3xl p-4 shadow-2xl">
+          <div :class="['border rounded-3xl p-4 shadow-md transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-2xl']">
             <!-- Day of week headers -->
-            <div class="grid grid-cols-7 gap-2 mb-2 text-center text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            <div :class="['grid grid-cols-7 gap-2 mb-3 text-center text-[11px] font-extrabold uppercase tracking-wider', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
               <span>Dush</span><span>Sesh</span><span>Chor</span><span>Pay</span><span>Jum</span><span>Shan</span><span>Yak</span>
             </div>
 
             <!-- Calendar Days Grid -->
-            <div class="grid grid-cols-7 gap-2">
+            <div class="grid grid-cols-7 gap-2 sm:gap-2.5">
               <div 
                 v-for="cell in monthGridCells" 
                 :key="cell.dateKey"
                 @click="selectCellDate(cell.dateKey)"
                 :class="[
-                  'min-h-[110px] p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden',
-                  cell.isCurrentMonth ? 'bg-card border-line hover:border-indigo-500/40 hover:bg-raised' : 'bg-sunken/50 border-transparent text-gray-600',
-                  cell.isToday ? 'ring-2 ring-indigo-500 bg-[#1A1E2B]' : '',
-                  selectedDateKey === cell.dateKey ? 'border-indigo-500/80 bg-[#1B1F2D]' : ''
+                  'min-h-[115px] p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden',
+                  cell.isCurrentMonth 
+                    ? (isLightTheme ? 'bg-slate-50/80 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40' : 'bg-card border-line hover:border-indigo-500/40 hover:bg-raised')
+                    : (isLightTheme ? 'bg-slate-100/40 border-transparent text-slate-400' : 'bg-sunken/40 border-transparent text-gray-600'),
+                  cell.isToday ? (isLightTheme ? 'ring-2 ring-indigo-500 bg-indigo-50/80 border-indigo-400' : 'ring-2 ring-indigo-500 bg-[#1A1E2B]') : '',
+                  selectedDateKey === cell.dateKey ? (isLightTheme ? 'border-indigo-600 bg-indigo-100/60 shadow-md' : 'border-indigo-500/80 bg-[#1B1F2D]') : ''
                 ]"
               >
                 <!-- Day Number Header -->
                 <div class="flex items-center justify-between mb-1 gap-1">
-                  <span :class="['text-xs font-bold font-mono', cell.isToday ? 'text-indigo-400' : 'text-gray-300']">
+                  <span :class="['text-xs font-bold font-mono', cell.isToday ? 'text-indigo-600 font-extrabold' : (isLightTheme ? 'text-slate-800' : 'text-gray-300')]">
                     {{ cell.dayNum }}
                   </span>
                   <div class="flex items-center gap-1 shrink-0">
-                    <span v-if="cell.events.length > 0" class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
-                      {{ cell.events.length }}
+                    <span v-if="cell.isToday" class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-600 text-white font-bold shadow-sm">
+                      BUGUN
                     </span>
-                    <span
-                      v-if="cell.tasks"
-                      class="text-[9px] font-mono px-1.5 py-0.5 rounded-full font-semibold border flex items-center gap-0.5"
-                      :class="cell.tasks.done === cell.tasks.total
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'"
-                      :title="`${cell.tasks.done}/${cell.tasks.total} vazifa bajarildi`"
-                    >
-                      ☑ {{ cell.tasks.done }}/{{ cell.tasks.total }}
+                    <span v-if="cell.events.length > 0" class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-600 font-bold border border-indigo-500/30">
+                      {{ cell.events.length }}
                     </span>
                   </div>
                 </div>
 
                 <!-- Event badges in cell -->
-                <div class="space-y-1 overflow-y-auto max-h-[70px] scrollbar-none">
+                <div class="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
                   <div 
                     v-for="evt in cell.events.slice(0, 3)" 
                     :key="evt.id"
                     @click.stop="openEditModal(evt)"
                     :class="[
-                      'px-2 py-1 rounded-lg text-[10px] font-medium truncate flex items-center justify-between border transition',
+                      'px-2 py-1 rounded-lg text-[10px] font-semibold truncate flex items-center justify-between border transition',
                       getPriorityBadgeClass(evt.priority)
                     ]"
                   >
                     <span class="truncate">{{ evt.title }}</span>
-                    <span class="text-[8px] opacity-75 font-mono ml-1 shrink-0">{{ evt.startTime }}</span>
+                    <span class="text-[8px] opacity-80 font-mono ml-1 shrink-0">{{ evt.startTime }}</span>
                   </div>
-                  <div v-if="cell.events.length > 3" class="text-[9px] text-gray-400 font-mono text-center">
+                  <div v-if="cell.events.length > 3" :class="['text-[9px] font-mono text-center', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
                     +{{ cell.events.length - 3 }} ko'proq
                   </div>
                 </div>
@@ -207,9 +208,9 @@
 
         <!-- WEEK VIEW -->
         <div v-else-if="currentViewTab === 'week'" class="space-y-4">
-          <div class="flex items-center justify-between bg-surface border border-line rounded-2xl p-4 shadow-xl">
-            <h2 class="text-sm font-bold text-white">Haftalik Rejalar & Uchrashuvlar Jadvali</h2>
-            <div class="text-xs text-gray-400 font-mono">Hozirgi hafta bugun bilan birga</div>
+          <div :class="['flex items-center justify-between border rounded-2xl p-4 shadow-sm transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-xl']">
+            <h2 :class="['text-sm font-bold', isLightTheme ? 'text-slate-900' : 'text-white']">Haftalik Rejalar & Uchrashuvlar Jadvali</h2>
+            <div :class="['text-xs font-mono', isLightTheme ? 'text-slate-500' : 'text-gray-400']">Hozirgi hafta bugun bilan birga</div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-7 gap-3">
@@ -219,26 +220,17 @@
               :class="[
                 'border rounded-2xl p-3 flex flex-col gap-3 min-h-[300px] transition-colors',
                 day.dateKey === todayDateKey
-                  ? 'bg-[#1A1E2B] border-indigo-500/60 ring-1 ring-indigo-500/30'
-                  : 'bg-card border-line hover:border-line-hover'
+                  ? (isLightTheme ? 'bg-indigo-50/70 border-indigo-400 ring-1 ring-indigo-400' : 'bg-[#1A1E2B] border-indigo-500/60 ring-1 ring-indigo-500/30')
+                  : (isLightTheme ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-card border-line hover:border-line-hover')
               ]"
             >
               <button
                 @click="openPlanner(day.dateKey)"
-                class="border-b border-line pb-2 text-center w-full group focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg"
+                :class="['border-b pb-2 text-center w-full group focus:outline-none rounded-lg', isLightTheme ? 'border-slate-200' : 'border-line']"
                 :title="day.dayName + ' kunlik planneri'"
               >
-                <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-400">{{ day.dayName }}</div>
-                <div class="text-xs font-bold text-white font-mono mt-0.5 group-hover:text-indigo-300 transition">{{ day.dateStr }}</div>
-                <div
-                  v-if="taskCounts[day.dateKey]"
-                  class="mt-1 inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded-full border"
-                  :class="taskCounts[day.dateKey].done === taskCounts[day.dateKey].total
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                    : 'bg-amber-500/15 text-amber-300 border-amber-500/30'"
-                >
-                  ☑ {{ taskCounts[day.dateKey].done }}/{{ taskCounts[day.dateKey].total }}
-                </div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">{{ day.dayName }}</div>
+                <div :class="['text-xs font-bold font-mono mt-0.5 group-hover:text-indigo-600 transition', isLightTheme ? 'text-slate-900' : 'text-white']">{{ day.dateStr }}</div>
               </button>
 
               <div class="space-y-2 flex-1">
@@ -252,16 +244,12 @@
                   ]"
                 >
                   <div class="flex items-center justify-between">
-                    <span class="font-bold truncate text-white">{{ evt.title }}</span>
+                    <span class="font-bold truncate">{{ evt.title }}</span>
                     <span class="text-[9px] font-mono opacity-80 shrink-0">{{ evt.startTime }}</span>
-                  </div>
-                  <div class="flex items-center justify-between text-[10px]">
-                    <span class="opacity-75 font-mono">{{ evt.category }}</span>
-                    <span :class="['px-1.5 py-0.5 rounded text-[8px] font-bold uppercase', getStatusClass(evt.status)]">{{ evt.status }}</span>
                   </div>
                 </div>
 
-                <div v-if="day.events.length === 0" class="h-full flex items-center justify-center text-[10px] text-gray-500 italic">
+                <div v-if="day.events.length === 0" :class="['h-full flex items-center justify-center text-[10px] italic', isLightTheme ? 'text-slate-400' : 'text-gray-500']">
                   Vazifa yo'q
                 </div>
               </div>
@@ -270,41 +258,29 @@
         </div>
 
         <!-- DAY VIEW & SELECTED EVENTS LIST -->
-        <!-- Rendered as a sibling (not v-else-if) so that clicking a day in Month/Week view
-             also reveals that day's full task list below the grid. -->
         <div
           v-if="currentViewTab === 'day' || selectedDateKey"
-          :class="['space-y-4', currentViewTab === 'day' ? '' : 'mt-6 pt-6 border-t border-line']"
+          :class="['space-y-4', currentViewTab === 'day' ? '' : 'mt-6 pt-6 border-t', isLightTheme ? 'border-slate-200' : 'border-line']"
         >
-          <div class="flex items-center justify-between bg-surface border border-line rounded-2xl p-4 shadow-xl gap-3">
+          <div :class="['flex items-center justify-between border rounded-2xl p-4 shadow-sm gap-3 transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-xl']">
             <div class="flex items-center gap-3 min-w-0">
               <span class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse shrink-0"></span>
               <div class="min-w-0">
-                <h2 class="text-sm font-bold text-white truncate">{{ selectedDayLabel }}</h2>
-                <p class="text-[11px] text-gray-400 font-mono">
+                <h2 :class="['text-sm font-bold truncate', isLightTheme ? 'text-slate-900' : 'text-white']">{{ selectedDayLabel }}</h2>
+                <p :class="['text-[11px] font-mono', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
                   {{ selectedDayEvents.length }} ta vazifa
-                  <span v-if="selectedCategoryFilter !== 'All'"> ({{ selectedCategoryFilter }} filtri bo'yicha)</span>
                 </p>
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <button
                 @click="openPlanner(selectedDateKey || todayDateKey)"
-                class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition flex items-center gap-1.5"
+                class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5"
               >
-                <Icon name="board" size="sm" />
                 Kunlik planner
               </button>
-              <button @click="openCreateModalWithDate(selectedDateKey || todayDateKey)" class="text-xs text-indigo-400 hover:text-white font-semibold flex items-center gap-1">
+              <button @click="openCreateModalWithDate(selectedDateKey || todayDateKey)" class="text-xs text-indigo-600 hover:text-indigo-700 font-bold px-2 py-1 rounded-lg">
                 + Event
-              </button>
-              <button
-                v-if="currentViewTab !== 'day' && selectedDateKey"
-                @click="selectedDateKey = ''"
-                class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-line transition"
-                title="Kun ko'rinishini yopish"
-              >
-                <Icon name="close" size="md" />
               </button>
             </div>
           </div>
@@ -315,76 +291,74 @@
               <div 
                 v-for="evt in selectedDayEvents" 
                 :key="evt.id"
-                class="bg-card border border-line hover:border-indigo-500/50 rounded-2xl p-4 transition-all shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                :class="[
+                  'border rounded-2xl p-4 transition-all shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 group',
+                  isLightTheme ? 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-indigo-500/10' : 'bg-card border-line hover:border-indigo-500/50 shadow-lg'
+                ]"
               >
                 <div class="space-y-1.5 flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span :class="['px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase font-mono', getPriorityBadgeClass(evt.priority)]">
                       {{ evt.priority }}
                     </span>
-                    <span class="text-[10px] font-medium bg-muted text-gray-300 px-2 py-0.5 rounded-md border border-line-hover">
+                    <span :class="['text-[10px] font-medium px-2 py-0.5 rounded-md border', isLightTheme ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-muted text-gray-300 border-line-hover']">
                       🏷️ {{ evt.category }}
-                    </span>
-                    <span v-if="evt.source === 'AI'" class="text-[9px] font-mono bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
-                      ⚡ AI Auto-Detected
                     </span>
                   </div>
 
-                  <h3 class="text-sm font-bold text-white truncate group-hover:text-indigo-300 transition">{{ evt.title }}</h3>
-                  <p v-if="evt.description" class="text-xs text-gray-400 line-clamp-2">{{ evt.description }}</p>
+                  <h3 :class="['text-sm font-bold truncate transition', isLightTheme ? 'text-slate-900 group-hover:text-indigo-600' : 'text-white group-hover:text-indigo-300']">{{ evt.title }}</h3>
+                  <p v-if="evt.description" :class="['text-xs line-clamp-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">{{ evt.description }}</p>
 
-                  <div class="flex items-center gap-4 text-[11px] text-gray-400 font-mono pt-1">
+                  <div :class="['flex items-center gap-4 text-[11px] font-mono pt-1', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
                     <span class="flex items-center gap-1">
-                      <Icon name="clock" size="sm" class="text-indigo-400" />
-                      {{ evt.startTime }} - {{ evt.endTime }}
+                      🕒 {{ evt.startTime }} - {{ evt.endTime }}
                     </span>
                     <span>🗓️ {{ evt.startDate }}</span>
                   </div>
                 </div>
 
                 <!-- Actions -->
-                <div class="flex items-center gap-2 shrink-0 border-t sm:border-t-0 border-line pt-2 sm:pt-0">
+                <div :class="['flex items-center gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0', isLightTheme ? 'border-slate-200' : 'border-line']">
                   <button 
                     @click="toggleStatus(evt)"
-                    :class="['px-3 py-1.5 rounded-xl text-xs font-semibold transition border', getStatusClass(evt.status)]"
+                    :class="['px-3 py-1.5 rounded-xl text-xs font-bold transition border', getStatusClass(evt.status)]"
                   >
                     {{ evt.status }}
                   </button>
-                  <button @click="openEditModal(evt)" class="p-2 rounded-xl bg-muted hover:bg-hover text-gray-300 transition" title="Tahrirlash">
-                    <Icon name="edit" size="md" />
+                  <button @click="openEditModal(evt)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-600' : 'bg-muted hover:bg-hover text-gray-300']" title="Tahrirlash">
+                    ✏️
                   </button>
-                  <button @click="deleteEventItem(evt.id)" class="p-2 rounded-xl bg-muted hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition" title="O'chirish">
-                    <Icon name="delete" size="md" />
+                  <button @click="deleteEventItem(evt.id)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-red-50 hover:bg-red-100 text-red-600' : 'bg-muted hover:bg-red-500/20 text-red-400']" title="O'chirish">
+                    🗑️
                   </button>
                 </div>
               </div>
 
-              <div v-if="selectedDayEvents.length === 0" class="bg-card border border-line rounded-2xl p-8 text-center space-y-3">
-                <div class="w-12 h-12 rounded-2xl bg-indigo-600/10 text-indigo-400 flex items-center justify-center mx-auto">
+              <div v-if="selectedDayEvents.length === 0" :class="['border rounded-2xl p-8 text-center space-y-3', isLightTheme ? 'bg-white border-slate-200' : 'bg-card border-line']">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center mx-auto text-xl">
                   📅
                 </div>
-                <h4 class="text-sm font-bold text-white">Ushbu kunga rejalashtirilgan vazifa yo'q</h4>
-                <p class="text-xs text-gray-400 max-w-sm mx-auto">Yangi vazifa yaratish uchun yuqoridagi tugmani bosing yoki AI Chatga "Ertaga meeting bor" deb yozing.</p>
+                <h4 :class="['text-sm font-bold', isLightTheme ? 'text-slate-900' : 'text-white']">Ushbu kunga rejalashtirilgan vazifa yo'q</h4>
+                <p :class="['text-xs max-w-sm mx-auto', isLightTheme ? 'text-slate-500' : 'text-gray-400']">Yangi vazifa yaratish uchun yuqoridagi tugmani bosing yoki AI Chatga "Ertaga meeting bor" deb yozing.</p>
               </div>
             </div>
 
             <!-- Side Reminders & Integration Status -->
             <div class="lg:col-span-4 space-y-4">
-              <div class="bg-card border border-line rounded-2xl p-4 space-y-3 shadow-xl">
-                <div class="flex items-center justify-between border-b border-line pb-2">
-                  <span class="text-xs font-bold text-white flex items-center gap-2">
-                    <Icon name="bell" size="md" class="text-emerald-400" />
-                    Yaqinlashayotgan AI Eslatmalar
+              <div :class="['border rounded-2xl p-4 space-y-3 shadow-md', isLightTheme ? 'bg-white border-slate-200' : 'bg-card border-line shadow-xl']">
+                <div :class="['flex items-center justify-between border-b pb-2', isLightTheme ? 'border-slate-200' : 'border-line']">
+                  <span :class="['text-xs font-bold flex items-center gap-2', isLightTheme ? 'text-slate-900' : 'text-white']">
+                    🔔 Yaqinlashayotgan AI Eslatmalar
                   </span>
-                  <span class="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono">Telegram Active</span>
+                  <span class="text-[9px] bg-emerald-500/20 text-emerald-600 px-2 py-0.5 rounded font-mono font-bold">Telegram Active</span>
                 </div>
 
                 <div class="space-y-2 text-xs">
-                  <div v-for="evt in upcomingReminders.slice(0, 3)" :key="evt.id" class="p-2.5 rounded-xl bg-muted border border-line-strong space-y-1">
-                    <div class="font-bold text-white truncate">{{ evt.title }}</div>
-                    <div class="text-[10px] text-gray-400 flex items-center justify-between">
+                  <div v-for="evt in upcomingReminders.slice(0, 3)" :key="evt.id" :class="['p-2.5 rounded-xl border space-y-1', isLightTheme ? 'bg-slate-50 border-slate-200' : 'bg-muted border-line-strong']">
+                    <div :class="['font-bold truncate', isLightTheme ? 'text-slate-800' : 'text-white']">{{ evt.title }}</div>
+                    <div :class="['text-[10px] flex items-center justify-between', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
                       <span>🕒 {{ evt.startDate }} ({{ evt.startTime }})</span>
-                      <span class="text-amber-400 font-mono font-bold">30 min oldin</span>
+                      <span class="text-amber-600 font-mono font-bold">30 min oldin</span>
                     </div>
                   </div>
                 </div>
@@ -565,8 +539,18 @@ export default {
         priority: 'Medium',
         category: 'Work',
         status: 'Pending'
-      }
+      },
+      isLightTheme: document.documentElement.classList.contains('light')
     };
+  },
+  mounted() {
+    this.themeObserver = new MutationObserver(() => {
+      this.isLightTheme = document.documentElement.classList.contains('light');
+    });
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  },
+  beforeUnmount() {
+    if (this.themeObserver) this.themeObserver.disconnect();
   },
   computed: {
     currentMonthName() {

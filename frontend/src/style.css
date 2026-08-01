@@ -2,9 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-canvas: 11 12 14;         /* #0B0C0E */
+  --color-sunken: 17 19 23;         /* #111317 */
+  --color-surface: 20 22 28;        /* #14161C */
+  --color-card: 26 29 38;           /* #1A1D26 */
+  --color-raised: 33 37 49;         /* #212531 */
+  --color-muted: 42 47 62;          /* #2A2F3E */
+  --color-hover: 50 56 74;          /* #32384A */
+  --color-line: 38 42 56;           /* #262A38 */
+  --color-line-strong: 55 62 82;    /* #373E52 */
+  --color-line-hover: 99 102 241;   /* #6366F1 */
+}
+
+html.light {
+  --color-canvas: 244 246 251;      /* #F4F6FB */
+  --color-sunken: 238 242 248;      /* #EEF2F8 */
+  --color-surface: 255 255 255;     /* #FFFFFF */
+  --color-card: 255 255 255;        /* #FFFFFF */
+  --color-raised: 241 245 249;     /* #F1F5F9 */
+  --color-muted: 226 232 240;      /* #E2E8F0 */
+  --color-hover: 238 242 255;      /* #EEF2FF */
+  --color-line: 226 232 240;       /* #E2E8F0 */
+  --color-line-strong: 203 213 225;/* #CBD5E1 */
+  --color-line-hover: 99 102 241;  /* #6366F1 */
+}
+
 @layer base {
   body {
-    @apply bg-[#0B0C0E] text-gray-100;
+    @apply bg-canvas text-gray-100;
   }
 }
 

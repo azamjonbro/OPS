@@ -877,11 +877,11 @@ ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
      💵 O'rtacha chek:
      [O'rtacha chek miqdori] so'm
 
-     💳 To'lovlar:
-     • Naqd: ...
-     • Karta: ...
-     • Click: ...
-     • Payme: ...
+     💳 To'lovlar: (FAQAT agar tool natijasida `payments` obyekti haqiqiy raqamlar bilan kelgan bo'lsa, shu qatorlarni chiqar — bo'lmasa BUTUN "To'lovlar" bo'limini butunlay tashlab ket. HECH QACHON "..." yoki boshqa placeholder yozma — bu mavjud bo'lmagan ma'lumotni o'ylab topayotganingni bildiradi.)
+     • Naqd: [haqiqiy raqam]
+     • Karta: [haqiqiy raqam]
+     • Click: [haqiqiy raqam]
+     • Payme: [haqiqiy raqam]
 
      ↩️ Qaytarilgan mahsulot:
      [Qaytarilgan mahsulot] so'm

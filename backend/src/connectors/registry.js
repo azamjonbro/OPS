@@ -376,7 +376,10 @@ class BillzConnector extends BaseConnector {
     }
 
     if (toolName === 'billz_get_sales') {
-      const res = await billzClient.getSales(params?.date || 'today');
+      // getSales() accepts the full { date, daysCount, label } shape — passing only
+      // params.date silently dropped daysCount, so "oxirgi 7 kunlik savdo" queries
+      // always fell back to a single day ('today') instead of summing the range.
+      const res = await billzClient.getSales(params && Object.keys(params).length ? params : 'today');
       return {
         success: res.success,
         isRealData: res.isRealData,
