@@ -292,145 +292,70 @@ class BillzClientService {
   }
 
   /**
-   * BILLZ Consolidated Reports API (JSON-RPC 2.0)
-   * Method: reports.consolidated
-   * Endpoint: POST https://api.billz.uz/v1/
+   * "Consolidated" daily report for Hadiya Store.
    *
-   * Filters EXCLUSIVELY for the "Hadiya Store" branch.
+   * This used to call the legacy Billz 1.0 JSON-RPC endpoint (POST api.billz.uz/v1/,
+   * method reports.consolidated). Verified directly against that endpoint: it rejects
+   * BOTH the 2.0 login-issued bearer token AND a self-signed HS256 JWT built from the
+   * same secret with "Invalid token" (-32500) — while an unauthenticated request gets
+   * a *different* error ("Empty token"), so the endpoint is reachable but this account
+   * has no working credential for the legacy product. That's a Billz-account-provisioning
+   * gap (a separate legacy API key would need to be issued), not something fixable here.
+   *
+   * Rather than fail the whole feature, this now builds the same response shape from
+   * getSales() — the 2.0 REST endpoint that already authenticates and returns real
+   * Store Hadiya data. That source only exposes per-product `updated_at`, not a receipt
+   * log, so checksCount / averageCheck / payments genuinely cannot be computed from it.
+   * Those stay `null` (not 0) so the caller can render "ma'lumot yo'q" instead of lying
+   * with a fabricated zero.
    */
   async getConsolidatedReport(options = {}) {
-    const rawToken = process.env.BILLZ_TOKEN || this.secretToken;
-    let token = await this.getAccessToken();
-    if (!token) token = rawToken;
+    const { date, query, userMessage } = options;
+    const parsed = this.parseDateToUtcRange(date || query || userMessage || 'bugun');
+    const targetDateStr = parsed.dateBegin.split('T')[0];
 
-    let { dateBegin, dateEnd, currency = 'UZS', date, query } = options;
+    const salesRes = await this.getSales({ date: targetDateStr });
 
-    if (!dateBegin || !dateEnd) {
-      const parsed = this.parseDateToUtcRange(date || query || options.userMessage || 'bugun');
-      dateBegin = parsed.dateBegin;
-      dateEnd = parsed.dateEnd;
-      options.displayDate = parsed.displayDate;
-    }
-
-    const requestPayload = {
-      jsonrpc: '2.0',
-      method: 'reports.consolidated',
-      params: {
-        dateBegin,
-        dateEnd,
-        currency
-      },
-      id: '1200'
-    };
-
-    try {
-      const res = await fetch('https://api.billz.uz/v1/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestPayload)
-      });
-
-      const resJson = await res.json().catch(() => null);
-
-      if (!res.ok || (resJson && resJson.error)) {
-        const errObj = resJson && resJson.error ? resJson.error : { code: res.status, message: res.statusText || 'API Error' };
-        return {
-          success: false,
-          isRealData: true,
-          error: `BILLZ API Error (${errObj.code}): ${errObj.message}`,
-          errorMessage: `BILLZ Consolidated Reports API xatosi (${errObj.code}): ${errObj.message}`,
-          requestPayload,
-          dateBegin,
-          dateEnd
-        };
-      }
-
-      const resultData = resJson.result || resJson.data || resJson;
-
-      // Extract branch list
-      let branches = [];
-      if (Array.isArray(resultData)) {
-        branches = resultData;
-      } else if (resultData && typeof resultData === 'object') {
-        branches = resultData.branches || resultData.shops || resultData.items || resultData.stores || [];
-        if (!branches.length) {
-          // Check if object keys are branch objects
-          branches = Object.values(resultData).filter(v => typeof v === 'object' && v !== null);
-        }
-      }
-
-      // STRICT FILTERING FOR "Hadiya Store" (or "Store Hadiya" as match alias)
-      let hadiyaBranch = branches.find(b => {
-        const name = String(b.name || b.shop_name || b.branch_name || b.title || '').toLowerCase().trim();
-        return name === 'hadiya store' || name === 'store hadiya' || b.shop_id === this.storeHadiyaId || b.id === this.storeHadiyaId;
-      });
-
-      if (!hadiyaBranch) {
-        return {
-          success: false,
-          isRealData: true,
-          notFound: true,
-          errorMessage: "Hadiya Store filiali hisobotda topilmadi.",
-          requestPayload,
-          dateBegin,
-          dateEnd
-        };
-      }
-
-      // Format strictly metrics belonging ONLY to Hadiya Store
-      const totalSales = hadiyaBranch.total_sales || hadiyaBranch.sales_total || hadiyaBranch.total_revenue || hadiyaBranch.revenue || hadiyaBranch.sales || 0;
-      const checksCount = hadiyaBranch.checks_count || hadiyaBranch.receipts_count || hadiyaBranch.orders_count || hadiyaBranch.checks || 0;
-      const itemsSoldsCount = hadiyaBranch.items_sold_count || hadiyaBranch.products_count || hadiyaBranch.items_sold || hadiyaBranch.qty || 0;
-      const averageCheck = hadiyaBranch.average_check || hadiyaBranch.avg_check || (checksCount > 0 ? Math.round(totalSales / checksCount) : 0);
-      const returnedProducts = hadiyaBranch.returned_products || hadiyaBranch.returns || hadiyaBranch.returned_amount || 0;
-      const netSales = hadiyaBranch.net_sales || (totalSales - returnedProducts);
-
-      const payments = hadiyaBranch.payments || {
-        naqd: hadiyaBranch.cash || hadiyaBranch.naqd || 0,
-        karta: hadiyaBranch.card || hadiyaBranch.karta || 0,
-        click: hadiyaBranch.click || 0,
-        payme: hadiyaBranch.payme || 0
-      };
-
-      return {
-        success: true,
-        isRealData: true,
-        method: 'reports.consolidated',
-        dateBegin,
-        dateEnd,
-        displayDate: options.displayDate || dateBegin.split('T')[0],
-        branchName: "Hadiya Store",
-        consolidatedData: {
-          displayDate: options.displayDate || dateBegin.split('T')[0],
-          branchName: "Hadiya Store",
-          totalSales,
-          formattedTotalSales: `${totalSales.toLocaleString()} so'm`,
-          checksCount,
-          itemsSoldsCount,
-          averageCheck,
-          formattedAverageCheck: `${averageCheck.toLocaleString()} so'm`,
-          payments,
-          returnedProducts,
-          formattedReturnedProducts: `${returnedProducts.toLocaleString()} so'm`,
-          netSales,
-          formattedNetSales: `${netSales.toLocaleString()} so'm`
-        },
-        rawBranchData: hadiyaBranch
-      };
-
-    } catch (err) {
+    if (!salesRes.success || !salesRes.isRealData) {
       return {
         success: false,
-        isRealData: true,
-        error: err.message,
-        errorMessage: `BILLZ API Ulanish Xatosi: ${err.message}`,
-        dateBegin,
-        dateEnd
+        isRealData: false,
+        error: 'Billz 2.0 REST API dan ma\'lumot olinmadi',
+        errorMessage: salesRes.errorDiagnostic
+          ? `BILLZ API xatosi: ${salesRes.errorDiagnostic.errorMessage || salesRes.errorDiagnostic.errorCode}`
+          : "BILLZ API dan real ma'lumot olinmadi.",
+        dateBegin: parsed.dateBegin,
+        dateEnd: parsed.dateEnd
       };
     }
+
+    const s = salesRes.salesSummary;
+
+    return {
+      success: true,
+      isRealData: true,
+      method: 'billz_2.0_rest_fallback',
+      dateBegin: parsed.dateBegin,
+      dateEnd: parsed.dateEnd,
+      displayDate: parsed.displayDate,
+      branchName: 'Hadiya Store',
+      consolidatedData: {
+        displayDate: parsed.displayDate,
+        branchName: 'Hadiya Store',
+        totalSales: s.totalRevenueUZS,
+        formattedTotalSales: s.formattedTotalRevenue,
+        // Not derivable from the 2.0 REST product endpoint — see method docstring.
+        checksCount: null,
+        itemsSoldsCount: s.transactedItemsCount,
+        averageCheck: null,
+        payments: null,
+        returnedProducts: null,
+        netSales: s.totalRevenueUZS,
+        formattedNetSales: s.formattedTotalRevenue,
+        dataSourceNote: "Chek soni, o'rtacha chek va to'lov turlari bo'yicha taqsimot Billz 1.0 hisobot API'si orqali kelardi; hozircha ushbu API uchun ishlaydigan kalit yo'q, shuning uchun bu ko'rsatkichlar ko'rsatilmaydi. Umumiy tushum va sotilgan mahsulotlar soni Billz 2.0 orqali real vaqtda olingan."
+      },
+      rawSalesSummary: s
+    };
   }
 
   // Get Store Hadiya Real Sales & Transacted Items for ANY Period (Single Day, Multi-Day, 7-Week, 1-Month)

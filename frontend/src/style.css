@@ -2,103 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Theme tokens.
- *
- * `:root` holds the dark palette (the app's original, default look). `.light`
- * overrides the same variable names — Icon.vue, every `bg-card` / `border-line`
- * utility, and the plain-CSS overrides below all read through these, so toggling
- * the class on <html> is the entire theme switch.
- *
- * Values are "R G B" triplets (no commas, no rgb()) so Tailwind's
- * `rgb(var(--x) / <alpha-value>)` pattern in tailwind.config.js can splice in an
- * opacity modifier from utilities like `bg-card/60`.
- */
-:root {
-  --color-canvas: 11 12 14;
-  --color-sunken: 14 16 20;
-  --color-surface: 17 19 23;
-  --color-card: 20 22 28;
-  --color-raised: 23 26 34;
-  --color-muted: 26 29 38;
-  --color-hover: 37 41 54;
-  --color-line: 31 34 42;
-  --color-line-strong: 38 42 54;
-  --color-line-hover: 45 50 66;
-
-  /* Text roles that the old markup hardcodes as text-white / text-gray-* / text-black.
-     Rewriting ~370 scattered class occurrences to a new set of utilities isn't safely
-     verifiable without a visual tool right now, so instead these variables feed the
-     `.light` override block below, which redefines what those exact Tailwind classes
-     compute to — everything keeps working, only the color swaps per theme. */
-  --text-primary: 255 255 255;
-  --text-secondary: 209 213 219;
-  --text-tertiary: 156 163 175;
-  --text-quaternary: 107 114 128;
-}
-
-.light {
-  --color-canvas: 246 247 249;
-  --color-sunken: 237 238 242;
-  --color-surface: 255 255 255;
-  --color-card: 255 255 255;
-  --color-raised: 249 250 251;
-  --color-muted: 241 242 245;
-  --color-hover: 231 233 238;
-  --color-line: 227 229 234;
-  --color-line-strong: 212 215 222;
-  --color-line-hover: 195 199 208;
-
-  --text-primary: 17 24 39;
-  --text-secondary: 55 65 81;
-  --text-tertiary: 100 108 122;
-  --text-quaternary: 133 140 153;
-}
-
 @layer base {
   body {
-    /* `@apply bg-canvas` fails here: Tailwind can't resolve an @apply'd utility built
-       from an extended color that uses the <alpha-value> CSS-variable pattern this
-       early in the stylesheet. Setting it directly sidesteps that resolution order
-       issue; text-gray-100 is a stock (non-extended) color, so @apply is fine for it. */
-    background-color: rgb(var(--color-canvas));
-    @apply text-gray-100 transition-colors duration-200;
+    @apply bg-[#0B0C0E] text-gray-100;
   }
 }
-
-/*
- * Light-mode text retrofit — deliberately NOT inside @layer utilities.
- * Unlayered CSS always wins over anything Tailwind puts in a @layer, so these
- * rules override the base utility classes reliably regardless of build order,
- * with no !important needed. Scoped under .light, so dark mode is untouched.
- */
-.light .text-white,
-.light .text-gray-100 { color: rgb(var(--text-primary)); }
-.light .text-gray-200,
-.light .text-gray-300 { color: rgb(var(--text-secondary)); }
-.light .text-gray-400 { color: rgb(var(--text-tertiary)); }
-.light .text-gray-500,
-.light .text-gray-600 { color: rgb(var(--text-quaternary)); }
-.light .text-black { color: rgb(var(--text-primary)); }
-.light .placeholder-gray-500::placeholder { color: rgb(var(--text-quaternary) / 0.8); }
-
-/*
- * Badge/pill accent text (priority tags, status chips, tool-call badges) is written
- * everywhere as `bg-{hue}-500/20 text-{hue}-300` — a pastel tint on a pastel wash,
- * tuned to glow on the dark canvas. Composited over a near-white light card that
- * combination measures under 2:1 contrast (verified: WCAG needs >=4.5:1 for text
- * this small), i.e. every badge in the app would go unreadable in light mode.
- * Darkening just the text side to each hue's 700/800 shade — never touching the
- * tinted background — restores >=4.5:1 while keeping the exact same markup.
- */
-.light .text-indigo-300,  .light .text-indigo-400  { color: #4338CA; }
-.light .text-emerald-300, .light .text-emerald-400 { color: #047857; }
-.light .text-purple-300,  .light .text-purple-400  { color: #6D28D9; }
-.light .text-rose-300,    .light .text-rose-400    { color: #BE123C; }
-.light .text-red-300,     .light .text-red-400     { color: #B91C1C; }
-.light .text-blue-300,    .light .text-blue-400    { color: #1D4ED8; }
-.light .text-amber-300,   .light .text-amber-400   { color: #92400E; }
-.light .text-cyan-300,    .light .text-cyan-400    { color: #155E75; }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
@@ -119,28 +27,151 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-.light ::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.14);
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.24);
-}
-
 /* Glassmorphism utilities */
 .glass-panel {
-  background: rgb(var(--color-muted) / 0.7);
+  background: rgba(26, 29, 36, 0.7);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-input {
-  background: rgb(var(--color-card) / 0.8);
+  background: rgba(20, 22, 27, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(8px);
 }
 
-.light .glass-panel,
-.light .glass-input {
-  border-color: rgba(15, 23, 42, 0.08);
+/* Creative Luxury Light Mode Rules */
+html.light body {
+  background: linear-gradient(135deg, #F4F6FB 0%, #E8EDF8 100%) !important;
+  color: #1E293B !important;
+}
+
+html.light aside {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(99, 102, 241, 0.15) !important;
+}
+
+html.light main {
+  background: linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%) !important;
+}
+
+html.light header {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.12) !important;
+}
+
+html.light header span.text-gray-200,
+html.light header .text-white {
+  color: #0F172A !important;
+}
+
+/* Light mode cards & containers */
+html.light .bg-\[\#14161C\],
+html.light .bg-\[\#17181E\],
+html.light .bg-\[\#171922\],
+html.light .bg-\[\#111317\],
+html.light .bg-\[\#1A1D26\],
+html.light .bg-\[\#17181e\] {
+  background-color: #FFFFFF !important;
+  border-color: rgba(99, 102, 241, 0.15) !important;
+  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.06) !important;
+}
+
+html.light .border-\[\#1F222A\],
+html.light .border-\[\#2D3242\],
+html.light .border-white\/10 {
+  border-color: rgba(99, 102, 241, 0.15) !important;
+}
+
+html.light .text-white,
+html.light .text-gray-100,
+html.light .text-gray-200 {
+  color: #0F172A !important;
+}
+
+html.light .text-gray-300,
+html.light .text-gray-400 {
+  color: #475569 !important;
+}
+
+html.light .text-gray-500 {
+  color: #64748B !important;
+}
+
+/* Markdown tables in light mode */
+html.light .markdown-body table {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+html.light .markdown-body th {
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+  border-bottom: 2px solid #CBD5E1 !important;
+  font-weight: 700 !important;
+}
+
+html.light .markdown-body td {
+  color: #334155 !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+html.light .markdown-body tr:hover {
+  background: #F8FAFC !important;
+}
+
+/* Light mode chat bubbles */
+html.light .bg-indigo-600 {
+  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25) !important;
+}
+
+html.light .bg-indigo-600 * {
+  color: #FFFFFF !important;
+}
+
+/* Input pill in light mode */
+html.light .bg-\[\#171922\].rounded-full,
+html.light input.bg-\[\#171922\],
+html.light .bg-\[\#161821\],
+html.light .bg-\[\#161820\] {
+  background: #FFFFFF !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Sidebar conversation list items in light mode */
+html.light aside div.bg-\[\#1E2029\],
+html.light aside div.bg-\[\#161820\],
+html.light aside div.bg-\[\#1A1D26\],
+html.light aside .bg-\[\#1E2029\],
+html.light aside .bg-\[\#161820\],
+html.light aside .bg-\[\#1A1D26\],
+html.light aside .bg-\[\#171A24\] {
+  background-color: #E2E8F0 !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+  color: #0F172A !important;
+}
+
+html.light aside div.bg-\[\#1E2029\]:hover,
+html.light aside div.bg-\[\#161820\]:hover,
+html.light aside div.bg-\[\#1A1D26\]:hover {
+  background-color: #CBD5E1 !important;
+}
+
+html.light aside .text-gray-300,
+html.light aside .text-gray-400,
+html.light aside .text-gray-500 {
+  color: #334155 !important;
+}
+
+/* Bottom input area container in light mode */
+html.light .bg-\[\#0B0C0E\],
+html.light .bg-\[\#111317\] {
+  background-color: transparent !important;
 }

@@ -535,19 +535,30 @@ function formatBillzConnectionReport(billzRes) {
       }
 
       const d = consRes.consolidatedData;
+      // `null` means "this data source can't tell us" — must render as "ma'lumot yo'q",
+      // never as "0 so'm", since a fabricated zero would be read as a real, confirmed
+      // figure (e.g. "0 chek" implies zero transactions happened, which is false).
+      const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+      const count = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v} ta`;
+
+      const paymentsBlock = d.payments
+        ? `💳 To'lovlar:\n` +
+          `• Naqd: ${money(d.payments.naqd)}\n` +
+          `• Karta: ${money(d.payments.karta)}\n` +
+          `• Click: ${money(d.payments.click)}\n` +
+          `• Payme: ${money(d.payments.payme)}\n\n`
+        : `💳 To'lovlar bo'yicha taqsimot: ma'lumot yo'q\n\n`;
+
       const responseText = `📅 Sana: ${d.displayDate}\n\n` +
         `🏪 Filial:\n${d.branchName}\n\n` +
-        `💰 Savdo:\n${d.totalSales ? d.totalSales.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
-        `🛒 Cheklar:\n${d.checksCount || 0} ta\n\n` +
-        `📦 Sotilgan mahsulotlar:\n${d.itemsSoldsCount || 0} ta\n\n` +
-        `💵 O'rtacha chek:\n${d.averageCheck ? d.averageCheck.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
-        `💳 To'lovlar:\n` +
-        `• Naqd: ${d.payments.naqd ? d.payments.naqd.toLocaleString() + " so'm" : "0 so'm"}\n` +
-        `• Karta: ${d.payments.karta ? d.payments.karta.toLocaleString() + " so'm" : "0 so'm"}\n` +
-        `• Click: ${d.payments.click ? d.payments.click.toLocaleString() + " so'm" : "0 so'm"}\n` +
-        `• Payme: ${d.payments.payme ? d.payments.payme.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
-        `↩️ Qaytarilgan mahsulot:\n${d.returnedProducts ? d.returnedProducts.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
-        `📈 Sof savdo:\n${d.netSales ? d.netSales.toLocaleString() + " so'm" : "0 so'm"}\n\n` +
+        `💰 Savdo:\n${money(d.totalSales)}\n\n` +
+        `🛒 Cheklar:\n${count(d.checksCount)}\n\n` +
+        `📦 Sotilgan mahsulotlar:\n${count(d.itemsSoldsCount)}\n\n` +
+        `💵 O'rtacha chek:\n${money(d.averageCheck)}\n\n` +
+        paymentsBlock +
+        `↩️ Qaytarilgan mahsulot:\n${money(d.returnedProducts)}\n\n` +
+        `📈 Sof savdo:\n${money(d.netSales)}\n\n` +
+        (d.dataSourceNote ? `ℹ️ ${d.dataSourceNote}\n\n` : '') +
         `⚠️ This report contains ONLY the Hadiya Store branch.`;
 
       return { responseText, executedTools, modelMetadataBadge };
