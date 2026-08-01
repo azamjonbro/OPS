@@ -30,9 +30,21 @@ html.light {
 
 @layer base {
   body {
-    @apply bg-canvas text-gray-100;
+    background-color: rgb(var(--color-canvas));
+    color: #F3F4F6;
   }
 }
+
+.bg-canvas { background-color: rgb(var(--color-canvas)); }
+.bg-sunken { background-color: rgb(var(--color-sunken)); }
+.bg-surface { background-color: rgb(var(--color-surface)); }
+.bg-card { background-color: rgb(var(--color-card)); }
+.bg-raised { background-color: rgb(var(--color-raised)); }
+.bg-muted { background-color: rgb(var(--color-muted)); }
+.bg-hover { background-color: rgb(var(--color-hover)); }
+.border-line { border-color: rgb(var(--color-line)); }
+.border-line-strong { border-color: rgb(var(--color-line-strong)); }
+.border-line-hover { border-color: rgb(var(--color-line-hover)); }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
