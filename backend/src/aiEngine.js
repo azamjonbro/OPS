@@ -394,8 +394,10 @@ function formatBillzSalesReport(d) {
            `|---|---|---|---|---|---|\n${rows}\n`;
   };
 
+  // The blank line before </details> matters: without it a body ending in a list item
+  // swallows the closing tag as lazy continuation and the panel closes in the wrong place.
   const collapsible = (summary, body) => body
-    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n</details>\n\n`
+    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n\n</details>\n\n`
     : '';
 
   const checkLines = (checks) => checks.map((c, i) => {
@@ -963,10 +965,19 @@ ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
      ↩️ Qaytarilgan mahsulot:
      [Qaytarilgan mahsulot] so'm
 
-     📈 Sof savdo:
+     📈 Sof savdo (kirim):
      [Sof savdo] so'm
 
+     🏬 Omborxonada qolgan tovar: (tool natijasidagi 'stock' obyektidan; yo'q bo'lsa bo'limni tashlab ket)
+     [stock.totalValue] so'm — [stock.positionsInStock] pozitsiya | [stock.totalUnits] dona
+
      ⚠️ This report contains ONLY the Hadiya Store branch.
+
+  6. DAVRIY HISOBOT (haftalik/oylik): agar tool natijasida 'dailyBreakdown' massivi kelgan bo'lsa,
+     avval HAR BIR KUNNI alohida sarlavha bilan chiqar (sana — kunlik savdo, chek soni, mahsulot soni),
+     har bir kunning mahsulotlarini markdown jadval ko'rinishida <details><summary>...</summary> ichida ber,
+     va eng oxirida "Davr yakuni" bo'limida umumiy savdo, to'lov usullari, qaytarilgan mahsulot,
+     sof savdo va omborxona qoldig'ini chiqar. Kunlarni O'ZING o'ylab topma — faqat 'dailyBreakdown' dagilar.
 
 - CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
   Whenever billz_get_sales or billz_get_products or billz_get_consolidated_report tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.

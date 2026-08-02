@@ -878,6 +878,52 @@ marked.setOptions({
   breaks: true
 });
 
+/**
+ * Swaps the emoji the backend writes for line-art icons (Lucide geometry) once the
+ * markdown is HTML.
+ *
+ * The emoji stay in the stored message and in every other channel (Telegram, e-mail),
+ * so this is a rendering upgrade only — nothing downstream depends on the markup.
+ * Each entry is the icon's inner geometry; `tone` picks the accent so a report reads
+ * as one system: money green, warnings amber, returns rose, everything else indigo.
+ */
+const MD_ICONS = {
+  '📅': { tone: 'accent', d: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>' },
+  '📆': { tone: 'accent', d: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/>' },
+  '🏪': { tone: 'accent', d: '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/>' },
+  '🏬': { tone: 'accent', d: '<path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect width="12" height="12" x="6" y="10"/>' },
+  '🧾': { tone: 'accent', d: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>' },
+  '📦': { tone: 'accent', d: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>' },
+  '🛒': { tone: 'accent', d: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>' },
+  '💳': { tone: 'accent', d: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>' },
+  '💰': { tone: 'money', d: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>' },
+  '💵': { tone: 'money', d: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>' },
+  '📈': { tone: 'money', d: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
+  '📊': { tone: 'accent', d: '<path d="M3 3v18h18"/><rect width="4" height="7" x="7" y="10" rx="1"/><rect width="4" height="12" x="15" y="5" rx="1"/>' },
+  '↩️': { tone: 'warn2', d: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>' },
+  '⚠️': { tone: 'warn', d: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>' },
+  'ℹ️': { tone: 'accent', d: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
+  '✅': { tone: 'money', d: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>' },
+  '❌': { tone: 'warn2', d: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>' }
+};
+
+const MD_ICON_RE = new RegExp(
+  Object.keys(MD_ICONS).map((e) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'g'
+);
+
+function decorateIcons(html) {
+  // Leave code samples alone — an emoji inside <code>/<pre> is content, not decoration.
+  return html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/).map((chunk, i) => {
+    if (i % 2 === 1) return chunk;
+    return chunk.replace(MD_ICON_RE, (emoji) => {
+      const icon = MD_ICONS[emoji];
+      return `<svg class="md-icon md-icon--${icon.tone}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
+             `stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon.d}</svg>`;
+    });
+  }).join('');
+}
+
 export default {
   components: {
     CalendarWorkspace,
@@ -1487,7 +1533,7 @@ export default {
     renderMarkdown(content) {
       if (!content) return '';
       try {
-        return marked.parse(content);
+        return decorateIcons(marked.parse(content));
       } catch (err) {
         return content;
       }
@@ -1579,6 +1625,49 @@ export default {
   background-color: #1A1D26;
   font-weight: 600;
 }
+
+/* Line-art icons swapped in for the report emoji (see decorateIcons). */
+.markdown-body .md-icon {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+  margin-right: 0.45em;
+  color: #818CF8;
+  opacity: 0.95;
+}
+.markdown-body h1 .md-icon,
+.markdown-body h2 .md-icon,
+.markdown-body h3 .md-icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  stroke-width: 2;
+}
+.markdown-body summary .md-icon {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.35em;
+  color: inherit;
+  opacity: 0.85;
+}
+.markdown-body .md-icon--money { color: #34D399; }
+.markdown-body .md-icon--warn { color: #FBBF24; }
+.markdown-body .md-icon--warn2 { color: #FB7185; }
+
+/* Headings are white for the dark theme; without this they vanish on a light page. */
+html.light .markdown-body h1,
+html.light .markdown-body h2,
+html.light .markdown-body h3,
+html.light .markdown-body h4 {
+  color: #0F172A;
+}
+html.light .markdown-body h1 { border-bottom-color: #E2E8F0; }
+
+html.light .markdown-body .md-icon { color: #4F46E5; }
+html.light .markdown-body .md-icon--money { color: #059669; }
+html.light .markdown-body .md-icon--warn { color: #D97706; }
+html.light .markdown-body .md-icon--warn2 { color: #E11D48; }
 
 /* Collapsible report sections (per-day product tables in Billz period reports). */
 .markdown-body details {
