@@ -14,6 +14,7 @@ router.post('/transcribe-audio', chatController.transcribeAudio);
 
 router.get('/memory/items', chatController.getMemoryItems);
 router.post('/memory/upload', chatController.uploadMemoryItem);
+router.put('/memory/items/:id', chatController.updateMemoryItem);
 router.delete('/memory/items/:id', chatController.deleteMemoryItem);
 
 router.get('/owner/profile', chatController.getOwnerProfile);

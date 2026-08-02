@@ -711,7 +711,9 @@ class BillzClientService {
   _mapOrderItems(order) {
     return (order.order_detail.order_items || []).map((item) => {
       const product = item.product || {};
-      const quantity = item.measurement_value || 0;
+      // A RETURN order carries its quantity in returned_measurement_value and leaves
+      // measurement_value at 0 (its prices come back negative, and the caller abs-es them).
+      const quantity = item.measurement_value || item.returned_measurement_value || 0;
       const lineTotal = Math.round(item.total_price || (item.sale_price || item.price || 0) * quantity);
       // A discount spread over several units leaves a fractional per-unit price
       // (400,000 / 3). The line total stays exact; only the displayed unit price is
@@ -853,7 +855,13 @@ class BillzClientService {
         formattedTotalPrice: `${Math.abs(o.order_detail.total_price || 0).toLocaleString()} UZS`,
         soldAt: o.display_sold_at || o.sold_at,
         soldTime: (o.display_sold_at || '').split(' ')[1] ? (o.display_sold_at || '').split(' ')[1].slice(0, 5) : '',
-        products: this._mapOrderItems(o).map((p) => ({ ...p, totalPrice: Math.abs(p.totalPrice) }))
+        products: this._mapOrderItems(o).map((p) => ({
+          ...p,
+          totalPrice: Math.abs(p.totalPrice),
+          unitPrice: Math.abs(p.unitPrice),
+          formattedTotalPrice: `${Math.abs(p.totalPrice).toLocaleString()} UZS`,
+          formattedUnitPrice: `${Math.abs(p.unitPrice).toLocaleString()} UZS`
+        }))
       }));
 
     const returnedProductsList = this._aggregateProducts(returnedChecks);

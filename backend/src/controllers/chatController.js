@@ -308,7 +308,7 @@ const getMemoryItems = asyncHandler(async (req, res) => {
 });
 
 const uploadMemoryItem = asyncHandler(async (req, res) => {
-  const { title, category, content, fileName } = req.body || {};
+  const { title, category, content, fileName, description, tags, priority } = req.body || {};
   if (!title || !content) {
     return res.status(400).json({ success: false, error: "Sarlavha va matn kiritilishi shart." });
   }
@@ -316,10 +316,31 @@ const uploadMemoryItem = asyncHandler(async (req, res) => {
     key: `knowledge-${Date.now()}`,
     category: category || 'knowledge',
     title,
+    description: description || '',
     content,
+    tags: Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []),
+    priority: priority || 'Normal',
     metadata: { fileName: fileName || 'Document', uploadedAt: new Date() }
   });
   res.json({ success: true, item: newItem });
+});
+
+const updateMemoryItem = asyncHandler(async (req, res) => {
+  const { title, category, content, fileName, description, tags, priority } = req.body || {};
+  const updatedItem = await OwnerMemory.findByIdAndUpdate(
+    req.params.id,
+    {
+      title,
+      category: category || 'knowledge',
+      description: description || '',
+      content,
+      tags: Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []),
+      priority: priority || 'Normal',
+      updatedAt: new Date()
+    },
+    { new: true }
+  );
+  res.json({ success: true, item: updatedItem });
 });
 
 const deleteMemoryItem = asyncHandler(async (req, res) => {
@@ -359,6 +380,7 @@ module.exports = {
   transcribeAudio,
   getMemoryItems,
   uploadMemoryItem,
+  updateMemoryItem,
   deleteMemoryItem,
   getOwnerProfile,
   saveOwnerProfile

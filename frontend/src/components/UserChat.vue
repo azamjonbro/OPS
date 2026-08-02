@@ -239,158 +239,10 @@
       <CalendarWorkspace v-if="activeViewMode === 'calendar'" />
 
       <!-- MY PROJECTS & KNOWLEDGE HUB VIEW -->
-      <div v-else-if="activeViewMode === 'projects'" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-5xl w-full mx-auto">
-        <!-- Hub Header Banner -->
-        <div class="bg-gradient-to-r from-[#171A24] via-[#1D2130] to-[#171A24] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-          <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
-            <div class="space-y-1.5">
-              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
-                <span>📁 Permanent AI Memory & Projects Hub</span>
-              </div>
-              <h1 class="text-2xl font-bold text-white tracking-tight">My Projects & Knowledge Bank</h1>
-              <p class="text-xs text-gray-300 max-w-xl leading-relaxed">
-                PDF kitoblar, sotuv strategiyalari va biznes logikalarini AI doimiy xotirasiga yuklang. AI ushbu hujjatlar ustida tahlil va sotuv amallarini bajaradi.
-              </p>
-            </div>
-            <button @click="toggleViewMode('chat')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-2 shrink-0">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-              <span>Chat Muloqotiga Qaytish</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Two Column Workspace: Upload Form & Saved Memory Cards -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          <!-- Left Column: Upload New Knowledge / PDF Book / Strategy -->
-          <div class="lg:col-span-5 bg-[#14161C] border border-[#1F222A] rounded-3xl p-5 space-y-4 shadow-xl">
-            <div class="flex items-center gap-2 border-b border-[#1F222A] pb-3">
-              <div class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
-                +
-              </div>
-              <h2 class="text-sm font-bold text-white">Yangi Bilim / PDF Kitob Yuklash</h2>
-            </div>
-
-            <div class="space-y-3 text-xs">
-              <!-- Title -->
-              <div>
-                <label class="block text-gray-400 font-medium mb-1">Sarlavha / Nomi</label>
-                <input 
-                  v-model="newDocTitle" 
-                  type="text" 
-                  placeholder="masalan: Sotuvni oshirish strategiyasi 2026..." 
-                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <!-- Category -->
-              <div>
-                <label class="block text-gray-400 font-medium mb-1">Kategoriya</label>
-                <select 
-                  v-model="newDocCategory" 
-                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="knowledge">📚 PDF Kitob / Bilim Bazasi</option>
-                  <option value="business">📊 Sotuv Logikasi & Strategiya</option>
-                  <option value="project">🚀 Yangi Loyiha / Project</option>
-                  <option value="architecture">🏗️ Texnik Arxitektura & Qoidalar</option>
-                </select>
-              </div>
-
-              <!-- File Upload Picker -->
-              <div>
-                <label class="block text-gray-400 font-medium mb-1">Fayl Yuklash (.pdf, .txt, .md, .doc)</label>
-                <input 
-                  type="file" 
-                  @change="handleKnowledgeFileUpload" 
-                  accept=".pdf,.txt,.md,.doc,.docx,.json" 
-                  class="w-full text-gray-400 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/20 file:text-indigo-300 hover:file:bg-indigo-600/30 cursor-pointer"
-                />
-              </div>
-
-              <!-- Text Content Input -->
-              <div>
-                <label class="block text-gray-400 font-medium mb-1">Matn / Qoidalar / Logikalar</label>
-                <textarea 
-                  v-model="newDocContent" 
-                  rows="6" 
-                  placeholder="PDF matni, sotuv qoidalari yoki loyiha bo'yicha ko'rsatmalaringizni beravering..." 
-                  class="w-full bg-[#1C1F2A] border border-[#2D3242] rounded-xl px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"
-                ></textarea>
-              </div>
-
-              <!-- Submit Button -->
-              <button 
-                @click="submitMemoryUpload" 
-                :disabled="isUploadingMemory || !newDocTitle.trim() || !newDocContent.trim()" 
-                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2"
-              >
-                <span v-if="isUploadingMemory">AI Xotirasiga Saqlanmoqda...</span>
-                <span v-else>🧠 AI Doimiy Xotirasiga Saqlash</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Right Column: Stored Memory Bank Cards -->
-          <div class="lg:col-span-7 space-y-4">
-            <div class="flex items-center justify-between border-b border-[#1F222A] pb-3">
-              <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                <span>📚 AI Xotirasidagi Loyihalar va Kitoblar</span>
-                <span class="text-xs font-mono bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full">({{ memoryItems.length }})</span>
-              </h2>
-              <button @click="fetchMemoryItems" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Yangilash 🔄</button>
-            </div>
-
-            <div v-if="memoryItems.length === 0" class="bg-[#14161C] border border-[#1F222A] rounded-3xl p-8 text-center space-y-3">
-              <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto text-xl font-bold">📚</div>
-              <div class="text-sm font-semibold text-white">Hozircha xotirada ma'lumot yo'q</div>
-              <p class="text-xs text-gray-400 max-w-sm mx-auto">
-                Chap tarafdagi shakl orqali sotuv logikalari, PDF kitoblar yoki loyiha ko'rsatmalarini saqlang.
-              </p>
-            </div>
-
-            <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              <div 
-                v-for="item in memoryItems" 
-                :key="item._id || item.key"
-                class="bg-[#14161C] border border-[#1F222A] hover:border-indigo-500/40 rounded-2xl p-4 space-y-2.5 transition shadow-md group"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                        {{ item.category || 'knowledge' }}
-                      </span>
-                      <span class="text-[10px] text-gray-500 font-mono">{{ new Date(item.updatedAt).toLocaleDateString() }}</span>
-                    </div>
-                    <h3 class="text-sm font-bold text-white group-hover:text-indigo-300 transition mt-1">{{ item.title }}</h3>
-                  </div>
-
-                  <button @click="deleteMemoryCard(item._id)" class="text-gray-500 hover:text-red-400 p-1 transition" title="Xotiradan o'chirish">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-
-                <p class="text-xs text-gray-300 line-clamp-3 leading-relaxed bg-[#1A1D26] p-2.5 rounded-xl border border-[#252936]">
-                  {{ item.content }}
-                </p>
-
-                <div class="flex items-center justify-between pt-1 text-xs">
-                  <span class="text-[10px] text-gray-400 font-mono" v-if="item.metadata && item.metadata.fileName">📄 {{ item.metadata.fileName }}</span>
-                  <button 
-                    @click="queryAiAboutMemory(item)" 
-                    class="px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-[11px] font-semibold transition ml-auto flex items-center gap-1.5"
-                  >
-                    <span>🤖 AI Tahlil & Muloqot</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <KnowledgeWorkspace 
+        v-else-if="activeViewMode === 'projects'" 
+        @switch-to-chat="handleSwitchToChat" 
+      />
 
       <!-- Message History Container (WHEN IN CHAT VIEW MODE) -->
       <div v-else ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
@@ -1019,6 +871,7 @@ import { VoiceController, RECORDING_STATE } from '../services/voiceController';
 import { API_BASE } from '../services/api';
 import themeService from '../services/themeService';
 import CalendarWorkspace from './CalendarWorkspace.vue';
+import KnowledgeWorkspace from './KnowledgeWorkspace.vue';
 
 marked.setOptions({
   gfm: true,
@@ -1027,7 +880,8 @@ marked.setOptions({
 
 export default {
   components: {
-    CalendarWorkspace
+    CalendarWorkspace,
+    KnowledgeWorkspace
   },
   data() {
     return {
@@ -1170,6 +1024,12 @@ export default {
         await axios.delete(`${API_BASE}/api/chat/memory/items/${id}`);
         await this.fetchMemoryItems();
       } catch (e) {}
+    },
+    handleSwitchToChat(prompt) {
+      this.activeViewMode = 'chat';
+      if (prompt && typeof prompt === 'string') {
+        this.inputQuery = prompt;
+      }
     },
     queryAiAboutMemory(item) {
       this.activeViewMode = 'chat';
@@ -1718,5 +1578,66 @@ export default {
 .markdown-body th {
   background-color: #1A1D26;
   font-weight: 600;
+}
+
+/* Collapsible report sections (per-day product tables in Billz period reports). */
+.markdown-body details {
+  border: 1px solid #262A36;
+  border-radius: 0.75rem;
+  background-color: #101219;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+.markdown-body details > summary {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #A5B4FC;
+  background-color: #171A22;
+  list-style: none;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+.markdown-body details > summary:hover {
+  background-color: #1E2230;
+  color: #FFFFFF;
+}
+.markdown-body details > summary::-webkit-details-marker {
+  display: none;
+}
+.markdown-body details > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.markdown-body details[open] > summary::before {
+  content: '▾ ';
+}
+.markdown-body details[open] > summary {
+  border-bottom: 1px solid #262A36;
+}
+/* Everything after the summary is the panel body. */
+.markdown-body details > *:not(summary) {
+  margin: 0.6rem 0.75rem;
+}
+.markdown-body details table {
+  width: calc(100% - 1.5rem);
+}
+
+html.light .markdown-body details {
+  border-color: #E2E8F0;
+  background: #FFFFFF;
+}
+html.light .markdown-body details > summary {
+  background: #F1F5F9;
+  color: #4338CA;
+}
+html.light .markdown-body details > summary:hover {
+  background: #E2E8F0;
+  color: #1E1B4B;
+}
+html.light .markdown-body details[open] > summary {
+  border-bottom-color: #E2E8F0;
 }
 </style>
