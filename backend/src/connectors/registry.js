@@ -177,7 +177,7 @@ class BillzConnector extends BaseConnector {
       },
       {
         name: 'billz_get_sales',
-        description: 'Get total sales revenue, average receipt, and transaction count for today or specified date',
+        description: 'Get total sales revenue, transaction count, per-receipt product lines and payment-method split for today or a specified date',
         parameters: { date: 'string', storeId: 'string' }
       },
       {

@@ -370,6 +370,108 @@ class AIEngine {
       "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" :
       "⚡ Primary Gateway: OpenAI GPT-4o";
 
+/**
+ * Renders the Billz sales report for one day or for a period.
+ *
+ * `null` means "this data source can't tell us" and must render as "ma'lumot yo'q",
+ * never as "0 so'm" — a fabricated zero reads as a real, confirmed figure.
+ *
+ * Product tables are wrapped in <details> so a 30-day report stays scannable: the owner
+ * sees a line per day and opens only the day they care about. marked() passes the raw
+ * HTML through and parses the markdown table inside it (the surrounding blank lines are
+ * what make that work), so the existing table toolbar still applies.
+ */
+function formatBillzSalesReport(d) {
+  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+  const count = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v} ta`;
+
+  const productTable = (products) => {
+    if (!products || !products.length) return '';
+    const rows = products.map((p, i) =>
+      `| ${i + 1} | ${p.name} | ${p.sku || '—'} | ${p.quantity} ${p.unit || 'dona'} | ${p.unitPrice.toLocaleString()} | ${p.totalPrice.toLocaleString()} |`
+    ).join('\n');
+    return `| # | Mahsulot | SKU | Soni | Dona narxi (so'm) | Summa (so'm) |\n` +
+           `|---|---|---|---|---|---|\n${rows}\n`;
+  };
+
+  const collapsible = (summary, body) => body
+    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n</details>\n\n`
+    : '';
+
+  const checkLines = (checks) => checks.map((c, i) => {
+    const head = `${i + 1}. **№${c.orderNumber}** — ${c.soldTime || c.soldAt || ''} | ${c.customerName} | ${money(c.totalPrice)}`;
+    const items = (c.products || []).length
+      ? c.products.map((p) => `   • ${p.name}${p.sku ? ` (${p.sku})` : ''} — ${p.quantity} ${p.unit} × ${money(p.unitPrice)} = ${money(p.totalPrice)}`).join('\n')
+      : `   • Mahsulot tafsiloti yo'q`;
+    return `${head}\n${items}`;
+  }).join('\n\n');
+
+  const header = d.isRange
+    ? `📅 **Davr:** ${d.displayDate}${d.periodLabel ? ` (${d.periodLabel})` : ''}\n\n🏪 **Filial:** ${d.branchName}\n\n`
+    : `📅 **Sana:** ${d.displayDate}\n\n🏪 **Filial:** ${d.branchName}\n\n`;
+
+  let body = '';
+
+  if (d.isRange) {
+    body += `## 📆 Kunlik savdo\n\n`;
+    if (!d.dailyBreakdown || !d.dailyBreakdown.length) {
+      body += `_Bu davrda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+    } else {
+      body += d.dailyBreakdown.map((day) => {
+        const line = `### ${day.displayDate} — ${money(day.totalSales)}\n` +
+          `🛒 ${count(day.checksCount)} chek | 📦 ${count(day.itemsCount)} mahsulot` +
+          (day.returnedAmount ? ` | ↩️ qaytarilgan: ${money(day.returnedAmount)}` : '') + `\n\n`;
+        const table = collapsible(
+          `📦 Mahsulotlar jadvali (${day.products.length} xil) — ochish uchun bosing`,
+          productTable(day.products)
+        );
+        const checks = collapsible(
+          `🧾 Cheklar tafsiloti (${day.checksCount} ta chek)`,
+          checkLines(day.checks)
+        );
+        const rets = day.returnedProducts && day.returnedProducts.length
+          ? collapsible(`↩️ Qaytarilgan mahsulotlar (${day.returnedProducts.length} xil)`, productTable(day.returnedProducts))
+          : '';
+        return line + table + checks + rets;
+      }).join('');
+    }
+  } else {
+    body += (d.checks && d.checks.length)
+      ? `🧾 **Cheklar tafsiloti:**\n\n${checkLines(d.checks)}\n\n` +
+        collapsible(`📦 Kun bo'yicha mahsulotlar jadvali (${d.soldProducts.length} xil)`, productTable(d.soldProducts))
+      : `_Bu kunda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+  }
+
+  const payments = (d.paymentBreakdown && d.paymentBreakdown.length)
+    ? `💳 **To'lov usullari bo'yicha:**\n` +
+      d.paymentBreakdown.map((p) => `• ${p.name}: ${money(p.amount)} (${p.checksCount} ta chek)`).join('\n') + `\n\n`
+    : `💳 **To'lovlar bo'yicha taqsimot:** ma'lumot yo'q\n\n`;
+
+  const returnsBlock = `↩️ **Qaytarilgan mahsulot:** ${money(d.returnedProducts)}` +
+    (d.returnedOrdersCount ? ` (${d.returnedOrdersCount} ta qaytarish)` : '') + `\n\n` +
+    ((d.returnedProductsList && d.returnedProductsList.length)
+      ? collapsible(`↩️ Qaytarilgan mahsulotlar jadvali (${d.returnedProductsList.length} xil)`, productTable(d.returnedProductsList))
+      : '');
+
+  const stockBlock = d.stock
+    ? `🏬 **Omborxonada qolgan tovar (Store Hadiya):** ${money(d.stock.totalValue)}\n` +
+      `   ${count(d.stock.positionsInStock)} pozitsiya | ${count(d.stock.totalUnits)} dona qoldiq\n\n`
+    : `🏬 **Omborxonada qolgan tovar:** ma'lumot yo'q\n\n`;
+
+  const totalsTitle = d.isRange ? `## 📊 Davr yakuni` : `## 📊 Kun yakuni`;
+
+  return header + body +
+    `${totalsTitle}\n\n` +
+    `💰 **Umumiy savdo:** ${money(d.totalSales)}\n\n` +
+    `🛒 **Cheklar:** ${count(d.checksCount)}\n\n` +
+    `📦 **Sotilgan mahsulotlar:** ${count(d.itemsSoldsCount)}\n\n` +
+    payments +
+    returnsBlock +
+    `📈 **Sof savdo (kirim):** ${money(d.netSales)}\n\n` +
+    stockBlock +
+    `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
+}
+
 function formatBillzConnectionReport(billzRes) {
   if (billzRes && billzRes.isRealData) {
     const h = billzRes.health || {};
@@ -505,17 +607,20 @@ function formatBillzConnectionReport(billzRes) {
       executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
     }
 
-    // 3. Billz Consolidated Daily Sales Report (reports.consolidated) Intent
+    // 3. Billz Sales Report Intent — one day ("bugungi hisobot", "1-avgust") or a period
+    //    ("1 haftalik hisobot", "oylik hisobot", "iyul oyi", "30 kunlik").
+    const isPeriodReportQuery = /hafta|oylik|\boy\b|\d{1,3}\s*kun(lik)?/i.test(lowerInput);
     const isDailyReportQuery = !hasAttachment && (
       lowerInput.includes('hisobot') ||
       lowerInput.includes('report') ||
       lowerInput.includes('bugun') ||
       lowerInput.includes('kecha') ||
+      isPeriodReportQuery ||
       /(\d{1,2})[-_\s]*(avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
       /\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/.test(lowerInput)
     );
 
-    if (isDailyReportQuery && (lowerInput.includes('billz') || lowerInput.includes('hisobot') || lowerInput.includes('savdo') || lowerInput.includes('bugun') || lowerInput.includes('kecha') || lowerInput.includes('avgust') || lowerInput.includes('sotuv'))) {
+    if (isDailyReportQuery && (lowerInput.includes('billz') || lowerInput.includes('hisobot') || lowerInput.includes('savdo') || lowerInput.includes('bugun') || lowerInput.includes('kecha') || lowerInput.includes('avgust') || lowerInput.includes('sotuv') || isPeriodReportQuery)) {
       const billzClient = require('./services/billzClientService');
       const consRes = await billzClient.getConsolidatedReport({ userMessage, date: userMessage });
 
@@ -534,33 +639,7 @@ function formatBillzConnectionReport(billzRes) {
         return { responseText, executedTools, modelMetadataBadge };
       }
 
-      const d = consRes.consolidatedData;
-      // `null` means "this data source can't tell us" — must render as "ma'lumot yo'q",
-      // never as "0 so'm", since a fabricated zero would be read as a real, confirmed
-      // figure (e.g. "0 chek" implies zero transactions happened, which is false).
-      const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
-      const count = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v} ta`;
-
-      const paymentsBlock = d.payments
-        ? `💳 To'lovlar:\n` +
-          `• Naqd: ${money(d.payments.naqd)}\n` +
-          `• Karta: ${money(d.payments.karta)}\n` +
-          `• Click: ${money(d.payments.click)}\n` +
-          `• Payme: ${money(d.payments.payme)}\n\n`
-        : `💳 To'lovlar bo'yicha taqsimot: ma'lumot yo'q\n\n`;
-
-      const responseText = `📅 Sana: ${d.displayDate}\n\n` +
-        `🏪 Filial:\n${d.branchName}\n\n` +
-        `💰 Savdo:\n${money(d.totalSales)}\n\n` +
-        `🛒 Cheklar:\n${count(d.checksCount)}\n\n` +
-        `📦 Sotilgan mahsulotlar:\n${count(d.itemsSoldsCount)}\n\n` +
-        `💵 O'rtacha chek:\n${money(d.averageCheck)}\n\n` +
-        paymentsBlock +
-        `↩️ Qaytarilgan mahsulot:\n${money(d.returnedProducts)}\n\n` +
-        `📈 Sof savdo:\n${money(d.netSales)}\n\n` +
-        (d.dataSourceNote ? `ℹ️ ${d.dataSourceNote}\n\n` : '') +
-        `⚠️ This report contains ONLY the Hadiya Store branch.`;
-
+      const responseText = formatBillzSalesReport(consRes.consolidatedData);
       return { responseText, executedTools, modelMetadataBadge };
     }
 
@@ -874,14 +953,12 @@ ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
      📦 Sotilgan mahsulotlar:
      [Sotilgan mahsulotlar soni] ta
 
-     💵 O'rtacha chek:
-     [O'rtacha chek miqdori] so'm
+     🧾 Cheklar tafsiloti: (tool natijasidagi 'checks' massividan HAR BIR chekni va uning ichidagi HAR BIR mahsulotni chiqar — mahsulot nomi, soni va summasi bilan. Bu bo'lim majburiy: egasi aynan chekda nima sotilganini ko'rmoqchi.)
+     1. №[chek raqami] — [vaqt] | [mijoz] | [chek summasi] so'm
+        • [Mahsulot nomi] — [soni] dona × [dona narxi] = [summa] so'm
 
-     💳 To'lovlar: (FAQAT agar tool natijasida 'payments' obyekti haqiqiy raqamlar bilan kelgan bo'lsa, shu qatorlarni chiqar — bo'lmasa BUTUN "To'lovlar" bo'limini butunlay tashlab ket. HECH QACHON "..." yoki boshqa placeholder yozma — bu mavjud bo'lmagan ma'lumotni o'ylab topayotganingni bildiradi.)
-     • Naqd: [haqiqiy raqam]
-     • Karta: [haqiqiy raqam]
-     • Click: [haqiqiy raqam]
-     • Payme: [haqiqiy raqam]
+     💳 To'lov usullari bo'yicha: (FAQAT tool natijasidagi 'paymentBreakdown' massivi kelgan bo'lsa chiqar — har bir elementni o'z nomi bilan yoz: Naqd, Karta, Uzum, Click, Payme, Nasiya va h.k. 'paymentBreakdown' null bo'lsa BUTUN bo'limni tashlab ket. HECH QACHON o'zingdan to'lov usuli yoki raqam qo'shma.)
+     • [To'lov usuli nomi]: [haqiqiy raqam] so'm ([chek soni] ta chek)
 
      ↩️ Qaytarilgan mahsulot:
      [Qaytarilgan mahsulot] so'm
