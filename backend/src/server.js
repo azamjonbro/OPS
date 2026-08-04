@@ -1,5 +1,3 @@
-require('dotenv').config({ path: '../.env.dev' });
-require('dotenv').config({ path: './.env.dev' });
 require('dotenv').config();
 
 const express = require('express');
@@ -25,7 +23,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ai_workspace';
+const MONGO_URI = process.env.MONGO_URI;
 
 // Services
 const billzSyncService = require('./services/billzSyncService');
@@ -59,6 +57,7 @@ async function seedInitialData() {
 }
 
 // Connect to MongoDB
+console.log("MONGO_URI =", process.env.MONGO_URI);
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
   .then(async () => {
     console.log('🍃 MongoDB connected successfully via Mongoose');
