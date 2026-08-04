@@ -1,105 +1,194 @@
-require('dotenv').config();
+const path = require("path");
 
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
+// .env faylini aniq yuklash
+require("dotenv").config({
+  path: path.resolve(__dirname, "../../.env"),
+});
+
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
 
 // Routes
-const chatRoutes = require('./routes/chatRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const scheduleRoutes = require('./routes/scheduleRoutes');
-const calendarRoutes = require('./routes/calendarRoutes');
-const taskRoutes = require('./routes/taskRoutes');
+const chatRoutes = require("./routes/chatRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const scheduleRoutes = require("./routes/scheduleRoutes");
+const calendarRoutes = require("./routes/calendarRoutes");
+const taskRoutes = require("./routes/taskRoutes");
 
-// Models (for startup cleanup / seeding)
-const Conversation = require('./models/Conversation');
-const Schedule = require('./models/Schedule');
-const Integration = require('./models/Integration');
-const AIModel = require('./models/AIModel');
-const Settings = require('./models/Settings');
+// Models
+const Conversation = require("./models/Conversation");
+const Schedule = require("./models/Schedule");
+const Integration = require("./models/Integration");
+const AIModel = require("./models/AIModel");
+const Settings = require("./models/Settings");
+
+// Services
+const billzSyncService = require("./services/billzSyncService");
+const connectorRegistry = require("./connectors/registry");
 
 const app = express();
+
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
 
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI;
 
-// Services
-const billzSyncService = require('./services/billzSyncService');
+if (!MONGO_URI) {
+  console.error("❌ MONGO_URI topilmadi!");
+  console.error("Qidirilgan joy:", path.resolve(__dirname, "../../.env"));
+  process.exit(1);
+}
 
-// Seed baseline collections on first boot (only runs if the collection is empty)
+console.log(
+  "📦 Mongo URI:",
+  MONGO_URI.replace(/\/\/.*@/, "//****:****@")
+);
+
+// Seed baseline collections
 async function seedInitialData() {
   const integrationCount = await Integration.countDocuments();
+
   if (integrationCount === 0) {
     await Integration.insertMany([
-      { type: 'BILLZ', name: 'Billz Retail POS Integration', status: 'CONNECTED' },
-      { type: 'NOTION', name: 'Notion Workspace Sync', status: 'CONNECTED' },
-      { type: 'TELEGRAM', name: 'Telegram Channel Notification Engine', status: 'CONNECTED' },
-      { type: 'CALENDAR', name: 'Google Calendar Sync', status: 'CONNECTED' }
+      {
+        type: "BILLZ",
+        name: "Billz Retail POS Integration",
+        status: "CONNECTED",
+      },
+      {
+        type: "NOTION",
+        name: "Notion Workspace Sync",
+        status: "CONNECTED",
+      },
+      {
+        type: "TELEGRAM",
+        name: "Telegram Channel Notification Engine",
+        status: "CONNECTED",
+      },
+      {
+        type: "CALENDAR",
+        name: "Google Calendar Sync",
+        status: "CONNECTED",
+      },
     ]);
   }
 
   const modelCount = await AIModel.countDocuments();
+
   if (modelCount === 0) {
     await AIModel.insertMany([
-      { provider: 'OpenAI', modelName: 'gpt-4o', displayName: 'OpenAI GPT-4o', isDefault: true, latencyMs: 180 },
-      { provider: 'Anthropic', modelName: 'claude-3-5-sonnet', displayName: 'Anthropic Claude 3.5 Sonnet', isDefault: false, latencyMs: 210 },
-      { provider: 'OpenAI', modelName: 'whisper-1', displayName: 'OpenAI Whisper v3 Audio', isDefault: false, latencyMs: 140 }
+      {
+        provider: "OpenAI",
+        modelName: "gpt-4o",
+        displayName: "OpenAI GPT-4o",
+        isDefault: true,
+        latencyMs: 180,
+      },
+      {
+        provider: "Anthropic",
+        modelName: "claude-3-5-sonnet",
+        displayName: "Anthropic Claude 3.5 Sonnet",
+        isDefault: false,
+        latencyMs: 210,
+      },
+      {
+        provider: "OpenAI",
+        modelName: "whisper-1",
+        displayName: "OpenAI Whisper v3 Audio",
+        isDefault: false,
+        latencyMs: 140,
+      },
     ]);
   }
 
   await Settings.findOneAndUpdate(
-    { key: 'dual_llm' },
-    { $setOnInsert: { enabled: true, primaryModel: 'OpenAI GPT-4o', consensusModel: 'Anthropic Claude 3.5 Sonnet' } },
+    { key: "dual_llm" },
+    {
+      $setOnInsert: {
+        enabled: true,
+        primaryModel: "OpenAI GPT-4o",
+        consensusModel: "Anthropic Claude 3.5 Sonnet",
+      },
+    },
     { upsert: true }
   );
 }
 
-// Connect to MongoDB
-console.log("MONGO_URI =", process.env.MONGO_URI);
-mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
-  .then(async () => {
-    console.log('🍃 MongoDB connected successfully via Mongoose');
+// Mongo ulanish
+async function startServer() {
+  try {
+    await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+
+    console.log("🍃 MongoDB connected successfully");
+
     try {
       await Promise.all([
-        Conversation.deleteMany({ title: { $in: ['Daily Sales & Operations', 'Meeting Schedule & Notion', 'Test Chat'] } }),
-        Schedule.deleteMany({ title: { $in: ['Daily Billz POS Sales Summary', 'Morning Meeting & Agenda Briefing'] } })
+        Conversation.deleteMany({
+          title: {
+            $in: [
+              "Daily Sales & Operations",
+              "Meeting Schedule & Notion",
+              "Test Chat",
+            ],
+          },
+        }),
+        Schedule.deleteMany({
+          title: {
+            $in: [
+              "Daily Billz POS Sales Summary",
+              "Morning Meeting & Agenda Briefing",
+            ],
+          },
+        }),
       ]);
+
       await seedInitialData();
-    } catch (e) {
-      console.error('Startup seed error:', e.message);
+    } catch (err) {
+      console.error("Startup seed error:", err);
     }
 
-    // Start Daily Automated Billz POS -> MongoDB Synchronization
     billzSyncService.startDailyCronJob();
-  })
-  .catch((err) => {
-    console.error('🔴 MongoDB connection failed:', err.message);
-    billzSyncService.startDailyCronJob();
-  });
 
-// Mount API Routers
-app.use('/api/chat', chatRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/schedules', scheduleRoutes);
-app.use('/api/calendar', calendarRoutes);
-app.use('/api/tasks', taskRoutes);
-// Billz Integration Endpoints
-const connectorRegistry = require('./connectors/registry');
-app.get('/api/integrations/billz/health', async (req, res) => {
-  const billzConnector = connectorRegistry.get('BILLZ');
+    app.listen(PORT, () => {
+      console.log(`🚀 Backend running on http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ MongoDB connection error");
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+// Routes
+app.use("/api/chat", chatRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/calendar", calendarRoutes);
+app.use("/api/tasks", taskRoutes);
+
+// Billz
+app.get("/api/integrations/billz/health", async (req, res) => {
+  const billzConnector = connectorRegistry.get("BILLZ");
   const health = await billzConnector.checkHealth();
   res.json(health);
 });
 
-app.get('/api/integrations/billz/sales', async (req, res) => {
+app.get("/api/integrations/billz/sales", async (req, res) => {
   const { date, daysCount, period } = req.query;
-  const billzClient = require('./services/billzClientService');
-  const salesData = await billzClient.getSales({ date: date || '2026-05-25', daysCount: daysCount ? parseInt(daysCount, 10) : 0, label: period });
-  res.json(salesData);
-});
 
-app.listen(PORT, () => {
-  console.log(`🚀 Node.js Express Backend (MVC Architecture) running on http://localhost:${PORT}`);
+  const billzClient = require("./services/billzClientService");
+
+  const salesData = await billzClient.getSales({
+    date: date || "2026-05-25",
+    daysCount: daysCount ? parseInt(daysCount, 10) : 0,
+    label: period,
+  });
+
+  res.json(salesData);
 });
