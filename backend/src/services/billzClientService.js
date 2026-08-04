@@ -25,6 +25,17 @@ const MONTH_NAMES_UZ = [
   'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
 ];
 
+const MONTH_ALT = Object.keys(MONTHS_UZ).join('|');
+// Uzbek declines the month: "31 chi iyulNI", "avgustDA", "iyulDAGI". Without these
+// endings a trailing \b fails and the date silently falls back to today. The list is
+// closed on purpose — a bare [a-z]* would read "3 maydonda" as 3-May.
+const MONTH_SUFFIX = '(?:ning|niki|dagi|gacha|ni|da|dan|ga|si|i)?';
+const DAY_MONTH_RE = new RegExp(
+  `(\\d{1,2})[-_\\s]*(?:chi|inchi|nchi)?[-_\\s]*(${MONTH_ALT})${MONTH_SUFFIX}\\b(?:[-_\\s]*(20\\d{2}))?`, 'i'
+);
+const MONTH_ONLY_RE = new RegExp(`\\b(${MONTH_ALT})${MONTH_SUFFIX}\\b`, 'i');
+const ISO_DATE_RE = /\b20\d{2}[-/](?:0[1-9]|1[0-2])[-/](?:0[1-9]|[12]\d|3[01])\b/;
+
 // Billz returns measurement units with their Russian short names.
 const UNIT_NAME_UZ = {
   'шт': 'dona',
@@ -305,11 +316,11 @@ class BillzClientService {
         targetMonth = parseInt(isoMatch[2], 10) - 1;
         targetDay = parseInt(isoMatch[3], 10);
       } else {
-        const dmMatch = lower.match(/(\d{1,2})[-_\s]*(chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b(?:[-_\s]*(20\d{2}))?/);
+        const dmMatch = lower.match(DAY_MONTH_RE);
         if (dmMatch) {
           targetDay = parseInt(dmMatch[1], 10);
-          targetMonth = MONTHS_UZ[dmMatch[3]];
-          if (dmMatch[4]) targetYear = parseInt(dmMatch[4], 10);
+          targetMonth = MONTHS_UZ[dmMatch[2]];
+          if (dmMatch[3]) targetYear = parseInt(dmMatch[3], 10);
         }
       }
     }
@@ -322,6 +333,17 @@ class BillzClientService {
       dateEnd: end.toISOString(),
       displayDate: `${targetDay}-${MONTH_NAMES_UZ[targetMonth]} ${targetYear}`
     };
+  }
+
+  /**
+   * Does this message name a concrete day? Routing asks this before handing the message
+   * to the report path, and it must agree with parseReportPeriod — when the two used
+   * different patterns, "31 chi iyulni savdosi" was routed away from the report and
+   * answered with an improvised layout instead.
+   */
+  hasExplicitDateReference(text) {
+    const lower = (text || '').toLowerCase();
+    return /kecha|yesterday|bugun|today/.test(lower) || ISO_DATE_RE.test(lower) || DAY_MONTH_RE.test(lower);
   }
 
   /** `2026-08-02` → `2-Avgust 2026`. */
@@ -356,20 +378,20 @@ class BillzClientService {
     });
 
     // "2026-07-26 dan 2026-08-01 gacha" — an explicitly stated range wins over everything.
-    const isoDates = lower.match(/\b20\d{2}[-/](?:0[1-9]|1[0-2])[-/](?:0[1-9]|[12]\d|3[01])\b/g) || [];
+    const isoDates = lower.match(new RegExp(ISO_DATE_RE.source, 'g')) || [];
     if (isoDates.length >= 2) {
       const sorted = isoDates.map((d) => d.replace(/\//g, '-')).sort();
       return range(sorted[0], sorted[sorted.length - 1], 'Tanlangan davr');
     }
 
-    // A concrete single day ("kecha", "1-avgust", "2026-08-01") is never a period.
+    // A concrete single day ("kecha", "31 chi iyulni", "2026-08-01") is never a period.
     const hasExplicitDay = /kecha|yesterday|bugun|today/.test(lower)
       || isoDates.length === 1
-      || /\d{1,2}[-_\s]*(chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b/.test(lower);
+      || DAY_MONTH_RE.test(lower);
 
     if (!hasExplicitDay) {
       // "iyul oyi hisoboti" — a bare month name means that whole calendar month.
-      const monthOnly = lower.match(/\b(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b/);
+      const monthOnly = lower.match(MONTH_ONLY_RE);
       if (monthOnly) {
         const monthIdx = MONTHS_UZ[monthOnly[1]];
         const yearMatch = lower.match(/\b(20\d{2})\b/);

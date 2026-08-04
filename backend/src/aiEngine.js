@@ -609,21 +609,34 @@ function formatBillzConnectionReport(billzRes) {
       executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
     }
 
-    // 3. Billz Sales Report Intent — one day ("bugungi hisobot", "1-avgust") or a period
-    //    ("1 haftalik hisobot", "oylik hisobot", "iyul oyi", "30 kunlik").
+    // 3. Billz Sales Report Intent — one day ("bugungi hisobot", "31 chi iyulni savdosi")
+    //    or a period ("1 haftalik hisobot", "oylik hisobot", "iyul oyi", "30 kunlik").
+    //
+    // The day pattern must stay in step with billzClientService.parseDateToUtcRange —
+    // it accepts the "31 chi iyul" ordinal, and routing that missed it used to drop the
+    // question into the generic LLM branch, which then invented its own report layout.
+    const billzClient = require('./services/billzClientService');
+    const hasSalesWord = /hisobot|report|savdo|sotuv|sotilgan|sotildi|tushum|chek|kirim|kassa/i.test(lowerInput);
+    const hasExplicitDate = billzClient.hasExplicitDateReference(lowerInput);
     const isPeriodReportQuery = /hafta|oylik|\boy\b|\d{1,3}\s*kun(lik)?/i.test(lowerInput);
-    const isDailyReportQuery = !hasAttachment && (
-      lowerInput.includes('hisobot') ||
-      lowerInput.includes('report') ||
-      lowerInput.includes('bugun') ||
-      lowerInput.includes('kecha') ||
-      isPeriodReportQuery ||
-      /(\d{1,2})[-_\s]*(avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
-      /\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/.test(lowerInput)
-    );
 
-    if (isDailyReportQuery && (lowerInput.includes('billz') || lowerInput.includes('hisobot') || lowerInput.includes('savdo') || lowerInput.includes('bugun') || lowerInput.includes('kecha') || lowerInput.includes('avgust') || lowerInput.includes('sotuv') || isPeriodReportQuery)) {
-      const billzClient = require('./services/billzClientService');
+    // "hisobot" and "bugun" belong to every system the owner uses, not just Billz —
+    // "notionga bugun nimalar yozdim, hisobotini ber" is a Notion question. So a
+    // message that names another system is only a sales report when it also names
+    // Billz or a POS word (a receipt, a sale), never on the date word alone.
+    const namesOtherSystem = /notion|sahifa|workspace|\bpage\b|telegram|whatsapp|instagram|email|pochta/i.test(lowerInput);
+    const namesBillz = /billz|kassa|chek|savdo|sotuv|sotildi|sotilgan|tushum/i.test(lowerInput);
+
+    // Calendar and catalog questions also mention days and products, so they keep their
+    // own branches instead of being answered with a sales report.
+    const isCalendarQuery = /vazifa|task|uchrashuv|taqvim|calendar|event|reja|eslatma|nima qil|kun tartibi/i.test(lowerInput);
+    const isCatalogQuery = !hasSalesWord && /katalog|qoldiq|ombor|narx|mavjud|nechta bor/i.test(lowerInput);
+
+    const isSalesReportQuery = !hasAttachment && !isCalendarQuery && !isCatalogQuery &&
+      !(namesOtherSystem && !namesBillz) &&
+      (hasSalesWord || hasExplicitDate || isPeriodReportQuery);
+
+    if (isSalesReportQuery) {
       const consRes = await billzClient.getConsolidatedReport({ userMessage, date: userMessage });
 
       executedTools.push({
