@@ -7,8 +7,8 @@ export const getApiBase = () => {
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:4000';
   }
-  // If running on production (Vercel/Render)
-  return window.location.origin;
+  // Default production API host for deployed frontend
+  return 'https://ops.techinfo.uz';
 };
 
 export const API_BASE = getApiBase();
