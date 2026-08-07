@@ -16,18 +16,29 @@ function randomSecret() {
 /**
  * Telegram "Business" bots: once the business account owner connects this bot in
  * Settings > Business > Chatbots, Telegram forwards every customer message in that
- * account's chats to our webhook as a `business_message` update, tagged with a
- * `business_connection_id` that replies must be sent back through (via `sendMessage`
- * with that id) so Telegram delivers them as "the business", not as the bot.
+ * account's chats as a `business_message` update, tagged with a `business_connection_id`
+ * that replies must be sent back through (via `sendMessage` with that id) so Telegram
+ * delivers them as "the business", not as the bot.
+ *
+ * OPS NOTE (2026-08-07): the production host cannot accept inbound connections from
+ * Telegram's webhook callers (confirmed via getWebhookInfo: "Connection timed out"),
+ * while outbound HTTPS to api.telegram.org from that same host works fine. So instead of
+ * `setWebhook`, this service long-polls `getUpdates` — an outbound call we make to
+ * Telegram, not one Telegram makes to us — which sidesteps the inbound block entirely and
+ * needs no proxy (unlike the raw-MTProto userbot in telegramUserbotService.js, which *is*
+ * blocked outbound and does need one). The webhook route/controller are left in place but
+ * unused; nothing calls setWebhook anymore.
  */
 class TelegramBusinessService {
   constructor() {
     this.token = '';
     this.webhookSecret = '';
     this.botUsername = '';
+    this._polling = false;
+    this._updateOffset = 0;
   }
 
-  /** Warms the in-memory token from Mongo at server boot — no re-paste needed after a restart. */
+  /** Warms the in-memory token from Mongo at server boot, then resumes polling. */
   async loadFromDb() {
     try {
       const doc = await Integration.findOne({ type: INTEGRATION_TYPE });
@@ -36,9 +47,59 @@ class TelegramBusinessService {
       this.token = creds.token || '';
       this.webhookSecret = creds.webhookSecret || '';
       this.botUsername = creds.botUsername || '';
-      if (this.token) console.log(`🤖 Telegram Business bot loaded from DB (@${this.botUsername || 'unknown'})`);
+      if (this.token) {
+        console.log(`🤖 Telegram Business bot loaded from DB (@${this.botUsername || 'unknown'})`);
+        await this.startPolling();
+      }
     } catch (err) {
       console.error('Telegram Business loadFromDb error:', err.message);
+    }
+  }
+
+  /**
+   * getUpdates and an active webhook are mutually exclusive on Telegram's side (409
+   * Conflict) — deleteWebhook first, keeping any already-queued updates (drop_pending_updates
+   * stays false) so the switch doesn't lose messages that piled up while the webhook was
+   * broken. Then loops getUpdates with a 30s long-poll timeout for as long as the process runs.
+   */
+  async startPolling() {
+    if (!this.token || this._polling) return;
+    this._polling = true;
+
+    await this.apiCall('deleteWebhook', { drop_pending_updates: false });
+    console.log('📡 Telegram Business: polling for updates (getUpdates) instead of webhook');
+
+    this._pollLoop();
+  }
+
+  stopPolling() {
+    this._polling = false;
+  }
+
+  async _pollLoop() {
+    while (this._polling) {
+      try {
+        const res = await this.apiCall('getUpdates', {
+          offset: this._updateOffset,
+          timeout: 30,
+          allowed_updates: ['business_connection', 'business_message', 'edited_business_message']
+        });
+
+        if (res.ok && res.data && Array.isArray(res.data.result)) {
+          for (const update of res.data.result) {
+            this._updateOffset = update.update_id + 1;
+            await this.handleUpdate(update).catch((err) => {
+              console.error('Telegram business update handling error:', err.message);
+            });
+          }
+        } else if (!res.ok) {
+          console.error('Telegram getUpdates failed:', (res.data && res.data.description) || res.status);
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
+      } catch (err) {
+        console.error('Telegram business poll error:', err.message);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
     }
   }
 
