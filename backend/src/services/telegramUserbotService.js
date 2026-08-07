@@ -36,6 +36,25 @@ class TelegramUserbotService {
     this.apiHash = (process.env.TELEGRAM_API_HASH || '').trim();
   }
 
+  /**
+   * Raw MTProto (unlike the plain-HTTPS Bot API) is network-blocked on the production host —
+   * see the ops notes in services/telegramBusinessService.js. A SOCKS5 proxy with real
+   * Telegram DC access routes around it. Returns undefined (no proxy) if unconfigured, so
+   * this stays a no-op in any environment where the direct connection works fine.
+   */
+  loadProxyConfig() {
+    const ip = (process.env.TELEGRAM_PROXY_IP || '').trim();
+    const port = parseInt(process.env.TELEGRAM_PROXY_PORT || '0', 10);
+    if (!ip || !port) return undefined;
+    return {
+      socksType: 5,
+      ip,
+      port,
+      username: process.env.TELEGRAM_PROXY_USERNAME || undefined,
+      password: process.env.TELEGRAM_PROXY_PASSWORD || undefined
+    };
+  }
+
   isConfigured() {
     return !!this.apiId && !!this.apiHash;
   }
@@ -71,7 +90,10 @@ class TelegramUserbotService {
   }
 
   async _connectWithSession() {
-    const client = new TelegramClient(new StringSession(this.sessionString), this.apiId, this.apiHash, { connectionRetries: 3 });
+    const client = new TelegramClient(new StringSession(this.sessionString), this.apiId, this.apiHash, {
+      connectionRetries: 3,
+      proxy: this.loadProxyConfig()
+    });
     await client.connect();
     this.client = client;
     this.status = 'CONNECTED';
@@ -107,7 +129,10 @@ class TelegramUserbotService {
       this._pendingLogin = null;
     }
 
-    const client = new TelegramClient(new StringSession(''), this.apiId, this.apiHash, { connectionRetries: 3 });
+    const client = new TelegramClient(new StringSession(''), this.apiId, this.apiHash, {
+      connectionRetries: 3,
+      proxy: this.loadProxyConfig()
+    });
     await client.connect();
 
     try {
