@@ -3,6 +3,7 @@ const memoryUpdater = require('./services/memoryUpdater');
 const mailSenderFilter = require('./services/mailSenderFilter');
 const billzClientService = require('./services/billzClientService');
 const spreadsheetParser = require('./services/spreadsheetParser');
+const { classifyJson } = require('./services/llmClassify');
 const Schedule = require('./models/Schedule');
 
 // Local date key — toISOString() would roll back a day for any local time before 05:00
@@ -554,38 +555,17 @@ QOIDALAR:
  * the real POS catalog.
  */
 async function classifyImportIntent(userMessage, apiKey) {
-  if (!apiKey) return { shouldImport: false };
-
-  try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: `Foydalanuvchi bir Excel/CSV fayl biriktirdi — unda tovar/mahsulot ro'yxati bor (nomi, narxi, soni).
+  const parsed = await classifyJson({
+    apiKey,
+    systemPrompt: `Foydalanuvchi bir Excel/CSV fayl biriktirdi — unda tovar/mahsulot ro'yxati bor (nomi, narxi, soni).
 Uning xabariga qarab, u shu fayldagi tovarlarni BILLZ POS tizimiga (Hadiya Store filialiga) yangi mahsulot sifatida QO'SHISH/YARATISH/IMPORT qilishni so'rayaptimi, yoki shunchaki fayl haqida savol berayapti/tahlil so'rayaptimi (masalan "necha xil tovar bor", "eng qimmati qaysi", "shuni tushuntirib ber")?
 Faqat ANIQ "qo'sh", "yarat", "import qil", "billzga kirit", "/create" kabi buyruq bo'lsa true qil. Shubha bo'lsa false qo'y — noto'g'ri import qilish xatarli.
-Aynan shu JSON formatda javob ber: {"shouldImport": true/false}`
-          },
-          { role: 'user', content: userMessage || "(bo'sh xabar, faqat fayl biriktirilgan)" }
-        ]
-      })
-    });
+Aynan shu JSON formatda javob ber: {"shouldImport": true/false}`,
+    userContent: userMessage || "(bo'sh xabar, faqat fayl biriktirilgan)",
+    fallback: { shouldImport: false }
+  });
 
-    if (!resp.ok) return { shouldImport: false };
-    const data = await resp.json();
-    const raw = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    const parsed = raw ? JSON.parse(raw) : null;
-    return { shouldImport: !!(parsed && parsed.shouldImport === true) };
-  } catch (err) {
-    console.error('Import intent classify failed:', err.message);
-    return { shouldImport: false };
-  }
+  return { shouldImport: !!(parsed && parsed.shouldImport === true) };
 }
 
 /** Deterministic per-row report — never phrased as a narrative so a partial failure can't be glossed over. */

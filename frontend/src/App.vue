@@ -2,7 +2,8 @@
   <div class="h-screen bg-canvas text-gray-100 font-sans">
     <LoginPage v-if="!isAuthenticated" @login-success="onLoginSuccess" />
     <UserChat v-else-if="currentView === 'chat'" @switch-view="switchView" @logout="onLogout" />
-    <AdminDashboard v-else @switch-view="switchView" @logout="onLogout" />
+    <AdminLoginPage v-else-if="!isAdminAuthenticated" @admin-login-success="onAdminLoginSuccess" @back-to-chat="() => switchView('chat')" />
+    <AdminDashboard v-else @switch-view="switchView" @logout="onAdminLogout" />
   </div>
 </template>
 
@@ -10,16 +11,21 @@
 import UserChat from './components/UserChat.vue';
 import AdminDashboard from './components/AdminDashboard.vue';
 import LoginPage from './components/LoginPage.vue';
+import AdminLoginPage from './components/AdminLoginPage.vue';
 
 export default {
   components: {
     UserChat,
     AdminDashboard,
-    LoginPage
+    LoginPage,
+    AdminLoginPage
   },
   data() {
     return {
       isAuthenticated: localStorage.getItem('jarvis_auth') === 'true',
+      // Separate from the chat's demo login on purpose — this is the gate in front of
+      // API tokens/credentials, so it must be a real, server-verified session.
+      isAdminAuthenticated: !!localStorage.getItem('jarvis_admin_token'),
       currentView: 'chat'
     };
   },
@@ -61,6 +67,14 @@ export default {
       localStorage.removeItem('jarvis_auth');
       localStorage.removeItem('jarvis_user');
       window.history.pushState({}, '', '/');
+    },
+    onAdminLoginSuccess() {
+      this.isAdminAuthenticated = true;
+    },
+    onAdminLogout() {
+      this.isAdminAuthenticated = false;
+      localStorage.removeItem('jarvis_admin_token');
+      this.switchView('chat');
     }
   }
 };

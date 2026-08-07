@@ -131,6 +131,44 @@ class TelegramBusinessService {
     return { success: true, data: res.data.result };
   }
 
+  /** The "yozmoqda..." indicator on the customer's side — makes the AI reply feel human-timed. */
+  async sendChatAction({ businessConnectionId, chatId, action = 'typing' }) {
+    if (!this.token) return { success: false, error: 'Bot token sozlanmagan' };
+    const res = await this.apiCall('sendChatAction', {
+      business_connection_id: businessConnectionId,
+      chat_id: chatId,
+      action
+    });
+    if (!res.ok) return { success: false, error: (res.data && res.data.description) || 'sendChatAction failed' };
+    return { success: true };
+  }
+
+  /**
+   * Pings the account owner directly (regular sendMessage, no business_connection_id — this
+   * is a bot->owner DM, not a reply-as-the-business message) when the sales agent escalates.
+   * Requires the owner to have opened a chat with the bot at least once, per Bot API rules.
+   */
+  async notifyOwner(text) {
+    if (!this.token) return { success: false, error: 'Bot token sozlanmagan' };
+    const conn = await TelegramBusinessConnection.findOne({ isEnabled: true, telegramUserId: { $ne: '' } }).sort({ updatedAt: -1 }).lean();
+    if (!conn || !conn.telegramUserId) return { success: false, error: "Egasining Telegram user ID'si topilmadi" };
+
+    const res = await this.apiCall('sendMessage', { chat_id: conn.telegramUserId, text });
+    if (!res.ok) return { success: false, error: (res.data && res.data.description) || 'notifyOwner sendMessage failed' };
+    return { success: true, data: res.data.result };
+  }
+
+  /**
+   * The connection id needed to send as "the business" to ANY of its chats — it's one id
+   * per connected business account, not per customer chat. Used by the post-sync catch-up
+   * (telegramSalesAgent.catchUpUnansweredChats) to reply to chats that were only ever seen
+   * via the MTProto history sync and so never carried a businessConnectionId of their own.
+   */
+  async getActiveConnectionId() {
+    const conn = await TelegramBusinessConnection.findOne({ isEnabled: true }).sort({ updatedAt: -1 }).lean();
+    return conn ? conn.businessConnectionId : '';
+  }
+
   async upsertConnection(conn) {
     if (!conn || !conn.id) return;
     const rights = conn.rights || {};

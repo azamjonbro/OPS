@@ -26,6 +26,9 @@ const calendarRoutes = require("./routes/calendarRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const mailRoutes = require("./routes/mailRoutes");
 const telegramBusinessRoutes = require("./routes/telegramBusinessRoutes");
+const telegramUserbotRoutes = require("./routes/telegramUserbotRoutes");
+const authRoutes = require("./routes/authRoutes");
+const requireAdmin = require("./middleware/requireAdmin");
 
 // Models
 const Conversation = require("./models/Conversation");
@@ -38,6 +41,8 @@ const Settings = require("./models/Settings");
 const billzSyncService = require("./services/billzSyncService");
 const mailSyncService = require("./services/mailSyncService");
 const telegramBusinessService = require("./services/telegramBusinessService");
+const telegramUserbotService = require("./services/telegramUserbotService");
+const adminAuthService = require("./services/adminAuthService");
 const notionTaskSyncService = require("./services/notionTaskSyncService");
 const connectorRegistry = require("./connectors/registry");
 
@@ -175,6 +180,7 @@ async function startServer() {
       ]);
 
       await seedInitialData();
+      await adminAuthService.seedDefaultAdmin();
     } catch (err) {
       console.error("Startup seed error:", err);
     }
@@ -183,6 +189,8 @@ async function startServer() {
     mailSyncService.startBackgroundSync();
     notionTaskSyncService.startBackgroundSync();
     await telegramBusinessService.loadFromDb();
+    await telegramUserbotService.loadFromDb();
+    telegramUserbotService.startDailyCronJob();
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on http://localhost:${PORT}`);
@@ -197,13 +205,15 @@ async function startServer() {
 startServer();
 
 // Routes
+app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/admin", requireAdmin, adminRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/mail", mailRoutes);
 app.use("/api/telegram", telegramBusinessRoutes);
+app.use("/api/admin/telegram-userbot", requireAdmin, telegramUserbotRoutes);
 
 // Billz
 app.get("/api/integrations/billz/health", async (req, res) => {

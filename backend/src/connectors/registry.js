@@ -132,6 +132,31 @@ class TelegramBusinessConnector extends BaseConnector {
   }
 }
 
+/**
+ * MTProto userbot (services/telegramUserbotService.js) — a one-off/manual historical chat
+ * backfill, separate from the Business bot's real-time webhook. Registered here only for
+ * Connections Hub status visibility; it exposes no AI tool and never sends messages.
+ */
+class TelegramUserbotConnector extends BaseConnector {
+  constructor() {
+    super('TELEGRAM_USERBOT', 'Telegram Userbot (Tarix Sync)', "Egasining shaxsiy Telegram akkountiga ulanib, eski chat tarixini bir martalik sync qiladi");
+  }
+
+  getTools() {
+    return [];
+  }
+
+  async healthCheck() {
+    const telegramUserbotService = require('../services/telegramUserbotService');
+    const status = telegramUserbotService.getStatus();
+    return { isHealthy: status.connected, message: status.connected ? `Ulangan: ${status.phone || 'noma\'lum'}` : 'Ulanmagan' };
+  }
+
+  async executeTool() {
+    return { success: false, error: 'TELEGRAM_USERBOT registers no AI tools' };
+  }
+}
+
 class BillzConnector extends BaseConnector {
   constructor() {
     super('BILLZ', 'Billz POS Retail Integration', 'Real-time sales reports, inventory levels, and product creation');
@@ -1239,6 +1264,7 @@ class ConnectorRegistry {
     this.connectors = new Map();
     this.register(new TelegramConnector());
     this.register(new TelegramBusinessConnector());
+    this.register(new TelegramUserbotConnector());
     this.register(new BillzConnector());
     this.register(new NotionConnector());
     this.register(new MailConnector());

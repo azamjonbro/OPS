@@ -16,6 +16,9 @@
           <Icon name="back" size="sm" />
           <span>Back to User Chat</span>
         </button>
+        <button @click="$emit('logout')" class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium rounded-xl border border-rose-500/20 transition flex items-center gap-1.5">
+          <span>Chiqish</span>
+        </button>
       </div>
     </header>
 
@@ -269,22 +272,29 @@
     </main>
 
     <!-- Credential Config Modal -->
-    <ConnectionModal 
-      :isOpen="isModalOpen" 
-      :integration="selectedIntegration" 
-      @close="isModalOpen = false" 
+    <ConnectionModal
+      :isOpen="isModalOpen"
+      :integration="selectedIntegration"
+      @close="isModalOpen = false"
       @save="handleSaveCredentials"
+    />
+
+    <!-- Telegram Userbot (MTProto history sync) — separate stepped login flow -->
+    <TelegramUserbotModal
+      :isOpen="isUserbotModalOpen"
+      @close="isUserbotModalOpen = false"
     />
   </div>
 </template>
 
 <script>
 import ConnectionModal from './ConnectionModal.vue';
+import TelegramUserbotModal from './TelegramUserbotModal.vue';
 import ThemeToggle from './ui/ThemeToggle.vue';
 import { adminService } from '../services/adminService';
 
 export default {
-  components: { ConnectionModal, ThemeToggle },
+  components: { ConnectionModal, TelegramUserbotModal, ThemeToggle },
   data() {
     return {
       activeTab: 'integrations',
@@ -300,7 +310,8 @@ export default {
       systemPrompt: 'You are an executive AI Assistant capable of invoking Telegram, Billz, Notion, Google Calendar, and Email connectors.',
       defaultLanguage: localStorage.getItem('jarvis_lang') || 'en-US',
       isModalOpen: false,
-      selectedIntegration: null
+      selectedIntegration: null,
+      isUserbotModalOpen: false
     };
   },
   mounted() {
@@ -364,6 +375,12 @@ export default {
       }
     },
     openConfigModal(item) {
+      // TELEGRAM_USERBOT is a phone -> code -> 2FA login flow, not a single paste-a-token
+      // form, so it gets its own stepped modal instead of ConnectionModal.
+      if (item.type === 'TELEGRAM_USERBOT') {
+        this.isUserbotModalOpen = true;
+        return;
+      }
       this.selectedIntegration = item;
       this.isModalOpen = true;
     },
@@ -392,6 +409,7 @@ export default {
       const icons = {
         TELEGRAM: 'TG',
         TELEGRAM_BUSINESS: 'TG BIZ',
+        TELEGRAM_USERBOT: 'TG SYNC',
         BILLZ: 'BILLZ',
         NOTION: 'NOTION',
         MAIL: 'MAIL',
