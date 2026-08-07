@@ -118,7 +118,7 @@ class TelegramBusinessService {
   }
 
   /**
-   * Validates the token against Telegram, registers the webhook, and persists the
+   * Validates the token against Telegram, starts polling for updates, and persists the
    * result (encrypted) into Mongo. This is the whole "paste token -> it just works" flow.
    */
   async saveToken(rawToken) {
@@ -135,24 +135,13 @@ class TelegramBusinessService {
 
     const botUsername = (meRes.result && meRes.result.username) || '';
     const webhookSecret = randomSecret();
-    const webhookUrl = `${publicBaseUrl()}/api/telegram/business-webhook`;
 
-    // Set live before calling setWebhook — apiCall() reads this.token.
     this.token = token;
     this.webhookSecret = webhookSecret;
     this.botUsername = botUsername;
+    this._updateOffset = 0;
 
-    const hookRes = await this.apiCall('setWebhook', {
-      url: webhookUrl,
-      secret_token: webhookSecret,
-      allowed_updates: ['business_connection', 'business_message', 'edited_business_message']
-    });
-
-    if (!hookRes.ok) {
-      this.token = '';
-      this.webhookSecret = '';
-      return { success: false, error: (hookRes.data && hookRes.data.description) || 'setWebhook muvaffaqiyatsiz tugadi', botUsername };
-    }
+    await this.startPolling();
 
     await Integration.findOneAndUpdate(
       { type: INTEGRATION_TYPE },
@@ -160,14 +149,14 @@ class TelegramBusinessService {
         status: 'CONNECTED',
         name: 'Telegram Business Bot',
         credentialsEncrypted: crypto.encryptJson({ token, webhookSecret, botUsername }),
-        settings: JSON.stringify({ webhookUrl }),
+        settings: JSON.stringify({ mode: 'long-polling' }),
         healthCheckAt: new Date(),
         updatedAt: new Date()
       },
       { upsert: true }
     );
 
-    return { success: true, botUsername, webhookUrl };
+    return { success: true, botUsername, mode: 'long-polling' };
   }
 
   async healthCheck() {
