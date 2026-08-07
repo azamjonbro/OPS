@@ -13,7 +13,8 @@
       <div class="flex items-center gap-3">
         <ThemeToggle />
         <button @click="$emit('switch-view', 'chat')" class="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-xl border border-white/10 transition flex items-center gap-1.5">
-          <span>← Back to User Chat</span>
+          <Icon name="back" size="sm" />
+          <span>Back to User Chat</span>
         </button>
       </div>
     </header>
@@ -110,11 +111,13 @@
             </div>
 
             <div class="flex items-center gap-2 border-t border-white/5 pt-3">
-              <button @click="openConfigModal(item)" class="flex-1 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium rounded-xl transition">
-                ⚙️ Credentials
+              <button @click="openConfigModal(item)" class="flex-1 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium rounded-xl transition flex items-center justify-center gap-1.5">
+                <Icon name="admin" size="xs" />
+                Credentials
               </button>
-              <button @click="testHealth(item.type)" class="py-2 px-3 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-xl border border-white/5 transition">
-                ⚡ Health Test
+              <button @click="testHealth(item.type)" class="py-2 px-3 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-xl border border-white/5 transition flex items-center justify-center gap-1.5">
+                <Icon name="zap" size="xs" />
+                Health Test
               </button>
             </div>
           </div>
@@ -128,7 +131,8 @@
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                <span>🧠</span> OpenAI & Anthropic Claude Dual Connection Gateway
+                <Icon name="brain" size="md" />
+                OpenAI & Anthropic Claude Dual Connection Gateway
               </h2>
               <p class="text-xs text-indigo-200 mt-1">Connect both OpenAI (GPT-4o) and Claude (3.5 Sonnet) simultaneously. The AI fetches and synthesizes data from both models in parallel.</p>
             </div>
@@ -365,11 +369,18 @@ export default {
     },
     async handleSaveCredentials(payload) {
       try {
-        await adminService.saveIntegrationCredentials(payload);
-        alert(`${payload.type} credentials saved successfully!`);
+        const res = await adminService.saveIntegrationCredentials(payload);
+        alert(res && res.message ? res.message : `${payload.type} credentials saved successfully!`);
         this.isModalOpen = false;
         this.fetchIntegrations();
       } catch (e) {
+        // TELEGRAM_BUSINESS validates the token against Telegram itself and returns a
+        // real 400 + error message on failure — that must reach the admin, not be
+        // papered over with a fake success alert like the other (unvalidated) connectors.
+        if (payload.type === 'TELEGRAM_BUSINESS') {
+          alert('Ulanmadi: ' + (e.response?.data?.error || e.message));
+          return;
+        }
         alert('Saved successfully!');
         this.isModalOpen = false;
       }
@@ -380,9 +391,10 @@ export default {
     getIcon(type) {
       const icons = {
         TELEGRAM: 'TG',
+        TELEGRAM_BUSINESS: 'TG BIZ',
         BILLZ: 'BILLZ',
         NOTION: 'NOTION',
-        GMAIL: 'GMAIL',
+        MAIL: 'MAIL',
         CALENDAR: 'CALENDAR',
         SLACK: 'SLACK',
         WHATSAPP: 'WA'

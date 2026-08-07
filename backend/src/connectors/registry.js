@@ -3,6 +3,7 @@
  */
 
 const cache = require('../utils/cache');
+const emailService = require('../services/emailService');
 
 // Read-only tools worth caching, and how long their data stays fresh.
 // Anything absent from this map is treated as a write and always executes.
@@ -12,7 +13,12 @@ const READ_TOOL_TTL_MS = {
   billz_get_inventory: 5 * 60 * 1000,
   notion_search_workspace: 3 * 60 * 1000,
   notion_list_pages: 3 * 60 * 1000,
-  calendar_list_events: 30 * 1000
+  calendar_list_events: 30 * 1000,
+  // Mail changes fast, but a 90s window still turns a repeated question in the same
+  // minute into an instant cache hit instead of a fresh 5-15s IMAP round-trip, and lets
+  // the background mailSyncService pre-warm these before the owner ever asks.
+  mail_read_unread: 90 * 1000,
+  mail_read_by_date: 90 * 1000
 };
 
 // After a write succeeds, drop the cached reads it would have made stale.
@@ -58,13 +64,28 @@ class TelegramConnector extends BaseConnector {
     return [
       {
         name: 'telegram_send_message',
-        description: 'Send a message to a specific Telegram chat ID or group',
-        parameters: { chatId: 'string', text: 'string' }
+        description: 'Send a text message to a specific Telegram chat ID or group. Only call this when the owner explicitly asks to send/post something to Telegram.',
+        parameters: {
+          type: 'object',
+          properties: {
+            chatId: { type: 'string', description: 'Target chat ID, defaults to the admin channel if omitted' },
+            text: { type: 'string', description: 'The full message text to send, written out by you now. If the owner asked you to draft real content, write the complete content here, not a short paraphrase.' }
+          },
+          required: ['text']
+        }
       },
       {
         name: 'telegram_send_photo',
         description: 'Send a photo to Telegram',
-        parameters: { chatId: 'string', photoUrl: 'string', caption: 'string' }
+        parameters: {
+          type: 'object',
+          properties: {
+            chatId: { type: 'string' },
+            photoUrl: { type: 'string' },
+            caption: { type: 'string' }
+          },
+          required: ['photoUrl']
+        }
       }
     ];
   }
@@ -83,6 +104,31 @@ class TelegramConnector extends BaseConnector {
       };
     }
     return { success: true, data: { sent: true, photoUrl: params.photoUrl }, executionMs: Date.now() - startTime };
+  }
+}
+
+/**
+ * The customer-facing Telegram Business bot (webhook + auto-reply pipeline lives in
+ * services/telegramBusinessService.js + services/telegramSalesAgent.js). Registered here
+ * only so it shows up in the /helpadmin Connections Hub with a real health check — it
+ * exposes no AI tool, since the owner's private chat (aiEngine.js) has no reason to call it.
+ */
+class TelegramBusinessConnector extends BaseConnector {
+  constructor() {
+    super('TELEGRAM_BUSINESS', 'Telegram Business Bot (Savdo Yordamchisi)', 'Customer-facing sales bot connected to a Telegram Business account — syncs messages and auto-replies to sales inquiries');
+  }
+
+  getTools() {
+    return [];
+  }
+
+  async healthCheck() {
+    const telegramBusinessService = require('../services/telegramBusinessService');
+    return telegramBusinessService.healthCheck();
+  }
+
+  async executeTool() {
+    return { success: false, error: 'TELEGRAM_BUSINESS registers no AI tools' };
   }
 }
 
@@ -171,29 +217,44 @@ class BillzConnector extends BaseConnector {
   getTools() {
     return [
       {
+        name: 'billz_get_consolidated_report',
+        description: "Get the full daily or period sales report for the Hadiya Store branch — revenue, receipts, sold products, payment-method split, returns, and remaining stock value. Use this for any question about sales, revenue, receipts (chek), or a specific day/week/month report ('bugungi hisobot', '31-iyul savdosi', 'oxirgi 7 kunlik savdo').",
+        parameters: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', description: "The period being asked about, in the owner's own words or an ISO date: a single day ('2026-08-05', 'bugun', 'kecha', '31 iyul') or a period phrase ('oxirgi 7 kun', 'shu oy', 'bu hafta'). Omit to default to today." }
+          }
+        }
+      },
+      {
         name: 'billz_get_products',
-        description: 'Get full list of all products in Store Hadiya Billz POS inventory with SKU, stock, and prices',
-        parameters: { category: 'string', limit: 'number' }
-      },
-      {
-        name: 'billz_get_sales',
-        description: 'Get total sales revenue, transaction count, per-receipt product lines and payment-method split for today or a specified date',
-        parameters: { date: 'string', storeId: 'string' }
-      },
-      {
-        name: 'billz_get_inventory',
-        description: 'Inspect product stock levels in Billz inventory',
-        parameters: { productName: 'string' }
+        description: 'Get the full product catalog in Store Hadiya Billz POS inventory with SKU, stock levels, and prices. Use for catalog/stock/price questions, not for sales figures.',
+        parameters: {
+          type: 'object',
+          properties: {
+            category: { type: 'string' },
+            limit: { type: 'number' }
+          }
+        }
       },
       {
         name: 'billz_create_product',
-        description: 'Add a new product to Billz catalog',
-        parameters: { name: 'string', price: 'number', sku: 'string', quantity: 'number' }
+        description: 'Add a new product to the Billz catalog. Only call when the owner explicitly asks to add/create a new product.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            price: { type: 'number' },
+            sku: { type: 'string' },
+            quantity: { type: 'number' }
+          },
+          required: ['name', 'price']
+        }
       },
       {
         name: 'billz_test_endpoints',
-        description: 'Probe and test all Billz REST API endpoints with the integration token',
-        parameters: {}
+        description: 'Probe and test all Billz REST API endpoints with the integration token — use only when the owner explicitly asks to check/test the Billz connection.',
+        parameters: { type: 'object', properties: {} }
       }
     ];
   }
@@ -402,6 +463,20 @@ class BillzConnector extends BaseConnector {
       };
     }
 
+    if (toolName === 'billz_create_product') {
+      // Previously fell through to the health-check branch below and reported success
+      // without ever calling Billz — the owner was told a product was added when nothing
+      // had been created.
+      const res = await billzClient.createProduct(params || {});
+      return {
+        success: res.success,
+        isRealData: res.success,
+        data: res.data || { name: params && params.name },
+        error: res.error,
+        executionMs: Date.now() - startTime
+      };
+    }
+
     const health = await this.checkHealth();
     return {
       success: health.connected,
@@ -429,18 +504,26 @@ class NotionConnector extends BaseConnector {
     return [
       {
         name: 'notion_search_workspace',
-        description: 'Search Notion workspace pages, documents, projects, and databases',
-        parameters: { query: 'string' }
-      },
-      {
-        name: 'notion_list_pages',
-        description: 'List all top-level workspace pages in Notion',
-        parameters: {}
+        description: "Search and read Notion workspace pages, documents, projects, tasks, and databases (including database rows and page contents). Use this for ANY request to find, look up, or read something from Notion — never use notion_create_task for a lookup.",
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search keywords — a name, topic, or phrase to look for. Leave empty to browse recent/all pages.' }
+          }
+        }
       },
       {
         name: 'notion_create_task',
-        description: 'Create a new task page inside Notion Database',
-        parameters: { title: 'string', priority: 'string', assignee: 'string' }
+        description: "Save a brand-new INTERNAL page/task in the Notion workspace — for the owner's own records, not delivered to anyone. ONLY call this when the owner explicitly asks to add/create/save a NEW page or task for themselves (e.g. 'notionga yangi task qo'sh', 'shuni notionga saqlab qo'y'). Never call this to look something up, read, or send information elsewhere (that is notion_search_workspace) — and never call this when the owner names a recipient (an email address or a person to deliver something to): that is mail_send_email or telegram_send_message instead, even if the message also contains words like 'yarat'/'generate'/'yozib ber'.",
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Full title/content of the new page. If the owner asked you to draft real content (not just a reminder label), write the complete content here, not a short paraphrase of the request.' },
+            priority: { type: 'string' },
+            assignee: { type: 'string' }
+          },
+          required: ['title']
+        }
       }
     ];
   }
@@ -540,7 +623,14 @@ class NotionConnector extends BaseConnector {
     }
   }
 
-  async fetchPageBlocks(pageId, token) {
+  // `depth` bounds recursion into nested subpages: many workspaces model a "chat" or a
+  // topic as a hub page that just links out to child pages (see the "Hadiya" hub in this
+  // workspace — 10 child_page blocks, each holding the actual content). Without recursing
+  // at least one level, the owner only ever gets a list of subpage TITLES and the final
+  // answer has nothing to work with but a link. Capped at depth 1 and at MAX_SUBPAGES
+  // children so a hub with many subpages doesn't turn into dozens of API calls.
+  async fetchPageBlocks(pageId, token, depth = 0) {
+    const MAX_SUBPAGES = 8;
     try {
       const res = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=50`, {
         method: 'GET',
@@ -552,19 +642,32 @@ class NotionConnector extends BaseConnector {
       if (!res.ok) return [];
       const data = await res.json();
       const textContents = [];
+      const childPageBlocks = (data.results || []).filter((b) => b.type === 'child_page');
+      let expandedSubpages = 0;
+
       for (const b of (data.results || [])) {
         const type = b.type;
         if (b[type] && b[type].rich_text) {
           const text = b[type].rich_text.map(t => t.plain_text).join('');
           if (text) textContents.push(`${type.toUpperCase()}: ${text}`);
         } else if (type === 'child_page' && b.child_page) {
-          textContents.push(`SUBPAGE: ${b.child_page.title}`);
+          if (depth < 1 && expandedSubpages < MAX_SUBPAGES) {
+            expandedSubpages++;
+            const childLines = await this.fetchPageBlocks(b.id, token, depth + 1);
+            textContents.push(`SUBPAGE "${b.child_page.title}":`);
+            childLines.forEach((line) => textContents.push(`  ${line}`));
+          } else {
+            textContents.push(`SUBPAGE: ${b.child_page.title}`);
+          }
         } else if (type === 'child_database' && b.child_database) {
           // Expand embedded databases (e.g. a "Hodimlar" table living inside a page) into their actual rows
           const rows = await this.fetchDatabaseEntries(b.id, token);
           textContents.push(`DATABASE: ${b.child_database.title}`);
           rows.forEach(row => textContents.push(`  - ${row}`));
         }
+      }
+      if (depth < 1 && childPageBlocks.length > MAX_SUBPAGES) {
+        textContents.push(`... va yana ${childPageBlocks.length - MAX_SUBPAGES} ta pastki sahifa (mazmuni ochilmadi — aniq shu sahifa nomini so'rang)`);
       }
       return textContents;
     } catch (e) {
@@ -737,16 +840,119 @@ class NotionConnector extends BaseConnector {
   }
 }
 
-class GmailConnector extends BaseConnector {
+/**
+ * iCloud Mail over SMTP + IMAP. This used to report "SMTP Mail Server Connected" and
+ * return `sent: true` without touching a mail server, so a failed send looked identical
+ * to a successful one. Every call now goes through emailService and reports what the
+ * server actually answered.
+ */
+class MailConnector extends BaseConnector {
   constructor() {
-    super('GMAIL', 'Gmail & Email Dispatcher', 'Send emails via SMTP / OAuth2');
+    super('MAIL', 'iCloud Mail (SMTP + IMAP)', 'Send and read mail on the iCloud account from .env.dev');
   }
+
   getTools() {
-    return [{ name: 'gmail_send_email', description: 'Send an email', parameters: { to: 'string', subject: 'string', body: 'string' } }];
+    return [
+      {
+        name: 'mail_read_unread',
+        description: "Get every unread (unseen) message in the inbox right now. Use for 'o'qilmagan xatlar', 'kim yozgan lekin men o'qimadim', 'yangi xat bormi' style questions.",
+        parameters: { type: 'object', properties: {} }
+      },
+      {
+        name: 'mail_read_by_date',
+        description: "Get every message (read and unread, incoming and outgoing) sent or received on a specific day or date range. Use whenever the owner names a day ('bugun', 'kecha', '5-avgust') and asks what mail came in.",
+        parameters: {
+          type: 'object',
+          properties: {
+            startDate: { type: 'string', description: 'ISO date, e.g. 2026-08-05. Compute this yourself from the message and the current date.' },
+            endDate: { type: 'string', description: 'ISO date; same as startDate for a single day, or a later date for a range.' }
+          },
+          required: ['startDate']
+        }
+      },
+      {
+        name: 'mail_search_correspondence',
+        description: "Get the full mail history exchanged with ONE specific person (by name or email address) — how many messages, subjects, and the conversation itself. Use for 'X bilan qanday suhbat bo'lgan', 'X ga oxirgi marta qachon yozganman' style questions.",
+        parameters: {
+          type: 'object',
+          properties: {
+            person: { type: 'string', description: 'The name or email address of the person to search for' }
+          },
+          required: ['person']
+        }
+      },
+      {
+        name: 'mail_send_email',
+        description: "Compose and send a real email from the iCloud account. Call this whenever the owner names a recipient (an email address, or a person to deliver something to) and asks you to write/generate/send them something — a message, a report, a technical brief (TZ), anything. This is the tool for 'delivered to someone', as opposed to notion_create_task which only saves an internal note.",
+        parameters: {
+          type: 'object',
+          properties: {
+            to: { type: 'string', description: 'Recipient email address' },
+            subject: { type: 'string', description: 'A concrete subject line describing the content' },
+            body: { type: 'string', description: "The FULL email content, written out by you right now. If the owner asked you to generate/draft something (a technical specification, a plan, a report, a message to someone else), write the complete, substantive, well-structured document here — multiple paragraphs or sections as appropriate. Never put a short paraphrase of the request here; write the actual requested content in full." }
+          },
+          required: ['to', 'subject', 'body']
+        }
+      },
+      {
+        name: 'mail_read_inbox',
+        description: 'Read the newest messages from the iCloud inbox, most recent first — a general "check my mailbox" request with no date or unread filter.',
+        parameters: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number' },
+            mailbox: { type: 'string' }
+          }
+        }
+      }
+    ];
   }
-  async healthCheck() { return { isHealthy: true, message: 'SMTP Mail Server Connected' }; }
-  async executeTool(toolName, params) {
-    return { success: true, data: { sent: true, recipient: params.to, subject: params.subject }, executionMs: 85 };
+
+  async healthCheck() {
+    const health = await emailService.healthCheck();
+    if (health.connected) {
+      return {
+        isHealthy: true,
+        message: `iCloud Mail ulandi (${health.account}) — ${health.imap.totalMessages} xat, ${health.imap.unseen} o'qilmagan`,
+        details: health
+      };
+    }
+    const reason = health.message
+      || (health.smtp && health.smtp.error)
+      || (health.imap && health.imap.error)
+      || 'Noma\'lum xato';
+    return { isHealthy: false, message: `iCloud Mail ulanmadi: ${reason}`, details: health };
+  }
+
+  async executeTool(toolName, params = {}) {
+    if (toolName === 'mail_read_inbox') {
+      const res = await emailService.readEmails(params.limit || 10, params.mailbox || 'INBOX');
+      return { success: !!res.success, data: res, error: res.success ? undefined : res.message || res.error };
+    }
+
+    if (toolName === 'mail_read_unread') {
+      const res = await emailService.readEmails(50, 'INBOX', { unreadOnly: true });
+      return { success: !!res.success, data: res, error: res.success ? undefined : res.message || res.error };
+    }
+
+    if (toolName === 'mail_read_by_date') {
+      const start = params.startDate;
+      const end = params.endDate || params.startDate;
+      const res = await emailService.readEmailsByDate(start, end);
+      return { success: !!res.success, data: res, error: res.success ? undefined : res.message || res.error };
+    }
+
+    if (toolName === 'mail_search_correspondence') {
+      const res = await emailService.searchCorrespondence(params.person, { limit: 60 });
+      return { success: !!res.success, data: res, error: res.success ? undefined : res.message || res.error };
+    }
+
+    if (toolName === 'mail_send_email') {
+      const res = await emailService.sendEmail(params);
+      return { success: !!res.success, data: res, error: res.success ? undefined : res.message || res.error };
+    }
+
+    return { success: false, error: `Noma'lum mail tool: ${toolName}` };
   }
 }
 
@@ -756,47 +962,196 @@ class CalendarConnector extends BaseConnector {
   }
   getTools() {
     return [
-      { name: 'calendar_create_event', description: 'Schedule a meeting or task in Google Calendar', parameters: { title: 'string', startTime: 'string', date: 'string', priority: 'string' } },
-      { name: 'calendar_list_events', description: 'List upcoming Google Calendar events', parameters: { limit: 'number' } },
-      { name: 'calendar_update_event', description: 'Update an existing event in Google Calendar', parameters: { eventId: 'string', title: 'string', startTime: 'string' } },
-      { name: 'calendar_delete_event', description: 'Delete an event from Google Calendar', parameters: { eventId: 'string' } }
+      {
+        name: 'calendar_create_event',
+        description: "Create a new event/task/meeting on the calendar. Only call this when the owner is describing something to schedule, not when they are asking to see or change an existing one.",
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Short title describing what the event is about' },
+            startDate: { type: 'string', description: 'ISO date, e.g. 2026-08-07. Compute from the message and the current date.' },
+            startTime: { type: 'string', description: 'HH:mm 24h time, e.g. 14:00' },
+            endTime: { type: 'string', description: 'HH:mm 24h time; defaults to one hour after startTime if omitted' },
+            priority: { type: 'string', enum: ['Low', 'Medium', 'High', 'Urgent'] },
+            category: { type: 'string', enum: ['Meeting', 'Work', 'Deadline', 'Personal', 'Call', 'Project'] }
+          },
+          required: ['title', 'startDate']
+        }
+      },
+      {
+        name: 'calendar_list_events',
+        description: "List every task/event currently on the calendar. Use for 'vazifalarimni ko'rsat', 'bugungi taqvim' style questions.",
+        parameters: { type: 'object', properties: { limit: { type: 'number' } } }
+      },
+      {
+        name: 'calendar_update_event',
+        description: "Reschedule or edit the most recently created calendar event (e.g. 'ertangi meetingni 16:00 ga sur').",
+        parameters: {
+          type: 'object',
+          properties: {
+            startTime: { type: 'string', description: 'New HH:mm time' },
+            title: { type: 'string', description: 'New title, if it is changing' }
+          },
+          required: ['startTime']
+        }
+      },
+      {
+        name: 'calendar_delete_event',
+        description: "Delete the most recently created calendar event. Only call when the owner explicitly asks to remove/cancel a task or meeting.",
+        parameters: { type: 'object', properties: {} }
+      }
     ];
   }
   async healthCheck() { return { isHealthy: true, message: 'Google Calendar API Ready & Synced' }; }
-  async executeTool(toolName, params) {
+
+  async executeTool(toolName, params = {}) {
+    const CalendarEvent = require('../models/CalendarEvent');
+
     if (toolName === 'calendar_create_event') {
+      const startDate = params.startDate || new Date().toISOString().split('T')[0];
+      const startTime = params.startTime || '10:00';
+      const [h] = startTime.split(':');
+      const endHour = Math.min(23, parseInt(h, 10) + 1);
+      const endTime = params.endTime || `${String(endHour).padStart(2, '0')}:${startTime.split(':')[1] || '00'}`;
+
+      let dbEvt;
+      try {
+        dbEvt = await CalendarEvent.create({
+          title: params.title || 'Rejalashtirilgan Vazifa',
+          description: `AI Chat orqali avtomatik yaratildi: "${params.title || ''}"`,
+          startDate: new Date(startDate),
+          endDate: new Date(startDate),
+          startTime,
+          endTime,
+          priority: params.priority || 'Medium',
+          category: params.category || 'Work',
+          status: 'Pending',
+          createdBy: 'Azamjon (Store Hadiya)',
+          source: 'AI',
+          googleCalendarSynced: true
+        });
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+
+      const registry = require('./registry');
+      await registry.executeTool('telegram_send_message', {
+        chatId: '@admin_channel',
+        text: `📅 Yangi Taqvim Vazifasi: "${dbEvt.title}" (${startDate} ${startTime})`
+      }).catch(() => {});
+
       return {
         success: true,
         data: {
-          eventId: `gcal-${Date.now()}`,
-          title: params.title || 'Executive Meeting',
-          startTime: params.startTime || '09:00',
-          date: params.date || new Date().toISOString().split('T')[0],
-          status: 'CONFIRMED',
-          googleCalendarSynced: true
+          id: dbEvt._id.toString(),
+          title: dbEvt.title,
+          startDate,
+          startTime,
+          endTime,
+          priority: dbEvt.priority,
+          category: dbEvt.category
         },
-        executionMs: 110
+        executionMs: 0
       };
     }
+
+    if (toolName === 'calendar_list_events') {
+      try {
+        const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 }).limit(params.limit || 50).lean();
+        const events = dbEvts.map((e) => ({
+          id: e._id.toString(),
+          title: e.title,
+          startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
+          startTime: e.startTime,
+          endTime: e.endTime,
+          priority: e.priority,
+          category: e.category,
+          status: e.status
+        }));
+        return { success: true, data: { count: events.length, events } };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+
     if (toolName === 'calendar_update_event') {
-      return {
-        success: true,
-        data: { eventId: params.eventId, updated: true, newTime: params.startTime, title: params.title },
-        executionMs: 95
-      };
+      try {
+        const targetEvt = await CalendarEvent.findOne().sort({ createdAt: -1 });
+        if (!targetEvt) return { success: false, error: 'Taqvimda hech qanday vazifa topilmadi' };
+
+        if (params.startTime) {
+          targetEvt.startTime = params.startTime;
+          const h = parseInt(params.startTime.split(':')[0], 10) + 1;
+          targetEvt.endTime = `${String(Math.min(23, h)).padStart(2, '0')}:${params.startTime.split(':')[1] || '00'}`;
+        }
+        if (params.title) targetEvt.title = params.title;
+        targetEvt.updatedAt = new Date();
+        await targetEvt.save();
+
+        return {
+          success: true,
+          data: { id: targetEvt._id.toString(), title: targetEvt.title, startTime: targetEvt.startTime, startDate: targetEvt.startDate ? new Date(targetEvt.startDate).toISOString().split('T')[0] : '' }
+        };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
+
     if (toolName === 'calendar_delete_event') {
-      return {
-        success: true,
-        data: { eventId: params.eventId, deleted: true },
-        executionMs: 80
-      };
+      try {
+        const removed = await CalendarEvent.findOneAndDelete({}, { sort: { createdAt: -1 } });
+        if (!removed) return { success: false, error: 'Taqvimda o\'chiriladigan vazifa topilmadi' };
+        return { success: true, data: { deletedTitle: removed.title, deletedId: removed._id.toString() } };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
-    return {
-      success: true,
-      data: { eventsCount: 3, synced: true },
-      executionMs: 85
-    };
+
+    return { success: false, error: `Noma'lum calendar tool: ${toolName}` };
+  }
+}
+
+class SchedulerConnector extends BaseConnector {
+  constructor() {
+    super('SCHEDULER', 'Recurring Report Scheduler', 'Register recurring automated reports/reminders (daily, weekly)');
+  }
+  getTools() {
+    return [
+      {
+        name: 'scheduler_create_automation',
+        description: "Register a recurring automated task — e.g. 'har kuni soat 6 da savdo hisobotini yubor'. Only call when the owner asks for something to repeat on a schedule (daily/weekly), not for a one-off request.",
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Short name for the automation' },
+            prompt: { type: 'string', description: 'The instruction to re-run each time, in the owner\'s own words' },
+            frequency: { type: 'string', enum: ['DAILY', 'WEEKLY', 'ONCE'] },
+            scheduledTime: { type: 'string', description: 'HH:mm 24h time it should run at' }
+          },
+          required: ['prompt', 'scheduledTime']
+        }
+      }
+    ];
+  }
+  async healthCheck() { return { isHealthy: true, message: 'Scheduler Ready' }; }
+  async executeTool(toolName, params = {}) {
+    if (toolName !== 'scheduler_create_automation') {
+      return { success: false, error: `Noma'lum scheduler tool: ${toolName}` };
+    }
+    const Schedule = require('../models/Schedule');
+    try {
+      const item = await Schedule.create({
+        title: params.title || 'Avtomatik Hisobot',
+        prompt: params.prompt,
+        frequency: params.frequency || 'DAILY',
+        scheduledTime: params.scheduledTime || '06:00',
+        targetChannel: 'TELEGRAM',
+        isEnabled: true
+      });
+      return { success: true, data: { id: item._id.toString(), title: item.title, frequency: item.frequency, scheduledTime: item.scheduledTime } };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   }
 }
 
@@ -805,7 +1160,15 @@ class SlackConnector extends BaseConnector {
     super('SLACK', 'Slack Integration', 'Post messages to Slack channel');
   }
   getTools() {
-    return [{ name: 'slack_send_message', description: 'Post channel message', parameters: { channel: 'string', message: 'string' } }];
+    return [{
+      name: 'slack_send_message',
+      description: 'Post a message to a Slack channel. Only call when the owner explicitly asks to post to Slack.',
+      parameters: {
+        type: 'object',
+        properties: { channel: { type: 'string' }, message: { type: 'string' } },
+        required: ['message']
+      }
+    }];
   }
   async healthCheck() { return { isHealthy: true, message: 'Slack Webhook Ready' }; }
   async executeTool(toolName, params) {
@@ -818,7 +1181,15 @@ class WhatsAppConnector extends BaseConnector {
     super('WHATSAPP', 'WhatsApp Cloud API', 'Send WhatsApp messages');
   }
   getTools() {
-    return [{ name: 'whatsapp_send_message', description: 'Send WhatsApp text', parameters: { phone: 'string', message: 'string' } }];
+    return [{
+      name: 'whatsapp_send_message',
+      description: 'Send a WhatsApp text message. Only call when the owner explicitly asks to send a WhatsApp message.',
+      parameters: {
+        type: 'object',
+        properties: { phone: { type: 'string' }, message: { type: 'string' } },
+        required: ['phone', 'message']
+      }
+    }];
   }
   async healthCheck() { return { isHealthy: true, message: 'WhatsApp API Connected' }; }
   async executeTool(toolName, params) {
@@ -832,8 +1203,20 @@ class GithubConnector extends BaseConnector {
   }
   getTools() {
     return [
-      { name: 'github_run_analysis', description: 'Run full code lint, build, and git analysis', parameters: { projectPath: 'string' } },
-      { name: 'github_commit_and_push', description: 'Commit and push changes to remote repository', parameters: { message: 'string' } }
+      {
+        name: 'github_run_analysis',
+        description: 'Run full code lint, build, and git analysis on the project repository. Only call when the owner explicitly asks about code health, lint, or build status.',
+        parameters: { type: 'object', properties: { projectPath: { type: 'string' } } }
+      },
+      {
+        name: 'github_commit_and_push',
+        description: 'Commit and push changes to the remote repository. Only call when the owner explicitly asks to commit/push code.',
+        parameters: {
+          type: 'object',
+          properties: { message: { type: 'string' } },
+          required: ['message']
+        }
+      }
     ];
   }
   async healthCheck() { return { isHealthy: true, message: 'GitHub CLI Agent Ready' }; }
@@ -855,10 +1238,12 @@ class ConnectorRegistry {
   constructor() {
     this.connectors = new Map();
     this.register(new TelegramConnector());
+    this.register(new TelegramBusinessConnector());
     this.register(new BillzConnector());
     this.register(new NotionConnector());
-    this.register(new GmailConnector());
+    this.register(new MailConnector());
     this.register(new CalendarConnector());
+    this.register(new SchedulerConnector());
     this.register(new SlackConnector());
     this.register(new WhatsAppConnector());
     this.register(new GithubConnector());
@@ -874,6 +1259,24 @@ class ConnectorRegistry {
 
   get(type) {
     return this.connectors.get(type.toUpperCase());
+  }
+
+  /** Every registered tool, flattened into the OpenAI `tools` array shape. */
+  getOpenAiToolSchemas() {
+    const schemas = [];
+    for (const connector of this.connectors.values()) {
+      for (const tool of connector.getTools()) {
+        schemas.push({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters || { type: 'object', properties: {} }
+          }
+        });
+      }
+    }
+    return schemas;
   }
 
   async executeTool(toolName, params) {

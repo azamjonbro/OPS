@@ -9,6 +9,12 @@ export const taskService = {
     return res.data;
   },
 
+  /** Every task in a date range — the calendar's per-day task table reads this. */
+  async getTasksForRange(from, to) {
+    const res = await axios.get(TASKS_URL, { params: { from, to } });
+    return res.data;
+  },
+
   /** Per-day { total, done } counters used by the calendar grid indicators. */
   async getCounts(from, to) {
     const res = await axios.get(`${TASKS_URL}/counts`, { params: { from, to } });

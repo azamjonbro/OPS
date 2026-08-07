@@ -1,9 +1,18 @@
 const path = require("path");
+const fs = require("fs");
 
-// .env faylini aniq yuklash
-require("dotenv").config({
-  path: path.resolve(__dirname, "../../.env"),
-});
+// Konfiguratsiya fayli: avval .env, topilmasa .env.dev.
+// Loyihaning qolgan qismi (ENDPOINTS.md, connectors/registry.js) .env.dev dan o'qiydi,
+// shuning uchun faqat .env ni qidirish serverni sababsiz ishga tushmaydigan qilib qo'yardi.
+const ENV_CANDIDATES = [
+  path.resolve(__dirname, "../../.env"),
+  path.resolve(__dirname, "../../.env.dev"),
+];
+const envPath = ENV_CANDIDATES.find((p) => fs.existsSync(p));
+
+if (envPath) {
+  require("dotenv").config({ path: envPath });
+}
 
 const express = require("express");
 const cors = require("cors");
@@ -15,6 +24,8 @@ const adminRoutes = require("./routes/adminRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const calendarRoutes = require("./routes/calendarRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+const mailRoutes = require("./routes/mailRoutes");
+const telegramBusinessRoutes = require("./routes/telegramBusinessRoutes");
 
 // Models
 const Conversation = require("./models/Conversation");
@@ -25,6 +36,9 @@ const Settings = require("./models/Settings");
 
 // Services
 const billzSyncService = require("./services/billzSyncService");
+const mailSyncService = require("./services/mailSyncService");
+const telegramBusinessService = require("./services/telegramBusinessService");
+const notionTaskSyncService = require("./services/notionTaskSyncService");
 const connectorRegistry = require("./connectors/registry");
 
 const app = express();
@@ -37,7 +51,8 @@ const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
   console.error("❌ MONGO_URI topilmadi!");
-  console.error("Qidirilgan joy:", path.resolve(__dirname, "../../.env"));
+  console.error("Qidirilgan fayllar:", ENV_CANDIDATES.join("  |  "));
+  console.error("Topilgan fayl:", envPath || "(hech qaysi)");
   process.exit(1);
 }
 
@@ -103,6 +118,19 @@ async function seedInitialData() {
     ]);
   }
 
+  // The seed block above only runs on an empty collection, so an existing database
+  // would never learn about MAIL. Its status follows the credentials in .env.dev.
+  const emailService = require("./services/emailService");
+  await Integration.findOneAndUpdate(
+    { type: "MAIL" },
+    {
+      status: emailService.isConfigured() ? "CONNECTED" : "DISCONNECTED",
+      updatedAt: new Date(),
+      $setOnInsert: { name: "iCloud Mail (SMTP + IMAP)" },
+    },
+    { upsert: true }
+  );
+
   await Settings.findOneAndUpdate(
     { key: "dual_llm" },
     {
@@ -152,6 +180,9 @@ async function startServer() {
     }
 
     billzSyncService.startDailyCronJob();
+    mailSyncService.startBackgroundSync();
+    notionTaskSyncService.startBackgroundSync();
+    await telegramBusinessService.loadFromDb();
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on http://localhost:${PORT}`);
@@ -171,6 +202,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/mail", mailRoutes);
+app.use("/api/telegram", telegramBusinessRoutes);
 
 // Billz
 app.get("/api/integrations/billz/health", async (req, res) => {

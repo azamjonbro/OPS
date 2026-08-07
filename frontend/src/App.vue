@@ -20,27 +20,47 @@ export default {
   data() {
     return {
       isAuthenticated: localStorage.getItem('jarvis_auth') === 'true',
-      currentView: 'chat' // 'chat' or 'admin'
+      currentView: 'chat'
     };
   },
   mounted() {
-    if (window.location.pathname === '/calendar' || window.location.hash === '#/calendar') {
-      this.currentView = 'chat';
-    }
+    this.checkRoute();
+    window.addEventListener('popstate', this.checkRoute);
+    window.addEventListener('hashchange', this.checkRoute);
+  },
+  beforeUnmount() {
+    window.removeEventListener('popstate', this.checkRoute);
+    window.removeEventListener('hashchange', this.checkRoute);
   },
   methods: {
+    checkRoute() {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path === '/helpadmin' || hash === '#/helpadmin' || path.endsWith('/helpadmin')) {
+        this.currentView = 'admin';
+      } else {
+        this.currentView = 'chat';
+      }
+    },
     switchView(viewName) {
       this.currentView = viewName;
+      if (viewName === 'admin') {
+        window.history.pushState({}, '', '/helpadmin');
+      } else {
+        window.history.pushState({}, '', '/');
+      }
     },
     onLoginSuccess(userData) {
       this.isAuthenticated = true;
       localStorage.setItem('jarvis_auth', 'true');
       localStorage.setItem('jarvis_user', JSON.stringify(userData));
+      this.checkRoute();
     },
     onLogout() {
       this.isAuthenticated = false;
       localStorage.removeItem('jarvis_auth');
       localStorage.removeItem('jarvis_user');
+      window.history.pushState({}, '', '/');
     }
   }
 };

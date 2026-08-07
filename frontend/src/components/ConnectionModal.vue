@@ -23,6 +23,17 @@
         </div>
       </div>
 
+      <!-- Telegram Business Bot Fields -->
+      <div v-else-if="integration?.type === 'TELEGRAM_BUSINESS'" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-300 mb-1">Bot Token (@BotFather)</label>
+          <input v-model="formData.botToken" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+        </div>
+        <p class="text-[11px] text-gray-400 leading-relaxed">
+          Webhook avtomatik ravishda sozlanadi — boshqa hech narsa kiritish shart emas. Saqlagandan keyin bu botni Telegram ilovasida Sozlamalar → Biznes → Chatbotlar bo'limidan ulang va "Reply to messages" ruxsatini bering.
+        </p>
+      </div>
+
       <!-- Billz Fields -->
       <div v-else-if="integration?.type === 'BILLZ'" class="space-y-3">
         <div>

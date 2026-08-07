@@ -55,7 +55,40 @@
 
     <!-- BOARD -->
     <main class="flex-1 overflow-y-auto p-4 sm:p-6">
-      <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 items-start">
+      <div class="max-w-7xl mx-auto space-y-4 sm:space-y-5">
+
+        <!-- CALENDAR EVENTS FOR THIS DAY — a separate data model from tasks (booked
+             meetings/deliveries vs. a to-do board). Shown here, clearly labeled, so
+             opening a day that has an event but no tasks never looks like the event
+             vanished — before this, the board below was the only thing rendered and a
+             day with "1 item" in the week strip but zero tasks looked broken. -->
+        <section v-if="events.length" class="rounded-2xl border border-line bg-surface overflow-hidden">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-line">
+            <Icon name="calendar" size="sm" />
+            <h2 class="text-xs font-bold text-white tracking-wide uppercase">Taqvim eventlari</h2>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-gray-400 tabular-nums">{{ events.length }}</span>
+          </div>
+          <div class="p-3 flex flex-wrap gap-2.5">
+            <button
+              v-for="evt in events"
+              :key="evt.id"
+              @click="$emit('edit-event', evt)"
+              class="text-left rounded-xl border border-line bg-card hover:border-indigo-500/40 hover:bg-raised transition px-3 py-2.5 min-w-[220px] flex-1 sm:flex-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border" :class="priorityClass(evt.priority)">{{ evt.priority }}</span>
+                <span class="text-[10px] font-mono text-gray-400">{{ evt.startTime }}{{ evt.endTime ? ' - ' + evt.endTime : '' }}</span>
+              </div>
+              <div class="text-xs font-semibold text-white mt-1.5 leading-snug">{{ evt.title }}</div>
+              <div class="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                <Icon name="tag" size="xs" />
+                {{ evt.category }}
+              </div>
+            </button>
+          </div>
+        </section>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 items-start">
 
         <section
           v-for="col in columns"
@@ -185,7 +218,9 @@
                 v-if="tasksByStatus[col.status].length === 0"
                 class="rounded-xl border border-dashed border-hover py-8 px-3 text-center"
               >
-                <div class="text-2xl mb-1.5 opacity-40">{{ col.emptyIcon }}</div>
+                <div class="flex justify-center mb-1.5 opacity-40">
+                  <Icon :name="col.emptyIcon" size="xl" />
+                </div>
                 <p class="text-[11px] text-gray-500 leading-relaxed">{{ col.emptyText }}</p>
                 <button
                   v-if="col.status === 'Todo'"
@@ -196,6 +231,7 @@
             </template>
           </div>
         </section>
+      </div>
       </div>
     </main>
 
@@ -284,18 +320,22 @@ import { nextTick } from 'vue';
 import taskService from '../services/taskService';
 import { formatLongDate, todayKey, addDays, errorText } from '../utils/date';
 
+// emptyIcon: a semantic name resolved by the shared <Icon> component.
 const COLUMNS = [
-  { status: 'Todo',  label: 'To Do',  dot: 'bg-amber-400',   next: 'Doing', prev: null,    emptyIcon: '📝', emptyText: 'Bu ustun bo\'sh. Kun rejasini shu yerdan boshlang.' },
-  { status: 'Doing', label: 'Doing',  dot: 'bg-cyan-400',    next: 'Done',  prev: 'Todo',  emptyIcon: '⚡', emptyText: 'Hozircha jarayondagi vazifa yo\'q.' },
-  { status: 'Done',  label: 'Done',   dot: 'bg-emerald-400', next: null,    prev: 'Doing', emptyIcon: '✅', emptyText: 'Hali hech narsa bajarilmadi.' }
+  { status: 'Todo',  label: 'To Do',  dot: 'bg-amber-400',   next: 'Doing', prev: null,    emptyIcon: 'pencil', emptyText: 'Bu ustun bo\'sh. Kun rejasini shu yerdan boshlang.' },
+  { status: 'Doing', label: 'Doing',  dot: 'bg-cyan-400',    next: 'Done',  prev: 'Todo',  emptyIcon: 'zap',    emptyText: 'Hozircha jarayondagi vazifa yo\'q.' },
+  { status: 'Done',  label: 'Done',   dot: 'bg-emerald-400', next: null,    prev: 'Doing', emptyIcon: 'check-circle', emptyText: 'Hali hech narsa bajarilmadi.' }
 ];
 
 export default {
   name: 'DayPlanner',
   props: {
-    dayKey: { type: String, required: true }
+    dayKey: { type: String, required: true },
+    // Calendar events for this day, passed down from CalendarWorkspace's own event list
+    // rather than fetched again here — it already loaded them for the week strip.
+    events: { type: Array, default: () => [] }
   },
-  emits: ['back', 'changed', 'navigate'],
+  emits: ['back', 'changed', 'navigate', 'edit-event'],
   data() {
     return {
       columns: COLUMNS,

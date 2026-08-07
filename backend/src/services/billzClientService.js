@@ -291,6 +291,61 @@ class BillzClientService {
   }
 
   /**
+   * Creates one new product in the Billz catalog, priced and stocked for Store Hadiya
+   * specifically (mirrors the exact field names getProducts() reads back: shop_prices /
+   * shop_measurement_values keyed by shop_id — the only write-shape signal available,
+   * since this project has never had a create-product call to reverse-engineer from a
+   * real response. NOT verified end-to-end against a live Billz account yet — the first
+   * real call should be checked against the `responseBody` this returns on failure.
+   */
+  async createProduct(product) {
+    const token = await this.getAccessToken();
+    if (!token) return { success: false, error: 'Billz token topilmadi (BILLZ_TOKEN)' };
+
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v2/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: product.name,
+          sku: product.sku || undefined,
+          barcode: product.barcode || undefined,
+          shop_prices: [{ shop_id: this.storeHadiyaId, retail_price: product.price, supply_price: product.price }],
+          shop_measurement_values: [{ shop_id: this.storeHadiyaId, active_measurement_value: product.quantity || 0 }]
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        return {
+          success: false,
+          error: (data.error && data.error.message) || data.message || `HTTP ${res.status}`,
+          httpStatus: res.status,
+          responseBody: data
+        };
+      }
+
+      return { success: true, data: data.result || data };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Creates each row sequentially (not in parallel) so one bad row's error is unambiguous and we never burst past Billz's rate limits. */
+  async createProductsBulk(products) {
+    const results = [];
+    for (const product of products) {
+      const res = await this.createProduct(product);
+      results.push({ name: product.name, price: product.price, quantity: product.quantity, success: res.success, error: res.error });
+    }
+    const succeeded = results.filter((r) => r.success).length;
+    return { results, succeeded, failed: results.length - succeeded, total: results.length };
+  }
+
+  /**
    * Helper to convert natural language date inputs into exact UTC dateBegin and dateEnd (00:00:00Z)
    */
   parseDateToUtcRange(inputStr = 'bugun') {

@@ -59,6 +59,24 @@ const getIntegrations = asyncHandler(async (req, res) => {
 const updateIntegration = async (req, res) => {
   const { type } = req.params;
   const { credentials, settings } = req.body;
+
+  // Telegram Business needs a real network round-trip (validate the token, register the
+  // webhook) before it can report success — unlike the other connectors here, which just
+  // flip a DB status flag, "saved" must mean "actually connected" for this one.
+  if (type.toUpperCase() === 'TELEGRAM_BUSINESS') {
+    const telegramBusinessService = require('../services/telegramBusinessService');
+    const result = await telegramBusinessService.saveToken(credentials && credentials.botToken);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    return res.json({
+      success: true,
+      message: `Telegram Business bot @${result.botUsername} ulandi va webhook faollashtirildi!`,
+      botUsername: result.botUsername,
+      webhookUrl: result.webhookUrl
+    });
+  }
+
   const connector = connectorRegistry.get(type);
   if (connector) {
     connector.connect(credentials, settings);

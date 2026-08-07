@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const { TASK_STATUSES, TASK_PRIORITIES } = require('../models/Task');
 const asyncHandler = require('../utils/asyncHandler');
+const notionTaskSync = require('../services/notionTaskSyncService');
 
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -101,6 +102,14 @@ const createTask = asyncHandler(async (req, res) => {
     source: source || 'Manual'
   });
 
+  // Mirror into the "Calendar Tasks" Notion database — best-effort, never blocks the
+  // Kanban board itself (see notionTaskSyncService.js).
+  const notionPageId = await notionTaskSync.createNotionRowForTask(task).catch(() => null);
+  if (notionPageId) {
+    task.notionPageId = notionPageId;
+    await task.save().catch(() => {});
+  }
+
   res.status(201).json(formatTask(task));
 }, 'Failed to create task');
 
@@ -131,6 +140,8 @@ const updateTask = asyncHandler(async (req, res) => {
   }
 
   await existing.save();
+  await notionTaskSync.updateNotionRowForTask(existing).catch(() => {});
+
   res.json(formatTask(existing));
 }, 'Failed to update task');
 
@@ -167,6 +178,14 @@ const reorderTasks = asyncHandler(async (req, res) => {
   );
 
   const tasks = await Task.find({ dayKey, archived: false }).sort({ status: 1, order: 1 });
+
+  // A drag between columns changes `status` — mirror that to Notion for every card that
+  // has a linked row. Best-effort and fired in parallel; never blocks the board response.
+  Promise.all(
+    tasks.filter((t) => t.notionPageId && orderedIds.includes(t._id.toString()))
+      .map((t) => notionTaskSync.updateNotionRowForTask(t).catch(() => {}))
+  ).catch(() => {});
+
   res.json(tasks.map(formatTask));
 }, 'Failed to reorder tasks');
 
@@ -177,6 +196,8 @@ const deleteTask = asyncHandler(async (req, res) => {
 
   const deleted = await Task.findByIdAndDelete(id);
   if (!deleted) return res.status(404).json({ error: 'Task not found' });
+
+  await notionTaskSync.archiveNotionRowForTask(deleted).catch(() => {});
 
   res.json({ success: true, id });
 }, 'Failed to delete task');

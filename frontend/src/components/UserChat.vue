@@ -20,21 +20,25 @@
     <div v-if="isMobileMenuOpen" @click="isMobileMenuOpen = false" class="fixed inset-0 z-40 bg-black/60 md:hidden"></div>
 
 
-    <aside :class="['w-72 border-r border-[#1F222A] bg-[#111317] flex flex-col justify-between p-4 z-40 transition-all duration-300 md:static fixed inset-y-0 left-0 h-full overflow-hidden', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
+    <!-- pb-24 on mobile keeps the last nav items clear of the floating bottom bar, which
+         sits above the drawer and used to cover them. -->
+    <aside :class="['w-72 shrink-0 border-r border-[#1F222A] bg-[#111317] flex flex-col justify-between p-4 pb-24 md:pb-4 z-40 transition-all duration-300 md:static fixed inset-y-0 left-0 h-full overflow-hidden', isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0']">
 
-      <div class="flex items-center justify-between px-2 pb-3 border-b border-[#1F222A] shrink-0">
-        <div class="flex items-center gap-3 group cursor-pointer">
+      <div class="flex items-center justify-between gap-2 px-2 pb-3 border-b border-[#1F222A] shrink-0">
+        <!-- min-w-0 + truncate: without them the workspace name wrapped onto three lines
+             and pushed the drawer's action buttons out of reach. -->
+        <div class="flex items-center gap-3 group cursor-pointer min-w-0">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 border border-indigo-400/30 shrink-0 group-hover:scale-105 transition-transform duration-300">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
           </div>
-          <div>
-            <span class="font-bold text-sm tracking-tight text-white block">Jarvis AI Workspace</span>
-            <span class="text-[10px] text-indigo-400 font-mono">Store Hadiya POS v2</span>
+          <div class="min-w-0">
+            <span class="font-bold text-sm tracking-tight text-white block truncate">Jarvis AI Workspace</span>
+            <span class="text-[10px] text-indigo-400 font-mono block truncate">Store Hadiya POS v2</span>
           </div>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 shrink-0">
           <button @click="newChat" class="p-2.5 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/40 hover:to-purple-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 shadow-md shadow-indigo-500/10 transition-all duration-200 group" title="New Chat">
             <svg class="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -183,10 +187,6 @@
             </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            <button @click.stop="toggleTheme" :class="['p-1.5 rounded-xl transition border', isLightTheme ? 'text-amber-600 hover:bg-amber-100 border-amber-200' : 'text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 border-transparent hover:border-amber-500/20']" :title="isLightTheme ? 'To\'q rejimga o\'tish (Dark Mode)' : 'Creative Light Mode ga o\'tish'">
-              <svg v-if="isLightTheme" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-              <svg v-else class="w-4 h-4 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-            </button>
             <button @click.stop="$emit('logout')" :class="['p-1.5 rounded-xl transition border', isLightTheme ? 'text-slate-500 hover:text-red-600 hover:bg-red-50 border-slate-200' : 'text-gray-400 hover:text-red-400 hover:bg-red-500/10 border-transparent hover:border-red-500/20']" title="Tizimdan Chiqish (Logout)">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
             </button>
@@ -196,7 +196,10 @@
     </aside>
 
     <!-- Main Chat Window -->
-    <main class="flex-1 flex flex-col justify-between h-full bg-[#0B0C0E] relative">
+    <!-- min-w-0: a flex item defaults to min-width:auto, so this column refused to shrink
+         below its widest child and its right edge (action buttons, day columns, the chat
+         input) was clipped by the shell's overflow-hidden on narrow windows. -->
+    <main class="flex-1 min-w-0 flex flex-col justify-between h-full bg-[#0B0C0E] relative">
       <!-- Header Bar -->
       <header class="h-16 border-b border-[#1F222A] flex items-center justify-between px-4 sm:px-6 bg-[#111317] z-20">
         <div class="flex items-center gap-2.5 min-w-0">
@@ -211,26 +214,65 @@
         </div>
 
         <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <!-- Schedule Automations Trigger Button -->
-          <button @click="isScheduleOpen = true" class="text-xs font-bold text-emerald-300 hover:text-white bg-gradient-to-r from-emerald-950/60 to-teal-950/60 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/30 hover:border-emerald-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-emerald-950/30 flex items-center gap-1.5">
-            <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          <!-- Apple / Raycast Style Segmented Theme Switch -->
+          <button 
+            @click="toggleTheme" 
+            class="relative inline-grid grid-cols-2 p-1 rounded-full backdrop-blur-md transition-all duration-300 border shadow-md shrink-0 cursor-pointer select-none group"
+            :class="isLightTheme 
+              ? 'bg-slate-200/90 border-slate-300/80 hover:border-slate-400' 
+              : 'bg-[#161820]/90 border-white/10 hover:border-white/20'"
+            :title="isLightTheme ? 'Tungi rejimga o\'tish (Dark)' : 'Kunduzgi rejimga o\'tish (Light)'"
+          >
+            <!-- Smooth Sliding Thumb Background Indicator -->
+            <div 
+              class="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-out shadow-sm border pointer-events-none"
+              :class="isLightTheme 
+                ? 'left-1 w-[calc(50%-4px)] bg-white border-amber-400/50 shadow-amber-500/20' 
+                : 'left-[calc(50%+2px)] w-[calc(50%-4px)] bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-400/50 shadow-indigo-500/40'"
+            ></div>
+
+            <!-- Light Side (Sun) -->
+            <div 
+              class="relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full transition-colors duration-300"
+              :class="isLightTheme ? 'text-amber-700 font-extrabold' : 'text-gray-400 group-hover:text-gray-200'"
+            >
+              <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-300 group-hover:rotate-45" :class="isLightTheme ? 'text-amber-600 stroke-[2.5]' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
+              <span class="text-xs hidden sm:inline select-none font-bold tracking-tight whitespace-nowrap">Kunduzgi</span>
             </div>
-            <span class="hidden sm:inline">Avtomatlashtirish</span>
-            <span class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30 font-bold">{{ schedules.length }}</span>
+
+            <!-- Dark Side (Moon) -->
+            <div 
+              class="relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full transition-colors duration-300"
+              :class="!isLightTheme ? 'text-white font-extrabold' : 'text-slate-500 group-hover:text-slate-700'"
+            >
+              <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-300 group-hover:-rotate-12" :class="!isLightTheme ? 'text-white stroke-[2.5]' : 'text-slate-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              <span class="text-xs hidden sm:inline select-none font-bold tracking-tight whitespace-nowrap">Tungi</span>
+            </div>
           </button>
 
-          <!-- Admin Panel Button -->
-          <button @click="$emit('switch-view', 'admin')" class="text-xs font-bold text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border border-indigo-500/30 hover:border-indigo-500/60 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-indigo-950/30 flex items-center gap-1.5">
+          <!-- User Settings Button -->
+          <button 
+            @click="toggleViewMode('settings')" 
+            :class="[
+              'text-xs font-bold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all shadow-lg flex items-center gap-1.5 border cursor-pointer',
+              activeViewMode === 'settings'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/30'
+                : (isLightTheme 
+                  ? 'text-slate-800 bg-white/90 border-slate-300 hover:bg-slate-100 hover:border-slate-400' 
+                  : 'text-indigo-300 hover:text-white bg-gradient-to-r from-indigo-950/60 to-purple-950/60 hover:from-indigo-900/80 hover:to-purple-900/80 border-indigo-500/30 hover:border-indigo-500/60 shadow-indigo-950/30')
+            ]"
+          >
             <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
               <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
             </div>
-            <span class="hidden sm:inline">Admin Panel</span>
+            <span class="hidden sm:inline">Sozlamalar</span>
           </button>
         </div>
       </header>
@@ -244,6 +286,12 @@
         @switch-to-chat="handleSwitchToChat" 
       />
 
+      <!-- USER SETTINGS WORKSPACE VIEW -->
+      <UserSettingsWorkspace 
+        v-else-if="activeViewMode === 'settings'" 
+        @switch-to-chat="toggleViewMode('chat')" 
+      />
+
       <!-- Message History Container (WHEN IN CHAT VIEW MODE) -->
       <div v-else ref="chatContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl w-full mx-auto scroll-smooth">
         <!-- Welcome Screen -->
@@ -251,19 +299,19 @@
           <!-- Glowing AI Hexagon Badge -->
           <div class="relative group">
             <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
-            <div class="relative w-16 h-16 rounded-2xl bg-[#14161C] border border-white/10 flex items-center justify-center text-indigo-400 shadow-2xl">
-              <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div :class="['relative w-16 h-16 rounded-2xl border flex items-center justify-center shadow-2xl transition', isLightTheme ? 'bg-white/90 border-slate-300 shadow-slate-400/40 text-indigo-600' : 'bg-[#14161C] border-white/10 text-indigo-400']">
+              <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
             </div>
           </div>
 
           <div class="space-y-2 max-w-lg">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
+            <div :class="['inline-flex items-center gap-2 px-3.5 py-1 rounded-full border text-xs font-bold shadow-sm', isLightTheme ? 'bg-white/90 border-indigo-200 text-indigo-700 shadow-slate-300/30' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300']">
               <span>Assalomu alaykum, Azamjon! 👋</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Jarvis AI Executive Assistant</h1>
-            <p class="text-xs sm:text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+            <h1 :class="['text-2xl sm:text-3xl font-black tracking-tight', isLightTheme ? 'text-slate-900 drop-shadow-sm' : 'text-white']">Jarvis AI Executive Assistant</h1>
+            <p :class="['text-xs sm:text-sm max-w-md mx-auto leading-relaxed font-semibold', isLightTheme ? 'text-slate-700' : 'text-gray-400']">
               Biznes integratsiyalaringiz, savdo hisobotlari, mahsulotlar bazasi va avtomatlashtirilgan eslatmalarni boshqaring.
             </p>
           </div>
@@ -273,72 +321,72 @@
             <div 
               @click="openVoiceModal()" 
               :class="[
-                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                'p-4 rounded-2xl border transition group shadow-md cursor-pointer',
                 isLightTheme 
-                  ? 'bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-white border-purple-300 hover:border-purple-500 hover:bg-purple-50/80' 
+                  ? 'bg-white/90 backdrop-blur-md border-purple-300 hover:border-purple-500 hover:bg-white shadow-slate-400/20 hover:shadow-lg' 
                   : 'bg-[#161420] border-purple-500/25 hover:bg-[#1D1B2A] hover:border-purple-500/50'
               ]"
             >
-              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-purple-900 group-hover:text-purple-700' : 'text-purple-200 group-hover:text-white']">
+              <div :class="['text-xs font-extrabold flex items-center justify-between', isLightTheme ? 'text-purple-950 group-hover:text-purple-700' : 'text-purple-200 group-hover:text-white']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                   </svg>
                   Ovozli Murojaat (Live Mic)
                 </span>
-                <span :class="['font-mono text-[9px] px-2 py-0.5 rounded-full border font-bold', isLightTheme ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-purple-500/20 text-purple-300 border-purple-400/30']">LIVE MIC</span>
+                <span :class="['font-mono text-[9px] px-2 py-0.5 rounded-full border font-extrabold', isLightTheme ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-500/20 text-purple-300 border-purple-400/30']">LIVE MIC</span>
               </div>
-              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">Mikrofon orqali ovozli topshiriq bering...</p>
+              <p :class="['text-[11px] mt-2 font-medium', isLightTheme ? 'text-slate-700' : 'text-gray-400']">Mikrofon orqali ovozli topshiriq bering...</p>
             </div>
 
             <div 
               @click="sendQuick('Do\'kondagi Rolex soatlari narxi va qoldig\'i haqida ma\'lumot ber.')" 
               :class="[
-                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                'p-4 rounded-2xl border transition group shadow-md cursor-pointer',
                 isLightTheme 
-                  ? 'bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60' 
+                  ? 'bg-white/90 backdrop-blur-md border-slate-300 hover:border-emerald-500 hover:bg-white shadow-slate-400/20 hover:shadow-lg' 
                   : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
               ]"
             >
-              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-slate-800 group-hover:text-emerald-700' : 'text-white group-hover:text-indigo-300']">
+              <div :class="['text-xs font-extrabold flex items-center justify-between', isLightTheme ? 'text-slate-900 group-hover:text-emerald-700' : 'text-white group-hover:text-indigo-300']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                   </svg>
                   Mahsulotlar Qoldig'i & Narxi
                 </span>
-                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-400' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-500' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">"Do'kondagi mahsulotlar narxi va qoldig'ini tekshir."</p>
+              <p :class="['text-[11px] mt-2 font-medium', isLightTheme ? 'text-slate-700' : 'text-gray-400']">"Do'kondagi mahsulotlar narxi va qoldig'ini tekshir."</p>
             </div>
 
             <div 
               @click="sendQuick('Bugungi kunlik biznes va savdo hisobotini chiqar.')" 
               :class="[
-                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                'p-4 rounded-2xl border transition group shadow-md cursor-pointer',
                 isLightTheme 
-                  ? 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/60' 
+                  ? 'bg-white/90 backdrop-blur-md border-slate-300 hover:border-indigo-500 hover:bg-white shadow-slate-400/20 hover:shadow-lg' 
                   : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
               ]"
             >
-              <div :class="['text-xs font-bold flex items-center justify-between', isLightTheme ? 'text-slate-800 group-hover:text-indigo-700' : 'text-white group-hover:text-indigo-300']">
+              <div :class="['text-xs font-extrabold flex items-center justify-between', isLightTheme ? 'text-slate-900 group-hover:text-indigo-700' : 'text-white group-hover:text-indigo-300']">
                 <span class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                   </svg>
                   Kunlik Savdo Hisoboti
                 </span>
-                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-400' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                <svg :class="['w-4 h-4 group-hover:translate-x-1 transition', isLightTheme ? 'text-slate-500' : 'text-gray-500']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </div>
-              <p :class="['text-[11px] mt-2', isLightTheme ? 'text-slate-600' : 'text-gray-400']">"Bugungi jami savdo va tushumlarni chiqar."</p>
+              <p :class="['text-[11px] mt-2 font-medium', isLightTheme ? 'text-slate-700' : 'text-gray-400']">"Bugungi jami savdo va tushumlarni chiqar."</p>
             </div>
 
             <div 
               @click="sendQuick('Har kuni soat 19:00 da kunlik hisobotni Telegramga yuborib tur.')" 
               :class="[
-                'p-4 rounded-2xl border transition group shadow-lg cursor-pointer',
+                'p-4 rounded-2xl border transition group shadow-md cursor-pointer',
                 isLightTheme 
-                  ? 'bg-white border-slate-200 hover:border-amber-400 hover:bg-amber-50/60' 
+                  ? 'bg-white/90 backdrop-blur-md border-slate-300 hover:border-amber-500 hover:bg-white shadow-slate-400/20 hover:shadow-lg' 
                   : 'bg-[#14161C] border-[#1F222A] hover:border-indigo-500/40 hover:bg-[#191C24]'
               ]"
             >
@@ -359,36 +407,73 @@
         <!-- Chat Messages -->
         <div v-else v-for="msg in messages" :key="msg.id" class="space-y-3">
           <!-- User Bubble -->
-          <div v-if="msg.role === 'user'" class="flex justify-end">
-            <div class="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2.5">
-              <div v-if="msg.attachedFile" class="p-2.5 rounded-xl bg-black/30 border border-white/15 flex items-center gap-3">
-                <img 
-                  v-if="msg.attachedFile.isImage" 
-                  :src="msg.attachedFile.dataUrl" 
-                  @click="openImagePreview(msg.attachedFile.dataUrl)" 
-                  class="w-16 h-16 rounded-lg object-cover border border-white/20 shrink-0 cursor-zoom-in hover:opacity-90 transition transform hover:scale-105 shadow" 
-                  title="Kattalashtirib ko'rish uchun bosing" 
-                />
-                <div v-else class="w-10 h-10 rounded-lg bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center text-indigo-200 shrink-0">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <div v-if="msg.role === 'user'" class="flex justify-end group">
+            <div class="space-y-1 max-w-xl">
+              <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm shadow-sm space-y-2.5">
+                <div v-if="msg.attachedFile" class="p-2.5 rounded-xl bg-black/30 border border-white/15 flex items-center gap-3">
+                  <img 
+                    v-if="msg.attachedFile.isImage" 
+                    :src="msg.attachedFile.dataUrl" 
+                    @click="openImagePreview(msg.attachedFile.dataUrl)" 
+                    class="w-16 h-16 rounded-lg object-cover border border-white/20 shrink-0 cursor-zoom-in hover:opacity-90 transition transform hover:scale-105 shadow" 
+                    title="Kattalashtirib ko'rish uchun bosing" 
+                  />
+                  <div v-else class="w-10 h-10 rounded-lg bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center text-indigo-200 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  </div>
+                  <div class="truncate text-xs">
+                    <div class="font-bold text-white truncate max-w-[220px]">{{ msg.attachedFile.name }}</div>
+                    <div class="text-[10px] opacity-80 font-mono">{{ msg.attachedFile.formattedSize }}</div>
+                  </div>
                 </div>
-                <div class="truncate text-xs">
-                  <div class="font-bold text-white truncate max-w-[220px]">{{ msg.attachedFile.name }}</div>
-                  <div class="text-[10px] opacity-80 font-mono">{{ msg.attachedFile.formattedSize }}</div>
-                </div>
+                <div v-if="msg.content">{{ msg.content }}</div>
               </div>
-              <div v-if="msg.content">{{ msg.content }}</div>
+
+              <!-- User Message Action Toolbar (Nusxalash, Javob berish) -->
+              <div class="flex items-center justify-end gap-2 opacity-90 hover:opacity-100 transition-all duration-200 text-xs font-semibold select-none pt-1">
+                <button 
+                  @click="copyMessageText(msg)" 
+                  :class="[
+                    'px-3 py-1.5 rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer',
+                    isLightTheme 
+                      ? 'bg-white/90 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-white hover:border-indigo-300' 
+                      : 'bg-[#181A22] border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40'
+                  ]"
+                  title="Matnni nusxalash"
+                >
+                  <svg class="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  <span>{{ copiedMessageId === msg.id ? '✓ Nusxalandi' : 'Nusxalash' }}</span>
+                </button>
+
+                <button 
+                  @click="replyToMsg(msg)" 
+                  :class="[
+                    'px-3 py-1.5 rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer',
+                    isLightTheme 
+                      ? 'bg-white/90 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-white hover:border-indigo-300' 
+                      : 'bg-[#181A22] border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40'
+                  ]"
+                  title="Ushbu xabarga javob berish"
+                >
+                  <svg class="w-3.5 h-3.5 text-purple-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                  </svg>
+                  <span>Javob berish</span>
+                </button>
+              </div>
             </div>
           </div>
 
           <!-- Assistant Bubble -->
-          <div v-else class="flex gap-3">
+          <div v-else class="flex gap-3 group">
             <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-sm">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
             </div>
-            <div class="flex-1 space-y-3">
+            <div class="flex-1 space-y-2">
               <!-- Executed Tools Badges -->
               <div v-if="parseTools(msg.toolCalls).length > 0" class="flex flex-wrap gap-1.5">
                 <span 
@@ -402,7 +487,58 @@
               </div>
 
               <!-- Message Content with Markdown Parsing -->
-              <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body" v-html="renderMarkdown(msg.content)"></div>
+              <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body shadow-sm" v-html="renderMarkdown(msg.content)"></div>
+
+              <!-- Assistant Message Action Toolbar (Nusxalash, Javob berish, Qayta tahlil qilish) -->
+              <div class="flex items-center gap-2 transition-all duration-200 text-xs font-semibold select-none pt-1">
+                <button 
+                  @click="copyMessageText(msg)" 
+                  :class="[
+                    'px-3 py-1.5 rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer',
+                    isLightTheme 
+                      ? 'bg-white/90 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-white hover:border-indigo-300 hover:shadow' 
+                      : 'bg-[#181A22] border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40 hover:bg-[#1E212C]'
+                  ]"
+                  title="Javob matnini nusxalash"
+                >
+                  <svg class="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  <span>{{ copiedMessageId === msg.id ? '✓ Nusxalandi' : 'Nusxalash' }}</span>
+                </button>
+
+                <button 
+                  @click="replyToMsg(msg)" 
+                  :class="[
+                    'px-3 py-1.5 rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer',
+                    isLightTheme 
+                      ? 'bg-white/90 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-white hover:border-indigo-300 hover:shadow' 
+                      : 'bg-[#181A22] border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40 hover:bg-[#1E212C]'
+                  ]"
+                  title="AI javobiga javob yozish"
+                >
+                  <svg class="w-3.5 h-3.5 text-purple-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                  </svg>
+                  <span>Javob berish</span>
+                </button>
+
+                <button 
+                  @click="regenerateMessage(msg)" 
+                  :class="[
+                    'px-3 py-1.5 rounded-xl border transition-all duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer',
+                    isLightTheme 
+                      ? 'bg-white/90 border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-white hover:border-indigo-300 hover:shadow' 
+                      : 'bg-[#181A22] border-white/10 text-gray-300 hover:text-white hover:border-indigo-500/40 hover:bg-[#1E212C]'
+                  ]"
+                  title="Qayta tahlil qilib yangi javob olish"
+                >
+                  <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                  <span>Qayta tahlil qilish</span>
+                </button>
+              </div>
 
               <!-- Interactive Action Confirmation Card (Allow / Cancel) -->
               <div v-if="msg.requiresApproval || (msg.content && (msg.content.includes('Biroz kuting') || msg.content.includes('ko\'rib chiqaman')))" class="mt-3 bg-gradient-to-r from-[#171922] via-[#1D212F] to-[#171922] border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
@@ -450,7 +586,7 @@
               <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
               <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
             </span>
-            <span class="font-semibold tracking-wide text-indigo-200 transition-all duration-300">{{ loadingStepText || "📡 Billz 2.0 POS API serveridan Store Hadiya ma'lumotlari olinmoqda..." }}</span>
+            <span class="font-semibold tracking-wide text-indigo-200 transition-all duration-300">{{ loadingStepText || "🧠 So'rov tahlil qilinmoqda..." }}</span>
           </div>
         </div>
       </div>
@@ -458,6 +594,30 @@
       <!-- Gemini Style Floating Input Pill Footer -->
       <footer class="p-4 sm:p-6 bg-[#0B0C0E] mb-[76px] md:mb-0 relative z-30">
         <div class="max-w-3xl w-full mx-auto space-y-2">
+
+          <!-- REPLY PREVIEW BAR -->
+          <div 
+            v-if="replyToMessage" 
+            class="flex items-center justify-between px-4 py-2.5 rounded-2xl border transition-all duration-200 shadow-lg select-none mb-2"
+            :class="isLightTheme 
+              ? 'bg-white/95 border-indigo-300 text-indigo-950 shadow-slate-300/40' 
+              : 'bg-[#1A1C26] border-indigo-500/40 text-indigo-200 shadow-xl'"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <svg class="w-4 h-4 text-indigo-500 shrink-0 transform -scale-x-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+              </svg>
+              <span class="font-extrabold text-xs shrink-0 text-indigo-600 dark:text-indigo-400">{{ replyToMessage.author }} ga javob:</span>
+              <span class="text-xs truncate italic" :class="isLightTheme ? 'text-slate-800' : 'text-gray-300'">"{{ replyToMessage.snippet }}"</span>
+            </div>
+            <button 
+              @click="cancelReply" 
+              class="p-1 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition shrink-0 ml-2 cursor-pointer" 
+              title="Bekor qilish"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
 
           <!-- ATTACHED FILE PREVIEW CARD -->
           <div v-if="attachedFile" class="flex items-center justify-between bg-[#1E1F24] border border-indigo-500/40 px-3.5 py-2 rounded-2xl w-fit shadow-lg mb-2">
@@ -855,9 +1015,9 @@
         <span>Hub</span>
       </button>
 
-      <button @click="$emit('switch-view', 'admin')" class="flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold text-gray-400 hover:text-white transition">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
-        <span>Admin</span>
+      <button @click="toggleViewMode('settings')" class="flex flex-col items-center gap-1 px-3.5 py-1.5 rounded-xl text-[10px] font-semibold transition" :class="activeViewMode === 'settings' ? 'text-indigo-400 bg-indigo-500/10 border border-indigo-500/20' : 'text-gray-400'">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>Sozlamalar</span>
       </button>
     </nav>
   </div>
@@ -869,9 +1029,11 @@ import { nextTick } from 'vue';
 import { marked } from 'marked';
 import { VoiceController, RECORDING_STATE } from '../services/voiceController';
 import { API_BASE } from '../services/api';
+import chatService from '../services/chatService';
 import themeService from '../services/themeService';
 import CalendarWorkspace from './CalendarWorkspace.vue';
 import KnowledgeWorkspace from './KnowledgeWorkspace.vue';
+import UserSettingsWorkspace from './UserSettingsWorkspace.vue';
 
 marked.setOptions({
   gfm: true,
@@ -903,6 +1065,18 @@ const MD_ICONS = {
   '↩️': { tone: 'warn2', d: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>' },
   '⚠️': { tone: 'warn', d: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>' },
   'ℹ️': { tone: 'accent', d: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
+  '📬': { tone: 'accent', d: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
+  '📝': { tone: 'accent', d: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>' },
+  '👤': { tone: 'accent', d: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+  '👥': { tone: 'accent', d: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
+  '🕒': { tone: 'accent', d: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' },
+  '📎': { tone: 'accent', d: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>' },
+  '📄': { tone: 'accent', d: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>' },
+  '🗂️': { tone: 'accent', d: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>' },
+  '💬': { tone: 'accent', d: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
+  '⬅️': { tone: 'accent', d: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>' },
+  '➡️': { tone: 'money', d: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>' },
+  '🔍': { tone: 'accent', d: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>' },
   '✅': { tone: 'money', d: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>' },
   '❌': { tone: 'warn2', d: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>' }
 };
@@ -927,7 +1101,8 @@ function decorateIcons(html) {
 export default {
   components: {
     CalendarWorkspace,
-    KnowledgeWorkspace
+    KnowledgeWorkspace,
+    UserSettingsWorkspace
   },
   data() {
     return {
@@ -940,6 +1115,10 @@ export default {
       inputQuery: '',
       isLoading: false,
 
+      // Reply & Copy States
+      replyToMessage: null,
+      copiedMessageId: null,
+
       // Image Lightbox Preview States
       isPreviewImageOpen: false,
       previewImageSrc: null,
@@ -947,7 +1126,6 @@ export default {
       // File Drag & Drop & Attachment States
       isLoading: false,
       loadingStepText: '',
-      loadingTimer: null,
       attachedFile: null,
 
       // Delete Modal Confirmation States
@@ -1318,12 +1496,92 @@ export default {
       this.inputQuery = text;
       this.sendMessage();
     },
+    copyMessageText(msg) {
+      if (!msg || !msg.content) return;
+      const rawText = msg.content.replace(/<[^>]*>/g, '');
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(rawText).then(() => {
+          this.copiedMessageId = msg.id;
+          setTimeout(() => {
+            if (this.copiedMessageId === msg.id) this.copiedMessageId = null;
+          }, 2000);
+        }).catch(() => {
+          this.fallbackCopy(rawText, msg.id);
+        });
+      } else {
+        this.fallbackCopy(rawText, msg.id);
+      }
+    },
+    fallbackCopy(text, msgId) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        this.copiedMessageId = msgId;
+        setTimeout(() => {
+          if (this.copiedMessageId === msgId) this.copiedMessageId = null;
+        }, 2000);
+      } catch (err) {}
+      document.body.removeChild(textArea);
+    },
+    replyToMsg(msg) {
+      if (!msg) return;
+      const author = msg.role === 'user' ? 'Azamjon' : 'Jarvis AI Assistant';
+      const snippet = (msg.content || '').replace(/\s+/g, ' ').trim();
+      const truncatedSnippet = snippet.length > 80 ? snippet.slice(0, 80) + '...' : snippet;
+      this.replyToMessage = {
+        id: msg.id,
+        role: msg.role,
+        author,
+        snippet: truncatedSnippet,
+        rawSnippet: snippet
+      };
+      nextTick(() => {
+        if (this.$refs.inputQueryRef) {
+          this.$refs.inputQueryRef.focus();
+        }
+      });
+    },
+    cancelReply() {
+      this.replyToMessage = null;
+    },
+    async regenerateMessage(msg) {
+      if (this.isLoading) return;
+      const msgIdx = this.messages.findIndex(m => m.id === msg.id);
+      let promptText = '';
+      if (msgIdx > 0 && this.messages[msgIdx - 1] && this.messages[msgIdx - 1].role === 'user') {
+        promptText = this.messages[msgIdx - 1].content;
+      }
+      if (!promptText) promptText = "Qayta tahlil qilib javob ber";
+      
+      this.inputQuery = promptText;
+      await this.sendMessage();
+    },
+    async reloadChatHistory() {
+      if (this.activeConvId) {
+        await this.fetchMessages(this.activeConvId);
+      } else {
+        await this.fetchConversations();
+      }
+    },
     async sendMessage() {
       if ((!this.inputQuery.trim() && !this.attachedFile) || this.isLoading) return;
       const text = this.inputQuery.trim();
       const fileToSend = this.attachedFile;
+      const replyPayload = this.replyToMessage ? {
+        id: this.replyToMessage.id,
+        role: this.replyToMessage.role,
+        snippet: this.replyToMessage.rawSnippet || this.replyToMessage.snippet
+      } : null;
+
       this.inputQuery = '';
       this.attachedFile = null;
+      this.replyToMessage = null;
       this.adjustTextareaHeight();
 
       if (!this.activeConvId) {
@@ -1347,26 +1605,27 @@ export default {
 
       this.scrollToBottom();
       this.isLoading = true;
-      this.startLoadingSteps();
+      this.loadingStepText = "🧠 So'rov tahlil qilinmoqda...";
 
       try {
-        const res = await axios.post(`${API_BASE}/api/chat/message`, {
+        const data = await chatService.sendMessageStream({
           conversationId: this.activeConvId,
           content: text,
-          attachedFile: fileToSend
-        });
+          attachedFile: fileToSend,
+          replyTo: replyPayload
+        }, (evt) => this.handleProgressEvent(evt));
 
         this.messages.push({
           id: `ai-${Date.now()}`,
           role: 'assistant',
-          content: res.data.assistantResponse,
-          toolCalls: JSON.stringify(res.data.executedTools || [])
+          content: data.assistantResponse,
+          toolCalls: JSON.stringify(data.executedTools || [])
         });
 
-        if (res.data.executedTools && res.data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
+        if (data.executedTools && data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
           window.dispatchEvent(new CustomEvent('calendar-updated'));
         }
-        
+
         await this.fetchConversations();
         this.fetchSchedules();
         this.scrollToBottom();
@@ -1378,7 +1637,7 @@ export default {
         });
       } finally {
         this.isLoading = false;
-        this.stopLoadingSteps();
+        this.loadingStepText = '';
         this.scrollToBottom();
       }
     },
@@ -1393,18 +1652,18 @@ export default {
       }
 
       this.isLoading = true;
-      this.startLoadingSteps();
+      this.loadingStepText = "🧠 So'rov tahlil qilinmoqda...";
 
       try {
-        const res = await axios.post(`${API_BASE}/api/chat/message`, {
+        const data = await chatService.sendMessageStream({
           conversationId: this.activeConvId,
           content: userPrompt,
           confirmed: true
-        });
+        }, (evt) => this.handleProgressEvent(evt));
 
-        msg.content = res.data.assistantResponse;
-        msg.toolCalls = JSON.stringify(res.data.executedTools || []);
-        
+        msg.content = data.assistantResponse;
+        msg.toolCalls = JSON.stringify(data.executedTools || []);
+
         await this.fetchConversations();
         this.fetchSchedules();
         this.scrollToBottom();
@@ -1412,7 +1671,7 @@ export default {
         msg.content = "Xatolik yuz berdi: Backend server bilan ulanishni tekshiring.";
       } finally {
         this.isLoading = false;
-        this.stopLoadingSteps();
+        this.loadingStepText = '';
         this.scrollToBottom();
       }
     },
@@ -1420,24 +1679,11 @@ export default {
       msg.requiresApproval = false;
       msg.content = "❌ So'rov foydalanuvchi tomonidan bekor qilindi.";
     },
-    startLoadingSteps() {
-      const steps = [
-        "📡 Billz 2.0 POS API serveriga ulanilmoqda...",
-        "📦 Store Hadiya 1,522 ta mahsulot va narxlari o'qilmoqda...",
-        "📊 Tanlangan davr sotuv tushumlari va qoldiqlar tahlil qilinmoqda...",
-        "🧠 Dual Ensemble GPT-4o executive hisobot shakllantirmoqda..."
-      ];
-      let idx = 0;
-      this.loadingStepText = steps[0];
-      if (this.loadingTimer) clearInterval(this.loadingTimer);
-      this.loadingTimer = setInterval(() => {
-        idx = (idx + 1) % steps.length;
-        this.loadingStepText = steps[idx];
-      }, 1100);
-    },
-    stopLoadingSteps() {
-      if (this.loadingTimer) clearInterval(this.loadingTimer);
-      this.loadingTimer = null;
+    // Real backend progress (which tool is running, which model is answering) replaces
+    // the old canned Billz-flavored loading strings — the backend already sends a
+    // human-readable Uzbek `label` for every phase (see TOOL_LABELS in aiEngine.js).
+    handleProgressEvent(evt) {
+      if (evt && evt.label) this.loadingStepText = evt.label;
     },
     parseTools(toolCalls) {
       if (!toolCalls) return [];
@@ -1476,8 +1722,11 @@ export default {
     },
     processFile(file) {
       const isImage = file.type.startsWith('image/');
-      const formattedSize = file.size > 1024 * 1024 
-        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB' 
+      // Excel/CSV of newly-arrived goods — flagged so the backend parses rows out of the
+      // base64 payload instead of treating it as an opaque, unreadable attachment.
+      const isSpreadsheet = /\.(xlsx|xls|csv)$/i.test(file.name);
+      const formattedSize = file.size > 1024 * 1024
+        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
         : Math.round(file.size / 1024) + ' KB';
 
       const reader = new FileReader();
@@ -1488,6 +1737,7 @@ export default {
           formattedSize,
           type: file.type,
           isImage,
+          isSpreadsheet,
           dataUrl: evt.target.result
         };
       };
@@ -1624,6 +1874,28 @@ export default {
 .markdown-body th {
   background-color: #1A1D26;
   font-weight: 600;
+}
+
+/* Returned goods — money going back out — read red and bold wherever they appear
+   (summary line, day headings, and every cell of a returns table). */
+.markdown-body .md-danger,
+.markdown-body .md-danger * {
+  color: #FB7185;
+  font-weight: 700;
+}
+.markdown-body summary .md-danger {
+  color: #FB7185;
+}
+.markdown-body td .md-danger {
+  font-weight: 600;
+}
+
+html.light .markdown-body .md-danger,
+html.light .markdown-body .md-danger * {
+  color: #E11D48;
+}
+html.light .markdown-body summary .md-danger {
+  color: #E11D48;
 }
 
 /* Line-art icons swapped in for the report emoji (see decorateIcons). */

@@ -21,7 +21,10 @@ const TaskSchema = new mongoose.Schema({
   order: { type: Number, default: 0 },
 
   archived: { type: Boolean, default: false, index: true },
-  source: { type: String, default: 'Manual' }
+  source: { type: String, default: 'Manual' },
+
+  // Mirrors this card to/from the "Calendar Tasks" Notion database (notionTaskSyncService.js).
+  notionPageId: { type: String, default: null }
 }, {
   timestamps: true
 });

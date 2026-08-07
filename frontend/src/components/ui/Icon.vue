@@ -12,11 +12,12 @@
 
 <script>
 import {
-  Archive, ArrowRight, AlertTriangle, BarChart3, Bell, BrainCircuit, Calendar, Check,
-  ChevronLeft, ChevronRight, CircleCheck, Clock, Columns3, Copy, ExternalLink, FileText,
-  Folder, FolderOpen, Image, ListTodo, Loader2, LogOut, Menu, MessageSquare, Mic, Monitor, Moon, Package,
-  Pause, Pencil, Phone, Pin, Play, Plus, Reply, RefreshCw, Save, Search, Send, Settings,
-  ShieldCheck, Sparkles, Square, SquarePen, Sun, Target, Trash2, UploadCloud, User, X, Zap
+  Archive, ArrowRight, AlertTriangle, BarChart3, Bell, BookOpen, BrainCircuit, Briefcase,
+  Building2, Calendar, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Columns3, Copy,
+  ExternalLink, FileText, Folder, FolderOpen, Image, Library, ListTodo, Loader2, LogOut, Mail,
+  Menu, MessageSquare, Mic, Monitor, Moon, Package, Pause, Pencil, Phone, Pin, Play, Plus, Reply,
+  RefreshCw, Rocket, Save, Search, Send, Settings, ShieldCheck, Sparkles, Square, SquarePen, Sun,
+  Tag, Target, Trash2, UploadCloud, User, Users, X, Zap
 } from 'lucide-vue-next';
 
 /**
@@ -28,6 +29,7 @@ import {
 const ICONS = {
   // Brand & AI
   logo: Zap,
+  zap: Zap,
   ai: Sparkles,
   brain: BrainCircuit,
 
@@ -79,12 +81,23 @@ const ICONS = {
   monitor: Monitor,
   clock: Clock,
   bell: Bell,
+  mail: Mail,
   phone: Phone,
   target: Target,
+  tag: Tag,
   user: User,
+  users: Users,
   shield: ShieldCheck,
   warning: AlertTriangle,
   spinner: Loader2,
+
+  // Knowledge Bank categories
+  book: BookOpen,
+  library: Library,
+  business: BarChart3,
+  project: Rocket,
+  architecture: Building2,
+  sop: Briefcase,
 
   // Theme
   sun: Sun,

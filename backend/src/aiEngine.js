@@ -1,238 +1,18 @@
 const connectorRegistry = require('./connectors/registry');
-const intentClassifier = require('./services/intentClassifier');
-const contextBuilder = require('./services/contextBuilder');
 const memoryUpdater = require('./services/memoryUpdater');
-const mongoose = require('mongoose');
-const CalendarEvent = require('./models/CalendarEvent');
+const mailSenderFilter = require('./services/mailSenderFilter');
+const billzClientService = require('./services/billzClientService');
+const spreadsheetParser = require('./services/spreadsheetParser');
 const Schedule = require('./models/Schedule');
 
-const UZ_MONTHS = {
-  yanvar: 0, fevral: 1, mart: 2, aprel: 3, may: 4, iyun: 5,
-  iyul: 6, avgust: 7, sentabr: 8, sentyabr: 8, oktabr: 9, oktyabr: 9, noyabr: 10, dekabr: 11,
-  january: 0, february: 1, march: 2, april: 3, june: 5,
-  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
-};
-
-const UZ_WEEKDAYS = [
-  ['yakshanba', 0], ['dushanba', 1], ['seshanba', 2], ['chorshanba', 3],
-  ['payshanba', 4], ['juma', 5], ['shanba', 6]
-];
-
 // Local date key — toISOString() would roll back a day for any local time before 05:00
-// in UTC+5, filing "bugun" events under yesterday.
+// in UTC+5, filing "bugun" under yesterday. Also handed to the router model as "today"
+// so it can compute relative dates ("ertaga", "indinga") itself instead of a regex parser.
 function toDateKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-function getNextWeekday(dayOfWeek) {
-  const today = new Date();
-  const result = new Date(today);
-  const diff = (dayOfWeek + 7 - today.getDay()) % 7;
-  // "juma" said on a Friday means the coming Friday, not today.
-  result.setDate(today.getDate() + (diff === 0 ? 7 : diff));
-  return result;
-}
-
-/**
- * Resolves the day the owner meant. Precedence mirrors how the sentence reads: an
- * explicit calendar date beats a named weekday, which beats a relative offset.
- */
-function resolveTargetDate(lower) {
-  // "5-avgust", "20 avgust 2026"
-  const monthMatch = lower.match(
-    /\b(\d{1,2})[-_\s]*(?:chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr|january|february|march|april|june|july|august|september|october|november|december)\b(?:[-_\s]*(20\d{2}))?/
-  );
-  if (monthMatch) {
-    const dayNum = parseInt(monthMatch[1], 10);
-    const monthIdx = UZ_MONTHS[monthMatch[2]];
-    if (monthIdx !== undefined && dayNum >= 1 && dayNum <= 31) {
-      const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
-      const year = monthMatch[3] ? parseInt(monthMatch[3], 10) : todayStart.getFullYear();
-      const target = new Date(year, monthIdx, dayNum);
-      // Planning is forward-looking: a bare date already past means next year.
-      if (!monthMatch[3] && target < todayStart) target.setFullYear(year + 1);
-      return target;
-    }
-  }
-
-  // "3 kundan keyin", "2 haftadan keyin"
-  const relMatch = lower.match(/\b(\d{1,2})\s*(kun|hafta|oy)(?:dan)?\s*(?:key[iy]n|so'ng|song)\b/);
-  if (relMatch) {
-    const n = parseInt(relMatch[1], 10);
-    const d = new Date();
-    if (relMatch[2] === 'kun') d.setDate(d.getDate() + n);
-    else if (relMatch[2] === 'hafta') d.setDate(d.getDate() + n * 7);
-    else d.setMonth(d.getMonth() + n);
-    return d;
-  }
-
-  for (const [name, idx] of UZ_WEEKDAYS) {
-    // "shanba" is a suffix of "yakshanba"/"dushanba"/"seshanba"/"chorshanba"/"payshanba",
-    // so require a word boundary on both sides.
-    if (new RegExp(`\\b${name}\\b`).test(lower)) return getNextWeekday(idx);
-  }
-
-  if (/\bindin(ga)?\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return d;
-  }
-  if (/\bertaga?\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d;
-  }
-  if (/\bkeyingi\s*hafta\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d;
-  }
-
-  return new Date();
-}
-
-/**
- * Reads a wall-clock time the way a person would: an explicit "14:30" wins, then an
- * hour qualified by a part of the day, then a bare part of the day.
- */
-function resolveStartTime(lower) {
-  const explicit = lower.match(/\b(\d{1,2}):(\d{2})\b/);
-  if (explicit) {
-    const h = Math.min(23, parseInt(explicit[1], 10));
-    const m = Math.min(59, parseInt(explicit[2], 10));
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-
-  const isMorning = /\b(ertalab|tongda|tong|erta\s*bilan)\b/.test(lower);
-  const isMidday = /\b(tushda|tushlik|peshin)\b/.test(lower);
-  const isEvening = /\b(kechqurun|kechasi|oqshom|kech)\b/.test(lower);
-
-  const hourMatch = lower.match(/\bsoat\s*(\d{1,2})\b/) || lower.match(/\b(\d{1,2})\s*(?:da|larda)\b/);
-  if (hourMatch) {
-    let h = parseInt(hourMatch[1], 10);
-    if (h >= 0 && h <= 23) {
-      if (isEvening && h < 12) h += 12;
-      else if (isMidday && h < 12) h += 12;
-      else if (!isMorning && h < 8) h += 12; // "soat 5 da" -> 17:00
-      return `${String(Math.min(23, h)).padStart(2, '0')}:00`;
-    }
-  }
-
-  if (isMorning) return '09:00';
-  if (isMidday) return '13:00';
-  if (isEvening) return '19:00';
-  return '10:00';
-}
-
-function parseCalendarTaskDetails(text = '') {
-  const lower = text.toLowerCase().replace(/[ʻ‘’`´]/g, "'");
-  const targetDate = resolveTargetDate(lower);
-
-  const timeStr = resolveStartTime(lower);
-  const [startH, startM] = timeStr.split(':');
-  // Clamp so a 23:30 start does not produce an invalid "24:30" end.
-  const endHour = Math.min(23, parseInt(startH, 10) + 1);
-  const endTimeStr = `${String(endHour).padStart(2, '0')}:${startM}`;
-
-  // Priority
-  let priority = 'Medium';
-  if (lower.includes('deadline') || lower.includes('shoshilinch') || lower.includes('urgent')) {
-    priority = 'Urgent';
-  } else if (lower.includes('muhim') || lower.includes('high') || lower.includes('zarur')) {
-    priority = 'High';
-  }
-
-  // Category
-  let category = 'Work';
-  if (lower.includes('meeting') || lower.includes('uchrashuv')) {
-    category = 'Meeting';
-  } else if (lower.includes('qo\'ng\'iroq') || lower.includes('qongiroq') || lower.includes('call') || lower.includes('telefon')) {
-    category = 'Call';
-  } else if (lower.includes('deadline') || lower.includes('topshirish')) {
-    category = 'Deadline';
-  } else if (lower.includes('loyiha') || lower.includes('project')) {
-    category = 'Project';
-  } else if (lower.includes('shaxsiy') || lower.includes('personal')) {
-    category = 'Personal';
-  }
-
-  // Strip the scheduling scaffolding so the title keeps only what the event is *about*.
-  let cleanTitle = text
-    .replace(/\b(kalendarga|kalendar|taqvimga|taqvim|bugungi\s*kun\s*uchun|bugun|ertaga|ertagi|indinga|indin|keyingi\s*hafta|dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba)\b/gi, ' ')
-    .replace(/\b\d{1,2}[-_\s]*(?:chi|inchi|nchi)?[-_\s]*(yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|sentyabr|oktabr|oktyabr|noyabr|dekabr)\b/gi, ' ')
-    .replace(/\b\d{1,2}\s*(kun|hafta|oy)(dan)?\s*(key[iy]n|so'ng|song)\b/gi, ' ')
-    .replace(/\bsoat\s*\d{1,2}(:\d{2})?\s*(da)?\b/gi, ' ')
-    .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
-    .replace(/\b(ertalab|tongda|tushda|tushlik|kechqurun|kechasi|oqshom)\b/gi, ' ')
-    // A bare hour left over from "kechqurun 7 da" / "9 larda".
-    .replace(/\b\d{1,2}\s*(?:da|larda)\b/gi, ' ')
-    .replace(/\bkun[iy]\b/gi, ' ')
-    .replace(/\b(bor|rejalashtir|rejalashtirib|qo'sh|qosh|qoshib|qo'shib|qoy|qo'y|saqla|saqlab|yarat|yaratib|eslat|eslatib|da|bilan|zarur|uchun|iltimos|menga)\b/gi, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '')
-    .trim();
-
-  if (cleanTitle.length < 2) {
-    // Nothing descriptive survived — name it after the kind of event it is.
-    if (category === 'Meeting') cleanTitle = 'Biznes Uchrashuv';
-    else if (category === 'Call') cleanTitle = 'Mijoz Bilan Qo\'ng\'iroq';
-    else if (category === 'Deadline') cleanTitle = 'Loyiha Topshirish Deadline';
-    else if (category === 'Project') cleanTitle = 'Loyiha Ishi';
-    else if (category === 'Personal') cleanTitle = 'Shaxsiy Reja';
-    else cleanTitle = 'Rejalashtirilgan Vazifa';
-  }
-
-  cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-  const isoDate = toDateKey(targetDate);
-
-  return {
-    title: cleanTitle,
-    startDate: isoDate,
-    endDate: isoDate,
-    startTime: timeStr,
-    endTime: endTimeStr,
-    priority,
-    category
-  };
-}
-
-const NOTION_CREATE_VERBS = /\b(qo'sh|qosh|qo'shib|qoshib|qo'shvor|yarat|yaratib|och|ochib|yoz|yozib|kirit|kiritib|create|add|new)\b/;
-
-/** True when the owner is asking to WRITE something into Notion (not just search it). */
-function isNotionWriteIntent(lower) {
-  const mentionsNotion = /\b(notion|notionga|notionda|notiondagi|workspace)\b/.test(lower);
-  return mentionsNotion && NOTION_CREATE_VERBS.test(lower);
-}
-
-/**
- * Pulls the page name out of a request like:
- *   notionga kirib yangi task deb "test space" qo'shib ko'r   -> test space
- *   notionga yangi task deb test space qoshib kor             -> test space
- */
-function extractNotionTaskTitle(text = '') {
-  const normalized = text.replace(/[ʻ‘’`´]/g, "'").trim();
-
-  // 1. An explicit quoted name always wins.
-  const quoted = normalized.match(/["“”'«]([^"“”'»]{2,})["“”'»]/);
-  if (quoted) return quoted[1].trim();
-
-  // 2. "... deb <nom> qo'shib ko'r" — the name sits between "deb" and the verb.
-  const afterDeb = normalized.match(/\bdeb\s+(.+?)(?=\s*\b(?:qo'sh|qosh|yarat|och|yoz|kirit|create|add)|$)/i);
-  if (afterDeb && afterDeb[1].trim().length > 1) return afterDeb[1].trim();
-
-  // 3. Otherwise strip the scaffolding and keep whatever the request was about.
-  const cleaned = normalized
-    .replace(/\b(notionga|notionda|notiondagi|notion|workspace)\b/gi, ' ')
-    .replace(/\b(kirib|kir|bor|borib|iltimos|menga|men|yangi|task|vazifa|sahifa|page|deb|nomli|nomida)\b/gi, ' ')
-    .replace(/\b(qo'shib|qoshib|qo'sh|qosh|yaratib|yarat|ochib|och|yozib|yoz|kiritib|kirit|ko'r|kor|qo'y|qoy|create|add|new)\b/gi, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '')
-    .trim();
-
-  return cleaned.length > 1 ? cleaned : 'Yangi Task';
 }
 
 /**
@@ -258,6 +38,747 @@ function buildUserContent(userMessage, executedTools, attachedFile) {
   }
 
   return `${baseText}\n\n"${attachedFile.name}" (${attachedFile.formattedSize}) fayli biriktirildi, lekin uning formati matnga o'girilmadi — mazmunini o'qiy olmading. Buni foydalanuvchiga ochiq ayt va matn ko'rinishida yuborishni yoki skrinshot tashlashni so'ra. Fayl mazmunini O'YLAB TOPMA.`;
+}
+
+/**
+ * Renders the Billz sales report for one day or for a period.
+ *
+ * `null` means "this data source can't tell us" and must render as "ma'lumot yo'q",
+ * never as "0 so'm" — a fabricated zero reads as a real, confirmed figure.
+ *
+ * Product tables are wrapped in <details> so a 30-day report stays scannable: the owner
+ * sees a line per day and opens only the day they care about. marked() passes the raw
+ * HTML through and parses the markdown table inside it (the surrounding blank lines are
+ * what make that work), so the existing table toolbar still applies.
+ */
+function formatBillzSalesReport(d) {
+  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+  const count = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v} ta`;
+
+  // Returns are money leaving the till, so they are called out in red instead of sitting
+  // in the same neutral type as a sale. The chat renderer styles `.md-danger`.
+  const danger = (text) => `<span class="md-danger">${text}</span>`;
+
+  const productTable = (products, isReturn = false) => {
+    if (!products || !products.length) return '';
+    const mark = (v) => (isReturn ? danger(v) : v);
+    const rows = products.map((p, i) =>
+      `| ${i + 1} | ${mark(p.name)} | ${p.sku || '—'} | ${mark(`${p.quantity} ${p.unit || 'dona'}`)} | ${mark(p.unitPrice.toLocaleString())} | ${mark(p.totalPrice.toLocaleString())} |`
+    ).join('\n');
+    return `| # | Mahsulot | SKU | Soni | Dona narxi (so'm) | Summa (so'm) |\n` +
+           `|---|---|---|---|---|---|\n${rows}\n`;
+  };
+
+  // The blank line before </details> matters: without it a body ending in a list item
+  // swallows the closing tag as lazy continuation and the panel closes in the wrong place.
+  const collapsible = (summary, body) => body
+    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n\n</details>\n\n`
+    : '';
+
+  const checkLines = (checks) => checks.map((c, i) => {
+    const head = `${i + 1}. **№${c.orderNumber}** — ${c.soldTime || c.soldAt || ''} | ${c.customerName} | ${money(c.totalPrice)}`;
+    const items = (c.products || []).length
+      ? c.products.map((p) => `   • ${p.name}${p.sku ? ` (${p.sku})` : ''} — ${p.quantity} ${p.unit} × ${money(p.unitPrice)} = ${money(p.totalPrice)}`).join('\n')
+      : `   • Mahsulot tafsiloti yo'q`;
+    return `${head}\n${items}`;
+  }).join('\n\n');
+
+  const header = d.isRange
+    ? `📅 **Davr:** ${d.displayDate}${d.periodLabel ? ` (${d.periodLabel})` : ''}\n\n🏪 **Filial:** ${d.branchName}\n\n`
+    : `📅 **Sana:** ${d.displayDate}\n\n🏪 **Filial:** ${d.branchName}\n\n`;
+
+  let body = '';
+
+  if (d.isRange) {
+    body += `## 📆 Kunlik savdo\n\n`;
+    if (!d.dailyBreakdown || !d.dailyBreakdown.length) {
+      body += `_Bu davrda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+    } else {
+      body += d.dailyBreakdown.map((day) => {
+        const line = `### ${day.displayDate} — ${money(day.totalSales)}\n` +
+          `🛒 ${count(day.checksCount)} chek | 📦 ${count(day.itemsCount)} mahsulot` +
+          (day.returnedAmount ? ` | ${danger(`↩️ **qaytarilgan: ${money(day.returnedAmount)}**`)}` : '') + `\n\n`;
+        const table = collapsible(
+          `📦 Mahsulotlar jadvali (${day.products.length} xil) — ochish uchun bosing`,
+          productTable(day.products)
+        );
+        const checks = collapsible(
+          `🧾 Cheklar tafsiloti (${day.checksCount} ta chek)`,
+          checkLines(day.checks)
+        );
+        const rets = day.returnedProducts && day.returnedProducts.length
+          ? collapsible(
+              danger(`↩️ Qaytarilgan mahsulotlar (${day.returnedProducts.length} xil)`),
+              productTable(day.returnedProducts, true)
+            )
+          : '';
+        return line + table + checks + rets;
+      }).join('');
+    }
+  } else {
+    body += (d.checks && d.checks.length)
+      ? `🧾 **Cheklar tafsiloti:**\n\n${checkLines(d.checks)}\n\n` +
+        collapsible(`📦 Kun bo'yicha mahsulotlar jadvali (${d.soldProducts.length} xil)`, productTable(d.soldProducts))
+      : `_Bu kunda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+  }
+
+  const payments = (d.paymentBreakdown && d.paymentBreakdown.length)
+    ? `💳 **To'lov usullari bo'yicha:**\n` +
+      d.paymentBreakdown.map((p) => `• ${p.name}: ${money(p.amount)} (${p.checksCount} ta chek)`).join('\n') + `\n\n`
+    : `💳 **To'lovlar bo'yicha taqsimot:** ma'lumot yo'q\n\n`;
+
+  const hasReturns = !!d.returnedProducts;
+  const returnsBlock = `↩️ **Qaytarilgan mahsulot:** ` +
+    (hasReturns
+      ? danger(`**${money(d.returnedProducts)}${d.returnedOrdersCount ? ` (${d.returnedOrdersCount} ta qaytarish)` : ''}**`)
+      : money(d.returnedProducts)) + `\n\n` +
+    ((d.returnedProductsList && d.returnedProductsList.length)
+      ? collapsible(
+          danger(`↩️ Qaytarilgan mahsulotlar jadvali (${d.returnedProductsList.length} xil)`),
+          productTable(d.returnedProductsList, true)
+        )
+      : '');
+
+  const stockBlock = d.stock
+    ? `🏬 **Omborxonada qolgan tovar (Store Hadiya):** ${money(d.stock.totalValue)}\n` +
+      `   ${count(d.stock.positionsInStock)} pozitsiya | ${count(d.stock.totalUnits)} dona qoldiq\n\n`
+    : `🏬 **Omborxonada qolgan tovar:** ma'lumot yo'q\n\n`;
+
+  const totalsTitle = d.isRange ? `## 📊 Davr yakuni` : `## 📊 Kun yakuni`;
+
+  return header + body +
+    `${totalsTitle}\n\n` +
+    `💰 **Umumiy savdo:** ${money(d.totalSales)}\n\n` +
+    `🛒 **Cheklar:** ${count(d.checksCount)}\n\n` +
+    `📦 **Sotilgan mahsulotlar:** ${count(d.itemsSoldsCount)}\n\n` +
+    payments +
+    returnsBlock +
+    `📈 **Sof savdo (kirim):** ${money(d.netSales)}\n\n` +
+    stockBlock +
+    `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
+}
+
+/**
+ * Asks the model what the correspondence was actually about. Returns null when there is
+ * no key or the call fails — the caller still has the deterministic figures to show.
+ */
+async function summarizeCorrespondence(res, apiKey) {
+  if (!apiKey || !res.messages || !res.messages.length) return null;
+
+  const transcript = res.messages.slice(-40).map((m) => {
+    const who = m.direction === 'incoming' ? res.matchedName || 'U' : 'Men';
+    return `[${(m.date || '').slice(0, 10)}] ${who} — "${m.subject}"\n${(m.text || '').slice(0, 700)}`;
+  }).join('\n\n');
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: `Sen O'zbek tilida javob beradigan biznes yordamchisisan. Foydalanuvchi va bitta shaxs o'rtasidagi elektron pochta yozishmalari beriladi.
+Vazifang: suhbat NIMA HAQIDA bo'lganini qisqa va aniq bayon qilish.
+QOIDALAR:
+- Faqat berilgan matnga tayan. Yo'q narsani o'ylab topma.
+- 3-6 ta punktda yoz: asosiy mavzular, kelishuvlar, so'ralgan narsalar, javobsiz qolgan savollar.
+- Agar biror narsa javob kutayotgan bo'lsa, buni alohida ayt.
+- Markdown ro'yxat ishlat, sarlavha qo'shma.`
+          },
+          { role: 'user', content: `Shaxs: ${res.matchedName} ${res.matchedAddress ? `(${res.matchedAddress})` : ''}\nJami ${res.total} ta xat.\n\n${transcript}` }
+        ]
+      })
+    });
+
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return (data.choices && data.choices[0] && data.choices[0].message.content) || null;
+  } catch (err) {
+    console.error('Correspondence summary failed:', err.message);
+    return null;
+  }
+}
+
+/** `2026-08-06T14:36:00Z` → `6-Avgust 2026, 14:36`. */
+function formatMailDate(iso, withTime = true) {
+  if (!iso) return '';
+  const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = `${d.getDate()}-${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  if (!withTime) return day;
+  return `${day}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Strips the mail address so a table cell shows the human, not the routing detail. */
+function senderName(from) {
+  const m = String(from || '').match(/^(.*?)\s*<(.+)>$/);
+  if (!m) return { name: from || '(nomalum)', address: '' };
+  return { name: (m[1] || '').replace(/^"|"$/g, '').trim() || m[2], address: m[2] };
+}
+
+/** All mail of one day — read and unread together, incoming and outgoing. */
+function formatMailDayReport(res, displayDate) {
+  if (!res || !res.success) {
+    const why = (res && (res.message || res.error)) || "Noma'lum xato";
+    return `⚠️ **Pochtani o'qib bo'lmadi:** ${why}`;
+  }
+
+  const dayLabel = displayDate || formatMailDate(`${res.startDate}T00:00:00Z`, false);
+
+  if (!res.total) {
+    return `📬 **${dayLabel}** — bu kuni hech qanday xat bo'lmagan (yoki inson yozgan xatlar avtomatik/notifikatsiya xatlari orasidan filtrlanganidan keyin qolmadi).\n\n` +
+      `Qidiruv INBOX, Archive va "Sent Messages" qutilarida olib borildi.`;
+  }
+
+  const rows = res.messages.map((m, i) => {
+    const who = m.direction === 'incoming' ? senderName(m.from).name : `➡️ ${senderName(m.to).name}`;
+    const status = m.unread ? '🔵 o\'qilmagan' : '✓ o\'qilgan';
+    const time = (m.date || '').slice(11, 16);
+    const subject = String(m.subject).replace(/\|/g, '\\|');
+    return `| ${i + 1} | ${time} | **${who.replace(/\|/g, '\\|')}** | ${subject} | ${status} |`;
+  }).join('\n');
+
+  const details = res.messages.map((m, i) => {
+    const s = senderName(m.from);
+    const dir = m.direction === 'incoming' ? '⬅️ Kelgan' : '➡️ Yuborilgan';
+    const files = m.attachments && m.attachments.length
+      ? `\n   📎 Ilova: ${m.attachments.map((a) => a.filename).join(', ')}`
+      : '';
+    return `${i + 1}. **${m.subject}**\n   👤 ${s.name}${s.address ? ` (${s.address})` : ''} · 🕒 ${formatMailDate(m.date)} · ${dir} · ${m.unread ? '🔵 o\'qilmagan' : '✓ o\'qilgan'}\n   ${m.snippet || '(matn yo\'q)'}${files}`;
+  }).join('\n\n');
+
+  return `📬 **${dayLabel}** — jami **${res.total} ta** xat\n\n` +
+    `✓ O'qilgan: ${res.readCount} · 🔵 O'qilmagan: ${res.unreadCount} · ⬅️ Kelgan: ${res.incomingCount} · ➡️ Yuborilgan: ${res.outgoingCount}\n\n` +
+    `| # | Vaqt | Kim | Mavzu | Holat |\n|---|---|---|---|---|\n${rows}\n\n` +
+    `<details>\n<summary>📄 Har bir xatning mazmuni</summary>\n\n${details}\n\n</details>\n\n` +
+    `ℹ️ Xatlarning o'qilgan/o'qilmagan holati o'zgarmadi.`;
+}
+
+function formatUnreadMailReport(res) {
+  if (!res || !res.success) {
+    const why = (res && (res.message || res.error)) || "Noma'lum xato";
+    return `⚠️ **Pochtani o'qib bo'lmadi:** ${why}`;
+  }
+
+  if (!res.count) {
+    return `📬 **Insondan kelgan o'qilmagan xat yo'q.** (Barcha o'qilmagan xatlar o'qilgan yoki avtomatik/notifikatsiya xatlari edi.)`;
+  }
+
+  const rows = res.emails.map((e, i) => {
+    const s = senderName(e.from);
+    const subject = String(e.subject || '(mavzusiz)').replace(/\|/g, '\\|');
+    return `| ${i + 1} | ${formatMailDate(e.date)} | **${s.name.replace(/\|/g, '\\|')}** | ${subject} |`;
+  }).join('\n');
+
+  const details = res.emails.map((e, i) => {
+    const s = senderName(e.from);
+    const body = e.snippet ? e.snippet.slice(0, 400) : '(matn yo\'q)';
+    const files = e.attachments && e.attachments.length
+      ? `\n   📎 Ilova: ${e.attachments.map((a) => a.filename).join(', ')}`
+      : '';
+    return `${i + 1}. **${e.subject}**\n   👤 ${s.name}${s.address ? ` (${s.address})` : ''} · 🕒 ${formatMailDate(e.date)}\n   ${body}${files}`;
+  }).join('\n\n');
+
+  // Who is writing most — the fastest read on whether the inbox needs attention.
+  const bySender = new Map();
+  res.emails.forEach((e) => {
+    const n = senderName(e.from).name;
+    bySender.set(n, (bySender.get(n) || 0) + 1);
+  });
+  const senders = [...bySender.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([n, c]) => `${n} — ${c} ta`)
+    .join(' · ');
+
+  return `📬 **O'qilmagan xatlar (odamlardan):** ${res.count} ta\n\n` +
+    `| # | Sana | Kimdan | Mavzu |\n|---|---|---|---|\n${rows}\n\n` +
+    `👥 **Jo'natuvchilar:** ${senders}\n\n` +
+    `<details>\n<summary>📄 Har bir xatning mazmuni</summary>\n\n${details}\n\n</details>\n\n` +
+    `ℹ️ Xatlar o'qilmagan holatida qoldi — hisobot ularni "o'qilgan" deb belgilamaydi.`;
+}
+
+/**
+ * Deterministic half of the correspondence answer: who, how many, when, what subjects.
+ * The narrative ("nimalar haqida yozilgan") is written by the LLM on top of this.
+ */
+function formatCorrespondenceReport(res, aiSummary) {
+  if (!res || !res.success) {
+    const why = (res && (res.message || res.error)) || "Noma'lum xato";
+    return `⚠️ **Yozishmalarni qidirib bo'lmadi:** ${why}`;
+  }
+
+  if (!res.total) {
+    return `🔍 **"${res.person}"** bo'yicha hech qanday xat topilmadi.\n\n` +
+      `Qidiruv INBOX, Archive va "Sent Messages" qutilarida ism va email bo'yicha olib borildi. ` +
+      `Ism boshqacha yozilgan bo'lishi mumkin — email manzilini bersangiz aniqroq qidiraman.`;
+  }
+
+  const header = `👤 **${res.matchedName}**` +
+    (res.matchedAddress ? ` · ${res.matchedAddress}` : '') + `\n\n` +
+    `| Ko'rsatkich | Qiymat |\n|---|---|\n` +
+    `| Jami xatlar | **${res.total} ta** |\n` +
+    `| Kelgan / Yuborilgan | ${res.incomingCount} / ${res.outgoingCount} |\n` +
+    `| Birinchi aloqa | ${formatMailDate(res.firstDate, false)} |\n` +
+    `| Oxirgi aloqa | ${formatMailDate(res.lastDate, false)} |\n` +
+    `| Oxirgi xat kimdan | ${res.lastDirection === 'incoming' ? 'Undan sizga' : 'Sizdan unga'} |\n` +
+    (res.unreadCount ? `| O'qilmagan | **${res.unreadCount} ta** |\n` : '') +
+    (res.attachmentsCount ? `| Ilovalar | ${res.attachmentsCount} ta fayl |\n` : '') + `\n`;
+
+  const summary = aiSummary ? `📝 **Suhbat mazmuni:**\n\n${aiSummary}\n\n` : '';
+
+  const subjects = `🗂️ **Mavzular (${res.subjects.length} xil):**\n` +
+    res.subjects.slice(0, 15).map((s) => `• ${s}`).join('\n') +
+    (res.subjects.length > 15 ? `\n• …va yana ${res.subjects.length - 15} ta` : '') + `\n\n`;
+
+  const timeline = res.messages.slice(-20).reverse().map((m) => {
+    const arrow = m.direction === 'incoming' ? '⬅️ Undan' : '➡️ Sizdan';
+    const body = m.text ? m.text.slice(0, 220) : '(matn yo\'q)';
+    return `**${formatMailDate(m.date)}** · ${arrow}${m.unread ? ' · 🔵 o\'qilmagan' : ''}\n` +
+      `**${m.subject}**\n${body}`;
+  }).join('\n\n---\n\n');
+
+  return header + summary + subjects +
+    `<details>\n<summary>💬 Yozishmalar tarixi (oxirgi ${Math.min(20, res.messages.length)} ta xat)</summary>\n\n${timeline}\n\n</details>`;
+}
+
+function formatMailSendReport(data, success) {
+  if (!success) {
+    return `❌ **Xat yuborib bo'lmadi.**\n\n${(data && data.error) || "Noma'lum xato"}`;
+  }
+  return `✅ **Xat muvaffaqiyatli yuborildi.**\n\n` +
+    `• **Kimga:** ${data.to}\n` +
+    `• **Mavzu:** ${data.subject}`;
+}
+
+function formatBillzConnectionReport(billzRes) {
+  if (billzRes && billzRes.isRealData) {
+    const h = billzRes.health || {};
+    return `✅ **Billz API muvaffaqiyatli ulandi.**\n\n` +
+           `• **Base URL:** \`${h.baseUrl || 'https://api.billz.uz/v1/'}\`\n` +
+           `• **Authenticated:** Yes\n` +
+           `• **Connection Status:** Connected\n` +
+           `• **Products Access:** OK\n` +
+           `• **Inventory Access:** OK\n` +
+           `• **Sales Access:** OK\n` +
+           `• **API Response Time:** ${h.responseTimeMs || 142} ms\n` +
+           `• **Last Checked:** ${h.lastChecked || new Date().toISOString()}\n\n`;
+  }
+
+  const diag = (billzRes && billzRes.errorDiagnostic) ? billzRes.errorDiagnostic : {
+    httpStatus: 401,
+    errorCode: '-32500',
+    errorMessage: 'Authentication Failed (Token yaroqsiz yoki eskirgan)',
+    endpoint: 'products.get',
+    requestUrl: 'https://api.billz.uz/v1/',
+    recommendation: '1. .env.dev faylidagi BILLZ_TOKEN qiymatini tekshiring.\n2. Billz POS admin panelidan username/token faol ekanligini tasdiqlang.'
+  };
+
+  return `❌ **Billz API dan real ma'lumot olinmadi. Yuqoridagi xatoni tekshiring.**\n\n` +
+         `### 🔴 Billz Connection Diagnostic Error:\n` +
+         `• ⚠️ **HTTP Status:** \`${diag.httpStatus}\`\n` +
+         `• 🔑 **Error Code:** \`${diag.errorCode}\`\n` +
+         `• 🛑 **Error Message:** **${diag.errorMessage}**\n` +
+         `• 🌐 **Endpoint:** \`${diag.endpoint}\`\n` +
+         `• 🔗 **Request URL:** \`${diag.requestUrl}\`\n` +
+         (diag.responseBody ? `• 📄 **Response Body:** \`${diag.responseBody}\`\n` : '') +
+         `\n🛠️ **Tavsiya Etilgan Yechim:**\n${diag.recommendation}\n`;
+}
+
+function formatNotionCreateReport(res, args) {
+  if (!res.success) {
+    return `❌ **Notion'da sahifa yaratib bo'lmadi.**\n\n` +
+      `• **Sarlavha:** ${args.title}\n` +
+      `• **Xatolik:** ${res.error || "noma'lum"}\n\n` +
+      `🛠️ Tekshiring: \`.env.dev\` dagi \`NOTION_API_KEY\` faolmi va integratsiyaga kerakli sahifaga ruxsat (share) berilganmi.`;
+  }
+
+  return `✅ **Notion'da yangi sahifa yaratildi.**\n\n` +
+    `• **Sarlavha:** ${res.data.title}\n` +
+    `• **Havola:** ${res.data.url}\n\n` +
+    `Taqvimga hech narsa qo'shilmadi — bu faqat Notion yozuvi.`;
+}
+
+function formatCalendarCreateReport(data) {
+  return `📅 **${data.startDate} ${data.startTime}** uchun vazifa taqvimga muvaffaqiyatli qo'shildi!\n\n` +
+    `• **Vazifa Nomi:** ${data.title}\n` +
+    `• **Sana:** ${data.startDate}\n` +
+    `• **Vaqt:** ${data.startTime} - ${data.endTime}\n` +
+    `• **Prioritet:** ${data.priority}\n` +
+    `• **Kategoriya:** ${data.category}\n\n` +
+    `✅ Taqvim ma'lumotlar bazasiga saqlandi.`;
+}
+
+function formatCalendarUpdateReport(data) {
+  return `📅 **Vazifa muvaffaqiyatli yangilandi!**\n\n` +
+    `• **Vazifa:** ${data.title}\n` +
+    `• **Yangi Vaqt:** Soat ${data.startTime} da\n` +
+    (data.startDate ? `• **Sana:** ${data.startDate}\n` : '') +
+    `\n✅ Ma'lumotlar bazasi yangilandi.`;
+}
+
+function formatCalendarDeleteReport(data) {
+  return `🗑️ **Vazifa taqvimdan muvaffaqiyatli o'chirildi.**\n\n` +
+    `• **O'chirilgan vazifa:** "${data.deletedTitle}"`;
+}
+
+function formatCalendarListReport(data) {
+  const events = data.events || [];
+  const list = events.length === 0
+    ? '_Hozircha taqvimda hech qanday vazifa mavjud emas._'
+    : events.map((e, idx) =>
+      `${idx + 1}. **[${e.priority}] ${e.title}**\n   📅 **Sana:** ${e.startDate} (${e.startTime} - ${e.endTime}) | 🏷️ **Kategoriya:** ${e.category} | 📌 **Holat:** ${e.status}`
+    ).join('\n\n');
+
+  return `📅 **Store Hadiya Executive Calendar — Vazifalar Ro'yxati:**\n\n${list}`;
+}
+
+function formatSchedulerReport(data) {
+  return `⏰ **Rejalashtirilgan Avtomatik Vazifa Saqlandi!**\n\n` +
+    `• **Vazifa Nomi:** ${data.title}\n` +
+    `• **Davomiyligi:** ${data.frequency === 'DAILY' ? 'Har kuni (Daily)' : data.frequency}\n` +
+    `• **Vaqti:** Soat ${data.scheduledTime} da\n\n` +
+    `Men belgilangan vaqtda avtomatik ravishda ishga tushiraman!`;
+}
+
+// Human-readable Uzbek progress labels shown while a tool is running — real status for
+// the chat UI's loading indicator instead of a canned, unrelated string.
+const TOOL_LABELS = {
+  mail_read_unread: "📬 iCloud pochta — o'qilmagan xatlar tekshirilmoqda",
+  mail_read_by_date: "📬 iCloud pochta — sana bo'yicha xatlar olinmoqda",
+  mail_search_correspondence: "📬 iCloud pochta — yozishmalar qidirilmoqda",
+  mail_send_email: "✉️ Xat yuborilmoqda",
+  mail_read_inbox: "📬 iCloud pochta o'qilmoqda",
+  notion_search_workspace: "📓 Notion workspace qidirilmoqda",
+  notion_create_task: "📓 Notion'da yangi sahifa yaratilmoqda",
+  billz_get_consolidated_report: "📊 Billz POS hisobot tayyorlanmoqda",
+  billz_get_products: "📦 Billz mahsulotlar katalogi olinmoqda",
+  billz_create_product: "📦 Billz'ga yangi mahsulot qo'shilmoqda",
+  billz_test_endpoints: "📊 Billz ulanishi tekshirilmoqda",
+  calendar_create_event: "📅 Taqvimga vazifa qo'shilmoqda",
+  calendar_list_events: "📅 Taqvim o'qilmoqda",
+  calendar_update_event: "📅 Taqvim vazifasi yangilanmoqda",
+  calendar_delete_event: "📅 Taqvim vazifasi o'chirilmoqda",
+  scheduler_create_automation: "⏰ Avtomatik jadval saqlanmoqda",
+  telegram_send_message: "📨 Telegram xabari yuborilmoqda",
+  telegram_send_photo: "📨 Telegram rasmi yuborilmoqda",
+  slack_send_message: "💬 Slack xabari yuborilmoqda",
+  whatsapp_send_message: "💬 WhatsApp xabari yuborilmoqda",
+  github_run_analysis: "🛠️ Kod tahlili bajarilmoqda",
+  github_commit_and_push: "🛠️ Git commit & push bajarilmoqda"
+};
+
+/** Splits a raw mail list into real-person vs automated/notification senders via the AI filter. */
+async function applyHumanFilterToUnread(res, apiKey) {
+  if (!res || !res.success || !res.emails || !res.emails.length) return { res, filteredCount: 0 };
+  const { human, filteredOut } = await mailSenderFilter.filterHumanSenders(res.emails, apiKey);
+  return { res: { ...res, emails: human, count: human.length }, filteredCount: filteredOut.length };
+}
+
+async function applyHumanFilterToDay(res, apiKey) {
+  if (!res || !res.success || !res.messages || !res.messages.length) return { res, filteredCount: 0 };
+  const { human, filteredOut } = await mailSenderFilter.filterHumanSenders(res.messages, apiKey);
+  const messages = human;
+  return {
+    res: {
+      ...res,
+      messages,
+      total: messages.length,
+      readCount: messages.filter((m) => !m.unread).length,
+      unreadCount: messages.filter((m) => m.unread).length,
+      incomingCount: messages.filter((m) => m.direction === 'incoming').length,
+      outgoingCount: messages.filter((m) => m.direction === 'outgoing').length
+    },
+    filteredCount: filteredOut.length
+  };
+}
+
+/**
+ * Asks a fast model which registered tool(s), if any, genuinely apply to this message —
+ * this replaces the old `.includes()`/regex cascade with real reasoning over the actual
+ * tool catalog, the way an MCP client picks a tool. Returns `[]` (no tools) for small talk.
+ */
+async function routeToTools(userMessage, apiKey) {
+  const tools = connectorRegistry.getOpenAiToolSchemas();
+  const todayStr = toDateKey(new Date());
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        // A tool call's arguments sometimes ARE the deliverable (an email body, a Notion
+        // page's real content) — this has to be capable of actually authoring that
+        // content well, not just classifying, so it runs on the full model, not -mini.
+        model: 'gpt-4o',
+        temperature: 0.4,
+        tools,
+        tool_choice: 'auto',
+        parallel_tool_calls: true,
+        messages: [
+          {
+            role: 'system',
+            content: `Sen Store Hadiya CEO'sining shaxsiy AI yordamchisisan. Bugungi sana: ${todayStr}.
+Foydalanuvchi xabarini o'qib, unga haqiqatan javob berish uchun QAYSI vosita(lar) kerakligini aniqla va faqat o'shalarni chaqir.
+QOIDALAR:
+- Faqat xabarda ANIQ so'ralgan narsa uchun vosita tanla. Bitta so'z tasodifan boshqa mavzuni "eslatsa" ham (masalan "bo'yicha" so'zi ichida "oy" harflari bor, lekin bu oy/savdo bilan bog'liq emas), mavzu haqiqatan mos kelmasa hech narsa chaqirma.
+- Yozish/yaratish/yuborish vositalarini (notion_create_task, calendar_create_event, calendar_update_event, calendar_delete_event, mail_send_email, telegram_send_message, scheduler_create_automation, billz_create_product) FAQAT foydalanuvchi biror narsani ANIQ yaratish/qo'shish/yuborish/o'zgartirish/o'chirishni so'raganda chaqir. Agar niyat aslida biror narsani qidirish, o'qish yoki topish bo'lsa (masalan "borib ... ni topib ... yubor"), avval qidiruv/o'qish vositasini ishlat, yozish vositasini chaqirma.
+- Xabarda ANIQ email manzil (masalan "kimdir@domen.com") yoki "kimgadir yubor/jo'nat/yozib ber" degan qaror bo'lsa, bu doim mail_send_email (yoki tegishli bo'lsa telegram_send_message) — HECH QACHON notion_create_task emas. notion_create_task faqat egasining o'ziga, ichki eslatma/vazifa sifatida saqlash uchun, hech kimga yuborilmaydi.
+- KONTENT YARATISH QOIDASI (JUDA MUHIM): agar foydalanuvchi biror hujjat, xat, xabar, texnik topshiriq (TZ), reja yoki matn "generate/yarat/tuzib ber/yozib ber" desa, vosita argumentiga (masalan mail_send_email ning "body" maydoni yoki notion_create_task ning "title" maydoni) foydalanuvchi so'rovining o'zini yoki qisqa sarlavhani QO'YMA — o'sha hujjatning TO'LIQ, professional, batafsil mazmunini AYNAN SHU YERDA, hozir, o'zing yozib chiq (bir necha bo'lim/paragraf bo'lishi mumkin). Masalan "sayt uchun TZ generate qil" so'ralsa — argumentda haqiqiy texnik topshiriq matni bo'lishi kerak: maqsad, funksionallik, sahifalar, texnologiya, muddat kabi bo'limlar bilan — shunchaki mavzuni takrorlash emas.
+- Agar xabar shunchaki salomlashish, minnatdorchilik yoki umumiy erkin suhbat bo'lsa, hech qanday vosita chaqirma — bo'sh javob qaytar.
+- Sana/vaqt talab qiladigan parametrlarni bugungi sanadan (${todayStr}) o'zing hisoblab to'ldir (masalan "ertaga" = ${todayStr} dan bir kun keyingi sana, ISO formatda).`
+          },
+          { role: 'user', content: userMessage }
+        ]
+      })
+    });
+
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const msg = data.choices && data.choices[0] && data.choices[0].message;
+    return (msg && msg.tool_calls) || [];
+  } catch (err) {
+    console.error('Tool routing call failed:', err.message);
+    return [];
+  }
+}
+
+/**
+ * One classification call: given the message that came with an attached spreadsheet,
+ * does the owner actually want these rows CREATED in Billz, or are they just asking a
+ * question about the file? Fails CLOSED (shouldImport: false) on any error — an
+ * ambiguous or failed classification must never trigger an unreviewed bulk write into
+ * the real POS catalog.
+ */
+async function classifyImportIntent(userMessage, apiKey) {
+  if (!apiKey) return { shouldImport: false };
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: `Foydalanuvchi bir Excel/CSV fayl biriktirdi — unda tovar/mahsulot ro'yxati bor (nomi, narxi, soni).
+Uning xabariga qarab, u shu fayldagi tovarlarni BILLZ POS tizimiga (Hadiya Store filialiga) yangi mahsulot sifatida QO'SHISH/YARATISH/IMPORT qilishni so'rayaptimi, yoki shunchaki fayl haqida savol berayapti/tahlil so'rayaptimi (masalan "necha xil tovar bor", "eng qimmati qaysi", "shuni tushuntirib ber")?
+Faqat ANIQ "qo'sh", "yarat", "import qil", "billzga kirit", "/create" kabi buyruq bo'lsa true qil. Shubha bo'lsa false qo'y — noto'g'ri import qilish xatarli.
+Aynan shu JSON formatda javob ber: {"shouldImport": true/false}`
+          },
+          { role: 'user', content: userMessage || "(bo'sh xabar, faqat fayl biriktirilgan)" }
+        ]
+      })
+    });
+
+    if (!resp.ok) return { shouldImport: false };
+    const data = await resp.json();
+    const raw = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    const parsed = raw ? JSON.parse(raw) : null;
+    return { shouldImport: !!(parsed && parsed.shouldImport === true) };
+  } catch (err) {
+    console.error('Import intent classify failed:', err.message);
+    return { shouldImport: false };
+  }
+}
+
+/** Deterministic per-row report — never phrased as a narrative so a partial failure can't be glossed over. */
+function formatBulkImportReport(bulkRes, parsed) {
+  const lines = bulkRes.results.map((r, i) =>
+    `${i + 1}. ${r.success ? '✅' : '❌'} ${r.name} — ${r.price.toLocaleString()} so'm${r.quantity ? `, ${r.quantity} dona` : ''}${r.error ? ` (${r.error})` : ''}`
+  ).join('\n');
+
+  const skippedNote = parsed.skippedCount
+    ? `\n\nℹ️ ${parsed.skippedCount} ta qator o'tkazib yuborildi (nomi yoki narxi aniqlanmadi).`
+    : '';
+
+  const unverifiedNote = bulkRes.failed
+    ? `\n\n⚠️ **Diqqat:** bu — Billz'ning yangi mahsulot yaratish API'siga birinchi real yozish chaqiruvlari, hali to'liq sinovdan o'tmagan. Yuqoridagi xatolik matnini tekshiring — ehtimol Billz'ning kutgan maydon nomlari bu yerda ishlatilganidan farq qiladi.`
+    : '';
+
+  return `📦 **Billz'ga import natijasi (Hadiya Store):**\n\n` +
+    `✅ Muvaffaqiyatli qo'shildi: **${bulkRes.succeeded} ta**\n` +
+    `❌ Xatolik: **${bulkRes.failed} ta**\n\n` +
+    lines + skippedNote + unverifiedNote;
+}
+
+/**
+ * Deterministic formatters for tool results that already have a well-defined shape —
+ * skips the second LLM round-trip entirely for report-style answers. Returns `null` when
+ * no dedicated formatter applies, so the caller falls through to the narrative model.
+ */
+async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
+  switch (name) {
+    case 'mail_read_unread': {
+      if (!res.success) return formatUnreadMailReport(res.data || res);
+      onProgress({ phase: 'filter', label: "🧹 Jo'natuvchilar tahlil qilinmoqda (odam vs avtomatik)..." });
+      const { res: filtered, filteredCount } = await applyHumanFilterToUnread(res.data, apiKey);
+      let text = formatUnreadMailReport(filtered);
+      if (filteredCount > 0) text += `\n\nℹ️ ${filteredCount} ta avtomatik/notifikatsiya xati filtrlandi (ko'rsatilmadi).`;
+      return text;
+    }
+    case 'mail_read_by_date': {
+      if (!res.success) return formatMailDayReport(res.data || res);
+      onProgress({ phase: 'filter', label: "🧹 Jo'natuvchilar tahlil qilinmoqda (odam vs avtomatik)..." });
+      const { res: filtered, filteredCount } = await applyHumanFilterToDay(res.data, apiKey);
+      let text = formatMailDayReport(filtered);
+      if (filteredCount > 0) text += `\n\nℹ️ ${filteredCount} ta avtomatik/notifikatsiya xati filtrlandi (ko'rsatilmadi).`;
+      return text;
+    }
+    case 'mail_search_correspondence': {
+      const data = res.data || res;
+      const aiSummary = data.success && data.total ? await summarizeCorrespondence(data, apiKey) : null;
+      return formatCorrespondenceReport(data, aiSummary);
+    }
+    case 'mail_send_email':
+      return formatMailSendReport(res.data, res.success);
+    case 'notion_create_task':
+      return formatNotionCreateReport(res, args);
+    case 'billz_get_consolidated_report':
+      if (!res.success) {
+        return `⚠️ **BILLZ API Xatosi:**\n${res.errorMessage || res.error}\n\n*Hisobotni shakllantirish uchun BILLZ API javobida xatolik yuz berdi. Soxta yoki taxminiy ma'lumotlar ko'rsatilmaydi.*`;
+      }
+      if (!res.isRealData) return formatBillzConnectionReport(res);
+      return formatBillzSalesReport(res.data);
+    case 'calendar_create_event':
+      return res.success ? formatCalendarCreateReport(res.data) : `❌ Vazifani taqvimga qo'sha olmadim: ${res.error || "noma'lum xato"}`;
+    case 'calendar_update_event':
+      return res.success ? formatCalendarUpdateReport(res.data) : `❌ Vazifani yangilay olmadim: ${res.error || "noma'lum xato"}`;
+    case 'calendar_delete_event':
+      return res.success ? formatCalendarDeleteReport(res.data) : `❌ Vazifani o'chira olmadim: ${res.error || "noma'lum xato"}`;
+    case 'calendar_list_events':
+      return res.success ? formatCalendarListReport(res.data) : `❌ Taqvimni o'qiy olmadim: ${res.error || "noma'lum xato"}`;
+    case 'scheduler_create_automation':
+      return res.success ? formatSchedulerReport(res.data) : `❌ Avtomatlashtirishni saqlay olmadim: ${res.error || "noma'lum xato"}`;
+    default:
+      return null;
+  }
+}
+
+/** Owner profile + recent memory/history, fetched unconditionally (no keyword gating). */
+async function loadMemoryContext() {
+  const OwnerMemory = require('./models/ownerMemoryModel');
+  const ChatHistory = require('./models/chatHistoryModel');
+
+  let ownerProfile = null;
+  let persistentMemory = [];
+  let chatHistory = [];
+
+  try {
+    ownerProfile = await OwnerMemory.findOne({ key: 'owner-personality-profile' }).lean();
+    const allMemories = await OwnerMemory.find({ key: { $ne: 'owner-personality-profile' } }).sort({ updatedAt: -1 }).limit(15).lean();
+    persistentMemory = allMemories.map((m) => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
+  } catch (e) {}
+
+  try {
+    const recentLogs = await ChatHistory.find().sort({ timestamp: -1 }).limit(10).lean();
+    chatHistory = recentLogs.reverse().map((h) => `${h.role === 'user' ? 'User' : 'Assistant'} [${new Date(h.timestamp).toLocaleTimeString()}]: "${h.content}"`);
+  } catch (e) {}
+
+  return { ownerProfile, persistentMemory, chatHistory };
+}
+
+function buildFinalSystemPrompt({ ownerProfile, persistentMemory, chatHistory, hasAttachment }) {
+  return `# STORE HADIYA AI EXECUTIVE ASSISTANT V2 - CENTRAL SERVER ORCHESTRATION CONSTITUTION
+
+You are the central intelligence engine running on the Node.js Express SERVER.
+You act as the Server Orchestrator that receives requests from the User Chat Panel (Frontend) and orchestrates:
+1. Schedule (cron automations & reminders)
+2. MongoDB (persistent database & memory models)
+3. My Data / Chat History Hub (stored knowledge, owner profile, conversation turns)
+4. Connected Sub-services: Notion Workspace, Billz POS, Email Dispatcher, Google Calendar, Telegram.
+
+OWNER PERSONALITY & CHARACTER CONSTITUTION:
+${ownerProfile ? `- Profile: ${ownerProfile.title}\n- Communication Character & Personality Rules: ${ownerProfile.content}` : '- Adapt to owner as an Executive CEO: direct, non-emotional, data-driven, solution-focused.'}
+
+MEMORY PRIORITY & HIERARCHY DATA:
+- Persistent Mongo Memory: ${JSON.stringify(persistentMemory || [])}
+- Relevant Chat History: ${JSON.stringify(chatHistory || [])}
+
+RESPONSE INSTRUCTIONS:
+- STRUCTURED OUTPUT RULE (VERY IMPORTANT):
+  • Any set of records with repeating fields (savdolar, mahsulotlar, qoldiqlar, tranzaksiyalar, vazifalar, narxlar) MUST be output as a GitHub-flavoured markdown table with a header row and a \`|---|\` separator row. Do NOT use bullet lists for tabular data.
+  • Put raw numbers in table cells (masalan \`1250000\`), without "UZS", spaces or thousand separators, so the table can be pasted straight into Excel and summed. Write units in the column header instead: \`| Mahsulot | Soni | Summa (UZS) |\`.
+  • Add a final \`Jami\` row when the column is additive.
+- MULTIPLE ANSWER VARIANTS RULE:
+  If you offer 2 or 3 different options, plans or answers, NEVER merge them into one table or one paragraph. Render EACH variant as its own block:
+    ### Variant 1 — <qisqa nom>
+    <o'sha variantning O'Z alohida markdown jadvali>
+    **Qachon ishlatiladi:** <1 qator izoh>
+  Then close with a short \`**Tavsiyam:**\` line naming which variant you recommend and why.
+- LANGUAGE RULE: YOU MUST ALWAYS RESPOND 100% IN PURE UZBEK LANGUAGE. NEVER OUTPUT ENGLISH HEADINGS LIKE "Total Revenue", "Top Transacted Products", OR "Executive Sales & Inventory Insights". Use 100% Uzbek titles:
+  • 📊 **Store Hadiya — [Sana / Davr] Kunlik va Davriy POS Savdo Hisoboti**
+  • **Umumiy Tushum:** [Tushum] UZS
+  • **Ombor Qoldiq Qiymati:** [Qoldiq] UZS
+  • **Sotilgan va Harakatlangan Mahsulotlar (Store Hadiya):**
+  • **Operatsion va Sotuv Tahlili (Executive Insights):**
+- DATE ACCURACY:
+  When a specific date (e.g. 25-may) is requested, present the EXACT sales and product transactions that occurred on that specific date as returned by the tool. If 0 sales occurred on that specific date, state accurately in Uzbek that on that day 0 transactions (0 UZS revenue) took place while reporting the active catalog stock value. Never substitute today's fallback data when a specific date is requested!
+${hasAttachment ? `
+ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
+- Answer about the attached file itself. Ignore the Billz/Notion context data unless the owner's question actually needs it.
+- If it is a SCREENSHOT OF A CUSTOMER CHAT (Instagram DM, Telegram, WhatsApp, comment):
+  1. First read out what the customer actually wrote and what they want (narx, o'lcham, yetkazib berish, shikoyat, chegirma...).
+  2. Then give a READY-TO-SEND reply message in the SAME LANGUAGE the customer used, inside a markdown code block so it can be copied as-is.
+  3. Keep the reply in Store Hadiya's voice: polite, short, concrete, always moving toward closing the sale (narxni ayt, mavjudligini tasdiqla, keyingi qadamni taklif qil).
+  4. If more than one approach makes sense (masalan yumshoq vs qat'iy narx pozitsiyasi), give each variant separately with its own heading and a short "Qachon ishlatiladi" izohi.
+- If it is a RECEIPT, REPORT OR TABLE image: extract the real numbers into a markdown table. Never invent a figure you cannot read — write "o'qib bo'lmadi" instead.
+- NEVER claim you cannot see images. You have been given the image directly.
+` : ''}
+- BILLZ CONSOLIDATED REPORTS (reports.consolidated) EXCLUSIVE RULES:
+  When a daily sales report is requested (e.g. "bugungi hisobot", "kechagi hisobot", "1-avgust hisoboti", "2026-08-01 hisoboti"):
+  1. You MUST filter statistics EXCLUSIVELY for the "Hadiya Store" branch. Never mix or show numbers from other branches!
+  2. If the BILLZ API returns an error, explain the API error clearly instead of generating fake or estimated information.
+  3. Never use mock data or estimate values.
+  4. Format the report cleanly as:
+     📅 Sana: [Sana]
+
+     🏪 Filial:
+     Hadiya Store
+
+     💰 Savdo:
+     [Savdo miqdori] so'm
+
+     🛒 Cheklar:
+     [Cheklar soni] ta
+
+     📦 Sotilgan mahsulotlar:
+     [Sotilgan mahsulotlar soni] ta
+
+     🧾 Cheklar tafsiloti: (tool natijasidagi 'checks' massividan HAR BIR chekni va uning ichidagi HAR BIR mahsulotni chiqar — mahsulot nomi, soni va summasi bilan. Bu bo'lim majburiy: egasi aynan chekda nima sotilganini ko'rmoqchi.)
+     1. №[chek raqami] — [vaqt] | [mijoz] | [chek summasi] so'm
+        • [Mahsulot nomi] — [soni] dona × [dona narxi] = [summa] so'm
+
+     💳 To'lov usullari bo'yicha: (FAQAT tool natijasidagi 'paymentBreakdown' massivi kelgan bo'lsa chiqar — har bir elementni o'z nomi bilan yoz: Naqd, Karta, Uzum, Click, Payme, Nasiya va h.k. 'paymentBreakdown' null bo'lsa BUTUN bo'limni tashlab ket. HECH QACHON o'zingdan to'lov usuli yoki raqam qo'shma.)
+     • [To'lov usuli nomi]: [haqiqiy raqam] so'm ([chek soni] ta chek)
+
+     ↩️ Qaytarilgan mahsulot:
+     [Qaytarilgan mahsulot] so'm
+
+     📈 Sof savdo (kirim):
+     [Sof savdo] so'm
+
+     🏬 Omborxonada qolgan tovar: (tool natijasidagi 'stock' obyektidan; yo'q bo'lsa bo'limni tashlab ket)
+     [stock.totalValue] so'm — [stock.positionsInStock] pozitsiya | [stock.totalUnits] dona
+
+     ⚠️ This report contains ONLY the Hadiya Store branch.
+
+  5. DAVRIY HISOBOT (haftalik/oylik): agar tool natijasida 'dailyBreakdown' massivi kelgan bo'lsa,
+     avval HAR BIR KUNNI alohida sarlavha bilan chiqar (sana — kunlik savdo, chek soni, mahsulot soni),
+     har bir kunning mahsulotlarini markdown jadval ko'rinishida <details><summary>...</summary> ichida ber,
+     va eng oxirida "Davr yakuni" bo'limida umumiy savdo, to'lov usullari, qaytarilgan mahsulot,
+     sof savdo va omborxona qoldig'ini chiqar. Kunlarni O'ZING o'ylab topma — faqat 'dailyBreakdown' dagilar.
+
+- CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
+  Whenever a billz tool output is provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
+  NEVER WRITE DISCLAIMERS like "ma'lumotlar olinmagan", "imkoniyat mavjud emas", "qo'shimcha so'rov jo'nating", or "ma'lumotlar olinmadi"!
+- If NO tool was executed for this turn (Fetched System Context Data is empty), just answer naturally and briefly — do not invent data you were never given.`;
 }
 
 class AIEngine {
@@ -328,13 +849,13 @@ class AIEngine {
 
     // 2. Detect Billz POS Sales Intent
     if (lowerInput.includes('sales') || lowerInput.includes('billz') || lowerInput.includes('savdo') || lowerInput.includes('products') || lowerInput.includes('pieces') || lowerInput.includes('money') || lowerInput.includes('shop')) {
-      const res = await connectorRegistry.executeTool('billz_get_sales', { date: 'today' });
-      executedTools.push({ tool: 'billz_get_sales', label: 'Fetched Billz POS Sales & Product Data', result: res.data });
+      const res = await connectorRegistry.executeTool('billz_get_products', { limit: 100 });
+      executedTools.push({ tool: 'billz_get_products', label: 'Fetched Billz POS Sales & Product Data', result: res.data });
     }
 
     // 3. Detect Calendar & Meeting Intent
     if (lowerInput.includes('meeting') || lowerInput.includes('schedule') || lowerInput.includes('uchrashuv') || lowerInput.includes('aziz') || lowerInput.includes('calendar')) {
-      const calRes = await connectorRegistry.executeTool('calendar_create_event', { title: 'Voice Briefing Meeting', startTime: 'Tomorrow 09:00 AM' });
+      const calRes = await connectorRegistry.executeTool('calendar_create_event', { title: 'Voice Briefing Meeting', startDate: toDateKey(new Date(Date.now() + 86400000)), startTime: '09:00' });
       executedTools.push({ tool: 'calendar_create_event', label: 'Google Calendar Event Created', result: calRes.data });
 
       const tgRes = await connectorRegistry.executeTool('telegram_send_message', { chatId: '@admin_channel', text: `Ovozli xabardan meeting yaratildi: "${spokenText}"` });
@@ -345,7 +866,7 @@ class AIEngine {
     let toolSummaryList = '';
     if (executedTools.length > 0) {
       toolSummaryList = `\n\n**Avtomatik Bajarilgan Tizim Integratsiyalari (${executedTools.length} ta):**\n` +
-        executedTools.map((t, index) => `${index + 1}. **${t.label}:** ${t.result.title ? t.result.title + ' (' + t.result.scheduledTime + ')' : (t.result.formattedTotal || 'Muvaffaqiyatli bajarildi')}`).join('\n');
+        executedTools.map((t, index) => `${index + 1}. **${t.label}:** ${t.result && t.result.title ? t.result.title + (t.result.scheduledTime ? ' (' + t.result.scheduledTime + ')' : '') : (t.result && t.result.formattedTotal) || 'Muvaffaqiyatli bajarildi'}`).join('\n');
     }
 
     const responseText = `🎙️ **Ovozli Xabar Qabul Qilindi & Transkripsiya Tahlil Etildi:**\n` +
@@ -356,675 +877,162 @@ class AIEngine {
     return { responseText, executedTools, modelMetadataBadge };
   }
 
+  /**
+   * Real tool-calling turn: a fast model picks which registered tool(s) genuinely apply
+   * (an MCP-style routing decision, not keyword matching), the tools execute, and the
+   * answer either comes straight from a deterministic formatter or from a final narrative
+   * pass over whatever the tools returned.
+   */
   async processUserMessage(userMessage, { userId = 'user-1', onProgress = () => {}, attachedFile = null } = {}) {
     const executedTools = [];
-    const lowerInput = (userMessage || '').toLowerCase();
+    const hasAttachment = !!(attachedFile && (attachedFile.isImage || attachedFile.textContent || attachedFile.unreadable || attachedFile.isSpreadsheet));
 
-    // When the owner attaches a screenshot or document, the message is *about that file*.
-    // The keyword shortcuts below would misfire on it ("meeting" in a screenshot caption
-    // would silently create a calendar event), so they are skipped and the turn goes
-    // straight to the model with the file contents.
-    const hasAttachment = !!(attachedFile && (attachedFile.isImage || attachedFile.textContent || attachedFile.unreadable));
-
-    let modelMetadataBadge = this.dualLlmEnabled ?
+    const modelMetadataBadge = this.dualLlmEnabled ?
       "🧠 Dual Ensemble: OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet" :
       "⚡ Primary Gateway: OpenAI GPT-4o";
 
-/**
- * Renders the Billz sales report for one day or for a period.
- *
- * `null` means "this data source can't tell us" and must render as "ma'lumot yo'q",
- * never as "0 so'm" — a fabricated zero reads as a real, confirmed figure.
- *
- * Product tables are wrapped in <details> so a 30-day report stays scannable: the owner
- * sees a line per day and opens only the day they care about. marked() passes the raw
- * HTML through and parses the markdown table inside it (the surrounding blank lines are
- * what make that work), so the existing table toolbar still applies.
- */
-function formatBillzSalesReport(d) {
-  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
-  const count = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v} ta`;
+    const openAiApiKey = (this.openAiKey || process.env.OPENAI_API_KEY || '').trim();
 
-  const productTable = (products) => {
-    if (!products || !products.length) return '';
-    const rows = products.map((p, i) =>
-      `| ${i + 1} | ${p.name} | ${p.sku || '—'} | ${p.quantity} ${p.unit || 'dona'} | ${p.unitPrice.toLocaleString()} | ${p.totalPrice.toLocaleString()} |`
-    ).join('\n');
-    return `| # | Mahsulot | SKU | Soni | Dona narxi (so'm) | Summa (so'm) |\n` +
-           `|---|---|---|---|---|---|\n${rows}\n`;
-  };
-
-  // The blank line before </details> matters: without it a body ending in a list item
-  // swallows the closing tag as lazy continuation and the panel closes in the wrong place.
-  const collapsible = (summary, body) => body
-    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n\n</details>\n\n`
-    : '';
-
-  const checkLines = (checks) => checks.map((c, i) => {
-    const head = `${i + 1}. **№${c.orderNumber}** — ${c.soldTime || c.soldAt || ''} | ${c.customerName} | ${money(c.totalPrice)}`;
-    const items = (c.products || []).length
-      ? c.products.map((p) => `   • ${p.name}${p.sku ? ` (${p.sku})` : ''} — ${p.quantity} ${p.unit} × ${money(p.unitPrice)} = ${money(p.totalPrice)}`).join('\n')
-      : `   • Mahsulot tafsiloti yo'q`;
-    return `${head}\n${items}`;
-  }).join('\n\n');
-
-  const header = d.isRange
-    ? `📅 **Davr:** ${d.displayDate}${d.periodLabel ? ` (${d.periodLabel})` : ''}\n\n🏪 **Filial:** ${d.branchName}\n\n`
-    : `📅 **Sana:** ${d.displayDate}\n\n🏪 **Filial:** ${d.branchName}\n\n`;
-
-  let body = '';
-
-  if (d.isRange) {
-    body += `## 📆 Kunlik savdo\n\n`;
-    if (!d.dailyBreakdown || !d.dailyBreakdown.length) {
-      body += `_Bu davrda hech qanday sotuv chegi qayd etilmagan._\n\n`;
-    } else {
-      body += d.dailyBreakdown.map((day) => {
-        const line = `### ${day.displayDate} — ${money(day.totalSales)}\n` +
-          `🛒 ${count(day.checksCount)} chek | 📦 ${count(day.itemsCount)} mahsulot` +
-          (day.returnedAmount ? ` | ↩️ qaytarilgan: ${money(day.returnedAmount)}` : '') + `\n\n`;
-        const table = collapsible(
-          `📦 Mahsulotlar jadvali (${day.products.length} xil) — ochish uchun bosing`,
-          productTable(day.products)
-        );
-        const checks = collapsible(
-          `🧾 Cheklar tafsiloti (${day.checksCount} ta chek)`,
-          checkLines(day.checks)
-        );
-        const rets = day.returnedProducts && day.returnedProducts.length
-          ? collapsible(`↩️ Qaytarilgan mahsulotlar (${day.returnedProducts.length} xil)`, productTable(day.returnedProducts))
-          : '';
-        return line + table + checks + rets;
-      }).join('');
-    }
-  } else {
-    body += (d.checks && d.checks.length)
-      ? `🧾 **Cheklar tafsiloti:**\n\n${checkLines(d.checks)}\n\n` +
-        collapsible(`📦 Kun bo'yicha mahsulotlar jadvali (${d.soldProducts.length} xil)`, productTable(d.soldProducts))
-      : `_Bu kunda hech qanday sotuv chegi qayd etilmagan._\n\n`;
-  }
-
-  const payments = (d.paymentBreakdown && d.paymentBreakdown.length)
-    ? `💳 **To'lov usullari bo'yicha:**\n` +
-      d.paymentBreakdown.map((p) => `• ${p.name}: ${money(p.amount)} (${p.checksCount} ta chek)`).join('\n') + `\n\n`
-    : `💳 **To'lovlar bo'yicha taqsimot:** ma'lumot yo'q\n\n`;
-
-  const returnsBlock = `↩️ **Qaytarilgan mahsulot:** ${money(d.returnedProducts)}` +
-    (d.returnedOrdersCount ? ` (${d.returnedOrdersCount} ta qaytarish)` : '') + `\n\n` +
-    ((d.returnedProductsList && d.returnedProductsList.length)
-      ? collapsible(`↩️ Qaytarilgan mahsulotlar jadvali (${d.returnedProductsList.length} xil)`, productTable(d.returnedProductsList))
-      : '');
-
-  const stockBlock = d.stock
-    ? `🏬 **Omborxonada qolgan tovar (Store Hadiya):** ${money(d.stock.totalValue)}\n` +
-      `   ${count(d.stock.positionsInStock)} pozitsiya | ${count(d.stock.totalUnits)} dona qoldiq\n\n`
-    : `🏬 **Omborxonada qolgan tovar:** ma'lumot yo'q\n\n`;
-
-  const totalsTitle = d.isRange ? `## 📊 Davr yakuni` : `## 📊 Kun yakuni`;
-
-  return header + body +
-    `${totalsTitle}\n\n` +
-    `💰 **Umumiy savdo:** ${money(d.totalSales)}\n\n` +
-    `🛒 **Cheklar:** ${count(d.checksCount)}\n\n` +
-    `📦 **Sotilgan mahsulotlar:** ${count(d.itemsSoldsCount)}\n\n` +
-    payments +
-    returnsBlock +
-    `📈 **Sof savdo (kirim):** ${money(d.netSales)}\n\n` +
-    stockBlock +
-    `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
-}
-
-function formatBillzConnectionReport(billzRes) {
-  if (billzRes && billzRes.isRealData) {
-    const h = billzRes.health || {};
-    return `✅ **Billz API muvaffaqiyatli ulandi.**\n\n` +
-           `• **Base URL:** \`${h.baseUrl || 'https://api.billz.uz/v1/'}\`\n` +
-           `• **Authenticated:** Yes\n` +
-           `• **Connection Status:** Connected\n` +
-           `• **Products Access:** OK\n` +
-           `• **Inventory Access:** OK\n` +
-           `• **Sales Access:** OK\n` +
-           `• **API Response Time:** ${h.responseTimeMs || 142} ms\n` +
-           `• **Last Checked:** ${h.lastChecked || new Date().toISOString()}\n\n`;
-  }
-
-  const diag = (billzRes && billzRes.errorDiagnostic) ? billzRes.errorDiagnostic : {
-    httpStatus: 401,
-    errorCode: '-32500',
-    errorMessage: 'Authentication Failed (Token yaroqsiz yoki eskirgan)',
-    endpoint: 'products.get',
-    requestUrl: 'https://api.billz.uz/v1/',
-    recommendation: '1. .env.dev faylidagi BILLZ_TOKEN qiymatini tekshiring.\n2. Billz POS admin panelidan username/token faol ekanligini tasdiqlang.'
-  };
-
-  return `❌ **Billz API dan real ma'lumot olinmadi. Yuqoridagi xatoni tekshiring.**\n\n` +
-         `### 🔴 Billz Connection Diagnostic Error:\n` +
-         `• ⚠️ **HTTP Status:** \`${diag.httpStatus}\`\n` +
-         `• 🔑 **Error Code:** \`${diag.errorCode}\`\n` +
-         `• 🛑 **Error Message:** **${diag.errorMessage}**\n` +
-         `• 🌐 **Endpoint:** \`${diag.endpoint}\`\n` +
-         `• 🔗 **Request URL:** \`${diag.requestUrl}\`\n` +
-         (diag.responseBody ? `• 📄 **Response Body:** \`${diag.responseBody}\`\n` : '') +
-         `\n🛠️ **Tavsiya Etilgan Yechim:**\n${diag.recommendation}\n`;
-}
-
-
-
-    // 1. Automatic Schedule Intent Detection
-    if (
-      !hasAttachment && (
-      lowerInput.includes('har kuni') ||
-      lowerInput.includes('har kunlik') ||
-      lowerInput.includes('eslatib tur') ||
-      lowerInput.includes('schedule') ||
-      lowerInput.includes('avtomatik') ||
-      lowerInput.includes('everyday') ||
-      lowerInput.includes('every day') ||
-      lowerInput.includes('daily') ||
-      lowerInput.includes('vaqtda'))
-    ) {
-      let extractedTime = '06:00';
-      const timeMatch = lowerInput.match(/(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm))/i);
-      if (timeMatch) extractedTime = timeMatch[0];
-
-      const newScheduleItem = {
-        title: 'Daily Billz & Operations Automated Summary',
-        prompt: userMessage,
-        frequency: 'DAILY',
-        scheduledTime: extractedTime,
-        targetChannel: 'TELEGRAM & CHAT',
-        isEnabled: true
-      };
-
-      try {
-        await Schedule.create(newScheduleItem);
-      } catch (e) {}
-
-      executedTools.push({
-        tool: 'scheduler_create_automation',
-        label: 'Automated Recurring Schedule Registered',
-        result: newScheduleItem
-      });
-
-      const responseText = `Rejalashtirilgan Avtomatik Vazifa Saqlandi! ⏰✨\n\n` +
-        `• **Vazifa Nomi:** ${newScheduleItem.title}\n` +
-        `• **Tashrif Davomiyligi:** Har kuni (Daily)\n` +
-        `• **Vaqti:** Soat ${extractedTime} da\n` +
-        `• **Yuborish Kanali:** Telegram Bot & Chat Panel\n\n` +
-        `Men har kuni belgilangan vaqtda Billz savdolarini va Notion topshiriqlarini avtomatik yig'ib sizga yuboraman!`;
-
+    if (!openAiApiKey) {
+      const responseText = `${this.dualLlmEnabled ? '> 🧠 **Dual LLM Mode (OpenAI GPT-4o + Anthropic Claude 3.5 Sonnet)**\n\n' : ''}` +
+        `Assalomu alaykum! Men sizning shaxsiy AI Agentingizman. 🚀\n\n` +
+        `Xabaringiz: "${userMessage}"\n\n` +
+        `⚠️ OPENAI_API_KEY sozlanmagan — \`.env.dev\` fayliga qo'shing.`;
       return { responseText, executedTools, modelMetadataBadge };
     }
 
-    // 2a. Notion WRITE intent — "notionga ... qo'shib qo'y / yangi task yarat".
-    // This has to be handled before the calendar block, because the calendar keyword
-    // list contains generic verbs like "qoshib" and "yarat" and was swallowing every
-    // Notion creation request into a calendar event instead.
-    if (!hasAttachment && isNotionWriteIntent(lowerInput)) {
-      const taskTitle = extractNotionTaskTitle(userMessage);
-      const notionRes = await connectorRegistry.executeTool('notion_create_task', { title: taskTitle });
+    // Spreadsheet attachments (Excel/CSV of newly-arrived goods) get parsed
+    // deterministically and, only on a clear import intent, pushed straight into Billz —
+    // never through the tool-call argument channel (hundreds of rows would be wasteful
+    // and error-prone to have the model retype), and never on a vague/ambiguous message.
+    if (attachedFile && attachedFile.isSpreadsheet) {
+      onProgress({ phase: 'parse', label: "📄 Excel/CSV fayl o'qilmoqda..." });
+      const parsed = spreadsheetParser.parseAttachedSpreadsheet(attachedFile);
 
-      executedTools.push({
-        tool: 'notion_create_task',
-        label: notionRes.success ? 'Created Notion Page' : 'Notion Page Creation FAILED',
-        result: notionRes.data || {},
-        error: notionRes.error
-      });
-
-      if (!notionRes.success) {
-        return {
-          responseText: `❌ **Notion'da sahifa yaratib bo'lmadi.**\n\n` +
-            `• **Sarlavha:** ${taskTitle}\n` +
-            `• **Xatolik:** ${notionRes.error || "noma'lum"}\n\n` +
-            `🛠️ Tekshiring: \`.env.dev\` dagi \`NOTION_API_KEY\` faolmi va integratsiyaga kerakli sahifaga ruxsat (share) berilganmi.`,
-          executedTools,
-          modelMetadataBadge
-        };
+      if (!parsed.success) {
+        return { responseText: `⚠️ **Faylni o'qib bo'lmadi:** ${parsed.error}`, executedTools, modelMetadataBadge };
       }
 
-      return {
-        responseText: `✅ **Notion'da yangi sahifa yaratildi.**\n\n` +
-          `• **Sarlavha:** ${notionRes.data.title}\n` +
-          `• **Havola:** ${notionRes.data.url}\n\n` +
-          `Taqvimga hech narsa qo'shilmadi — bu faqat Notion yozuvi.`,
-        executedTools,
-        modelMetadataBadge
-      };
-    }
+      const { shouldImport } = await classifyImportIntent(userMessage, openAiApiKey);
 
-    // 2b. Notion Workspace read intent
-    if (
-      lowerInput.includes('notion') ||
-      lowerInput.includes('page') ||
-      lowerInput.includes('sahifa') ||
-      lowerInput.includes('workspace') ||
-      lowerInput.includes('agency') ||
-      lowerInput.includes('swisswatch') ||
-      lowerInput.includes('bahodir') ||
-      lowerInput.includes('moliya') ||
-      lowerInput.includes('project') ||
-      lowerInput.includes('task')
-    ) {
-      const notionRes = await connectorRegistry.executeTool('notion_search_workspace', { query: userMessage });
-      executedTools.push({ tool: 'notion_search_workspace', label: 'Queried Notion Workspace Pages & Databases', result: notionRes.data });
-    }
-
-    // 3. Billz Sales Report Intent — one day ("bugungi hisobot", "31 chi iyulni savdosi")
-    //    or a period ("1 haftalik hisobot", "oylik hisobot", "iyul oyi", "30 kunlik").
-    //
-    // The day pattern must stay in step with billzClientService.parseDateToUtcRange —
-    // it accepts the "31 chi iyul" ordinal, and routing that missed it used to drop the
-    // question into the generic LLM branch, which then invented its own report layout.
-    const billzClient = require('./services/billzClientService');
-    const hasSalesWord = /hisobot|report|savdo|sotuv|sotilgan|sotildi|tushum|chek|kirim|kassa/i.test(lowerInput);
-    const hasExplicitDate = billzClient.hasExplicitDateReference(lowerInput);
-    const isPeriodReportQuery = /hafta|oylik|\boy\b|\d{1,3}\s*kun(lik)?/i.test(lowerInput);
-
-    // "hisobot" and "bugun" belong to every system the owner uses, not just Billz —
-    // "notionga bugun nimalar yozdim, hisobotini ber" is a Notion question. So a
-    // message that names another system is only a sales report when it also names
-    // Billz or a POS word (a receipt, a sale), never on the date word alone.
-    const namesOtherSystem = /notion|sahifa|workspace|\bpage\b|telegram|whatsapp|instagram|email|pochta/i.test(lowerInput);
-    const namesBillz = /billz|kassa|chek|savdo|sotuv|sotildi|sotilgan|tushum/i.test(lowerInput);
-
-    // Calendar and catalog questions also mention days and products, so they keep their
-    // own branches instead of being answered with a sales report.
-    const isCalendarQuery = /vazifa|task|uchrashuv|taqvim|calendar|event|reja|eslatma|nima qil|kun tartibi/i.test(lowerInput);
-    const isCatalogQuery = !hasSalesWord && /katalog|qoldiq|ombor|narx|mavjud|nechta bor/i.test(lowerInput);
-
-    const isSalesReportQuery = !hasAttachment && !isCalendarQuery && !isCatalogQuery &&
-      !(namesOtherSystem && !namesBillz) &&
-      (hasSalesWord || hasExplicitDate || isPeriodReportQuery);
-
-    if (isSalesReportQuery) {
-      const consRes = await billzClient.getConsolidatedReport({ userMessage, date: userMessage });
-
-      executedTools.push({
-        tool: 'billz_get_consolidated_report',
-        label: 'BILLZ Consolidated Reports API (Hadiya Store Branch Only)',
-        result: consRes
-      });
-
-      if (consRes.notFound) {
-        return { responseText: "Hadiya Store filiali hisobotda topilmadi.", executedTools, modelMetadataBadge };
-      }
-
-      if (!consRes.success || consRes.error || consRes.errorMessage) {
-        const responseText = `⚠️ **BILLZ API Xatosi:**\n${consRes.errorMessage || consRes.error}\n\n*Hisobotni shakllantirish uchun BILLZ API javobida xatolik yuz berdi. Soxta yoki taxminiy ma'lumotlar ko'rsatilmaydi.*`;
-        return { responseText, executedTools, modelMetadataBadge };
-      }
-
-      const responseText = formatBillzSalesReport(consRes.consolidatedData);
-      return { responseText, executedTools, modelMetadataBadge };
-    }
-
-    if (lowerInput.includes('billz') || lowerInput.includes('nima gap') || lowerInput.includes('savdo') || lowerInput.includes('sales') || lowerInput.includes('mahsulot') || lowerInput.includes('katalog')) {
-      const dateOpts = contextBuilder.parseUzbekDateOptions(userMessage);
-      const res = await connectorRegistry.executeTool('billz_get_sales', dateOpts);
-      executedTools.push({ tool: 'billz_get_sales', label: `Fetched Billz POS Sales & Product Data (${dateOpts.label || dateOpts.date})`, result: res.data || res });
-
-      if (!res.isRealData) {
-        const responseText = formatBillzConnectionReport(res);
-        return { responseText, executedTools, modelMetadataBadge };
-      }
-    }
-
-    // 4. Comprehensive AI Calendar & Automatic Task Detection Engine
-    const isShowCalendarIntent = !hasAttachment && (
-      lowerInput.includes('vazifalarimni ko\'rsat') ||
-      lowerInput.includes('uchrashuvlarimni ko\'rsat') ||
-      lowerInput.includes('bugungi vazifalar') ||
-      lowerInput.includes('keyingi haftadagi') ||
-      lowerInput.includes('mavjud tasklar') ||
-      lowerInput.includes('taqvimni ko\'rsat') ||
-      lowerInput.includes('calendar eventlar'));
-
-    if (isShowCalendarIntent) {
-      let events = [];
-      try {
-        const dbEvts = await CalendarEvent.find().sort({ startDate: 1, startTime: 1 });
-        events = dbEvts.map(e => ({
-          id: e._id.toString(),
-          title: e.title,
-          startDate: e.startDate ? new Date(e.startDate).toISOString().split('T')[0] : '',
-          startTime: e.startTime,
-          endTime: e.endTime,
-          priority: e.priority,
-          category: e.category,
-          status: e.status
-        }));
-      } catch (e) { }
-
-      executedTools.push({ tool: 'calendar_list_events', label: 'Fetched Calendar Events', result: { count: events.length, events } });
-
-      let eventListMd = events.length === 0
-        ? '_Hozircha taqvimda hech qanday vazifa mavjud emas._'
-        : events.map((e, idx) =>
-          `${idx + 1}. **[${e.priority}] ${e.title}**\n   📅 **Sana:** ${e.startDate} (${e.startTime} - ${e.endTime}) | 🏷️ **Kategoriya:** ${e.category} | 📌 **Holat:** ${e.status}`
-        ).join('\n\n');
-
-      const responseText = `📅 **Store Hadiya Executive Calendar — Vazifalar Ro'yxati:**\n\n${eventListMd}\n\n` +
-        `💡 *AI Assistant maslahati: Chatga "Ertaga meeting bor" yoki "5-avgust 14:00 da prezentatsiya" deb yozsangiz, AI avtomatik yangi vazifa yaratadi.*`;
-
-      return { responseText, executedTools, modelMetadataBadge };
-    }
-
-    // Reschedule / Edit Event Intent (e.g. "Ertangi meetingni 16:00 ga sur")
-    const isRescheduleIntent = !hasAttachment && (
-      lowerInput.includes('ga sur') ||
-      lowerInput.includes('ga o\'tkaz') ||
-      lowerInput.includes('vaqtini o\'zgartir') ||
-      (lowerInput.includes('meeting') && lowerInput.includes('16:00')));
-
-    if (isRescheduleIntent) {
-      let newTime = '16:00';
-      const timeMatch = lowerInput.match(/(\d{1,2}:\d{2})/);
-      if (timeMatch) newTime = timeMatch[1];
-
-      let targetEvt = await CalendarEvent.findOne().sort({ createdAt: -1 }).catch(() => null);
-      if (targetEvt) {
-        targetEvt.startTime = newTime;
-        const h = parseInt(newTime.split(':')[0], 10) + 1;
-        targetEvt.endTime = `${h.toString().padStart(2, '0')}:${newTime.split(':')[1] || '00'}`;
-        targetEvt.updatedAt = new Date();
-        await targetEvt.save().catch(() => {});
+      if (shouldImport) {
+        onProgress({ phase: 'tool:start', tool: 'billz_bulk_import_products', label: `📦 ${parsed.products.length} ta mahsulot Billz'ga (Hadiya Store) qo'shilmoqda...` });
+        const bulkRes = await billzClientService.createProductsBulk(parsed.products);
+        onProgress({ phase: 'tool:done', tool: 'billz_bulk_import_products', ok: bulkRes.failed === 0 });
 
         executedTools.push({
-          tool: 'calendar_update_event',
-          label: 'Updated Calendar Event Time',
-          result: { eventId: targetEvt._id.toString(), newStartTime: targetEvt.startTime, title: targetEvt.title }
+          tool: 'billz_bulk_import_products',
+          label: "Billz'ga ommaviy mahsulot import qilindi",
+          result: { succeeded: bulkRes.succeeded, failed: bulkRes.failed, total: bulkRes.total }
         });
 
-        const responseText = `📅 **Uchrashuv vaqti muvaffaqiyatli o'zgartirildi!**\n\n` +
-          `• **Vazifa:** ${targetEvt.title}\n` +
-          `• **Yangi Vaqt:** Soat ${targetEvt.startTime} da\n` +
-          `• **Sana:** ${targetEvt.startDate ? new Date(targetEvt.startDate).toISOString().split('T')[0] : ''}\n` +
-          `• **Prioritet:** ${targetEvt.priority}\n\n` +
-          `✅ Google Calendar hamda MongoDB ma'lumotlar bazasi avtomatik yangilandi.`;
-
-        return { responseText, executedTools, modelMetadataBadge };
+        return { responseText: formatBulkImportReport(bulkRes, parsed), executedTools, modelMetadataBadge };
       }
+
+      // Not an import request — let the narrative model discuss the file's contents normally.
+      const preview = parsed.products.slice(0, 50)
+        .map((p, i) => `${i + 1}. ${p.name} — ${p.price.toLocaleString()} so'm${p.quantity ? `, ${p.quantity} dona` : ''}`)
+        .join('\n');
+      attachedFile.textContent = `Faylda ${parsed.products.length} ta mahsulot qatori topildi (jami ${parsed.totalRows} qator, ${parsed.skippedCount} tasi o'tkazib yuborildi):\n\n${preview}` +
+        (parsed.products.length > 50 ? `\n… va yana ${parsed.products.length - 50} ta qator.` : '');
     }
 
-    // Delete Event Intent (e.g. "Shanba kungi taskni o'chir")
-    const isDeleteIntent = !hasAttachment &&
-      (lowerInput.includes('taskni o\'chir') || lowerInput.includes('meetingni o\'chir') || lowerInput.includes('eventni o\'chir') || lowerInput.includes('o\'chirib tashla')) &&
-      !lowerInput.includes('chat');
+    // 1. Ask a fast model which tool(s), if any, this message actually needs. Skipped for
+    // attachments — the turn is about the file itself, not about picking a data source.
+    let toolCalls = [];
+    if (!hasAttachment) {
+      onProgress({ phase: 'route', label: "🧠 So'rov tahlil qilinmoqda..." });
+      toolCalls = await routeToTools(userMessage, openAiApiKey);
+    }
 
-    if (isDeleteIntent) {
-      let deletedTitle = 'Belgilangan uchrashuv';
-      const removed = await CalendarEvent.findOneAndDelete({}, { sort: { createdAt: -1 } }).catch(() => null);
-      if (removed) {
-        deletedTitle = removed.title;
+    // 2. Execute whatever the model chose.
+    const toolResults = [];
+    for (const call of toolCalls) {
+      const name = call.function.name;
+      let args = {};
+      try { args = JSON.parse(call.function.arguments || '{}'); } catch (e) {}
+
+      // billzClientService already has a solid Uzbek period parser that reads the raw
+      // sentence ("oxirgi 7 kunlik", "shu oy") — feed it the message instead of asking
+      // the router model to reinvent that parsing in its `date` argument.
+      if (name === 'billz_get_consolidated_report') {
+        args = { date: args.date, query: userMessage, userMessage };
       }
 
+      const label = TOOL_LABELS[name] || `${name} bajarilmoqda...`;
+      onProgress({ phase: 'tool:start', tool: name, label });
+      const startedAt = Date.now();
+      const res = await connectorRegistry.executeTool(name, args);
+      onProgress({ phase: 'tool:done', tool: name, label, ms: Date.now() - startedAt, ok: !!(res && res.success) });
+
+      toolResults.push({ name, args, res });
       executedTools.push({
-        tool: 'calendar_delete_event',
-        label: 'Deleted Event from Calendar',
-        result: { deletedTitle }
+        tool: name,
+        label,
+        // Message bodies go to the summariser, not into the tool log the UI/DB stores.
+        result: (name === 'mail_search_correspondence' && res.data)
+          ? { ...res.data, messages: undefined, messagesCount: res.data.total }
+          : res.data,
+        error: res.error
       });
-
-      const responseText = `🗑️ **Vazifa taqvimdan muvaffaqiyatli o'chirildi.**\n\n` +
-        `• **O'chirilgan vazifa:** "${deletedTitle}"\n` +
-        `• **Sinxronizatsiya:** Google Calendar & DB yangilandi.`;
-
-      return { responseText, executedTools, modelMetadataBadge };
     }
 
-    // Automatic Event Creation Intent (e.g. "kalendarga event qoshib qoy", "Ertaga meeting bor", "5-avgustda prezentatsiya", "Bugun 17:00 da qo'ng'iroq qil")
-    const isEventCreationIntent = !hasAttachment && (
-      lowerInput.includes('kalendar') ||
-      lowerInput.includes('taqvim') ||
-      lowerInput.includes('event') ||
-      lowerInput.includes('qoshib qoy') ||
-      lowerInput.includes('qo\'shib qo\'y') ||
-      lowerInput.includes('qoshib') ||
-      lowerInput.includes('saqlab qoy') ||
-      lowerInput.includes('saqla') ||
-      lowerInput.includes('yarat') ||
-      lowerInput.includes('meeting') ||
-      lowerInput.includes('uchrashuv') ||
-      lowerInput.includes('prezentatsiya') ||
-      lowerInput.includes('qo\'ng\'iroq') ||
-      lowerInput.includes('qongiroq') ||
-      lowerInput.includes('deadline') ||
-      lowerInput.includes('task yarat') ||
-      lowerInput.includes('vazifa qo\'sh') ||
-      lowerInput.includes('vazifa') ||
-      /(\d{1,2})[-_\s]*(avgust|sentabr|oktabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul)/i.test(lowerInput) ||
-      (lowerInput.includes('ertaga') && (lowerInput.includes('soat') || lowerInput.includes('bor') || lowerInput.includes('ish'))));
-    const isQueryOrReport = (lowerInput.includes('sotuv') || lowerInput.includes('sotildi') || lowerInput.includes('hisobot') || lowerInput.includes('billz')) && !lowerInput.includes('event') && !lowerInput.includes('kalendar');
+    // 3. A single tool call with a dedicated deterministic formatter answers immediately —
+    // no second LLM round-trip, which keeps report-style answers fast.
+    if (toolResults.length === 1) {
+      const fastAnswer = await dispatchFastFormat(toolResults[0], openAiApiKey, onProgress);
+      if (fastAnswer !== null) {
+        return { responseText: fastAnswer, executedTools, modelMetadataBadge };
+      }
+    }
 
-    // If the owner named a different destination (Notion, Telegram, e-mail), a generic
-    // verb like "qo'shib qo'y" belongs to that system, not to the calendar.
-    const namesOtherDestination = /\b(notion|notionga|notionda|telegram|telegramga|email|emailga|pochta|gmail)\b/.test(lowerInput) &&
-      !/\b(kalendar|kalendarga|taqvim|taqvimga)\b/.test(lowerInput);
+    // 4. Everything else (generic Notion search, small talk, multi-tool turns, file
+    // attachments) gets a full narrative answer from the model over whatever context
+    // was gathered.
+    onProgress({ phase: 'memory', label: "🧠 Xotira va profil o'qilmoqda..." });
+    const { ownerProfile, persistentMemory, chatHistory } = await loadMemoryContext();
 
-    if (isEventCreationIntent && !isQueryOrReport && !namesOtherDestination) {
-      const parsed = parseCalendarTaskDetails(userMessage);
-
-      const newCalendarEvent = {
-        id: `evt-${Date.now()}`,
-        title: parsed.title,
-        description: `AI Chat orqali avtomatik yaratildi: "${userMessage}"`,
-        startDate: parsed.startDate,
-        endDate: parsed.endDate,
-        startTime: parsed.startTime,
-        endTime: parsed.endTime,
-        priority: parsed.priority,
-        category: parsed.category,
-        status: 'Pending',
-        createdBy: 'Azamjon (Store Hadiya)',
-        source: 'AI',
-        googleCalendarSynced: true,
-        reminders: [{ timeBeforeMinutes: 30, notified: false }],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      // Save directly to MongoDB Database
+    const openAiApiKeyTrimmed = openAiApiKey;
+    const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
+    for (const modelName of modelsToTry) {
+      onProgress({ phase: 'llm', label: `🧠 ${modelName.toUpperCase()} javob shakllantirmoqda...`, model: modelName });
       try {
-        const dbEvt = await CalendarEvent.create({
-          title: newCalendarEvent.title,
-          description: newCalendarEvent.description,
-          startDate: new Date(newCalendarEvent.startDate),
-          endDate: new Date(newCalendarEvent.endDate),
-          startTime: newCalendarEvent.startTime,
-          endTime: newCalendarEvent.endTime,
-          priority: newCalendarEvent.priority,
-          category: newCalendarEvent.category,
-          status: newCalendarEvent.status,
-          createdBy: newCalendarEvent.createdBy,
-          source: newCalendarEvent.source,
-          googleCalendarSynced: true
+        const openAiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAiApiKeyTrimmed}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: 'system', content: buildFinalSystemPrompt({ ownerProfile, persistentMemory, chatHistory, hasAttachment }) },
+              { role: 'user', content: buildUserContent(userMessage, executedTools, attachedFile) }
+            ],
+            temperature: 0.7
+          })
         });
-        newCalendarEvent.id = dbEvt._id.toString();
-      } catch (e) {
-        console.error('Mongo save error in AI engine:', e.message);
-      }
 
-      executedTools.push({
-        tool: 'calendar_create_event',
-        label: 'Automatic Calendar Event Created',
-        result: newCalendarEvent
-      });
+        if (openAiResp.ok) {
+          const aiData = await openAiResp.json();
+          if (aiData.choices && aiData.choices[0] && aiData.choices[0].message) {
+            const realAiText = aiData.choices[0].message.content;
 
-      const tgRes = await connectorRegistry.executeTool('telegram_send_message', {
-        chatId: '@admin_channel',
-        text: `📅 Yangi Taqvim Vazifasi: "${newCalendarEvent.title}" (${newCalendarEvent.startDate} ${newCalendarEvent.startTime})`
-      });
-      executedTools.push({ tool: 'telegram_send_message', label: 'Telegram Notification Sent', result: tgRes.data });
+            onProgress({ phase: 'saving', label: "💾 Suhbat xotiraga saqlanmoqda..." });
+            const intentLabel = toolResults.length ? toolResults.map((t) => t.name).join(',') : 'general_chat';
+            await memoryUpdater.saveMessage(userMessage, 'user', userMessage, intentLabel, executedTools);
+            await memoryUpdater.saveMessage(userMessage, 'assistant', realAiText, intentLabel, executedTools);
+            await memoryUpdater.extractAndSaveKnowledge(userMessage, realAiText);
 
-      const responseText = `📅 **${newCalendarEvent.startDate} ${newCalendarEvent.startTime}** uchun vazifa taqvimga muvaffaqiyatli qo'shildi!\n\n` +
-        `• **Vazifa Nomi:** ${newCalendarEvent.title}\n` +
-        `• **Sana:** ${newCalendarEvent.startDate}\n` +
-        `• **Vaqt:** ${newCalendarEvent.startTime} - ${newCalendarEvent.endTime}\n` +
-        `• **Prioritet:** ${newCalendarEvent.priority}\n` +
-        `• **Kategoriya:** ${newCalendarEvent.category}\n` +
-        `• **Manba:** AI Automatic Task Detection Engine\n\n` +
-        `✅ Google Calendar hamda MongoDB ma'lumotlar bazasiga saqlandi.`;
-
-      return { responseText, executedTools, modelMetadataBadge };
-    }
-
-    // V2 Intent Classification & Context Builder Pipeline
-    const intent = intentClassifier.classify(userMessage);
-    onProgress({ phase: 'intent', label: `Niyat aniqlandi: ${intent}`, intent });
-    const v2Context = await contextBuilder.buildContext(userMessage, intent, onProgress);
-
-    // Merge tools from intent classifier context builder if present
-    if (v2Context.executedTools && v2Context.executedTools.length > 0) {
-      v2Context.executedTools.forEach(t => {
-        if (!executedTools.some(ex => ex.tool === t.tool)) {
-          executedTools.push(t);
-        }
-      });
-    }
-
-    // 5. OpenAI Real API Call (GPT-4o / GPT-4o-mini)
-    const openAiApiKey = (this.openAiKey || process.env.OPENAI_API_KEY || '').trim();
-    if (openAiApiKey) {
-      const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
-      for (const modelName of modelsToTry) {
-        onProgress({ phase: 'llm', label: `${modelName} hisobot shakllantirmoqda`, model: modelName });
-        try {
-          const openAiResp = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openAiApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: modelName,
-              messages: [
-                {
-                  role: 'system',
-                  content: `# STORE HADIYA AI EXECUTIVE ASSISTANT V2 - CENTRAL SERVER ORCHESTRATION CONSTITUTION
-
-You are the central intelligence engine running on the Node.js Express SERVER.
-You act as the Server Orchestrator that receives requests from the User Chat Panel (Frontend) and orchestrates:
-1. Schedule (cron automations & reminders)
-2. MongoDB (persistent database & memory models)
-3. My Data / Chat History Hub (stored knowledge, owner profile, conversation turns)
-4. Connected Sub-services: Notion Workspace, Billz POS, Email Dispatcher, Google Calendar, Telegram.
-
-OWNER PERSONALITY & CHARACTER CONSTITUTION:
-${v2Context.ownerProfile ? `- Profile: ${v2Context.ownerProfile.title}\n- Communication Character & Personality Rules: ${v2Context.ownerProfile.content}` : '- Adapt to owner as an Executive CEO: direct, non-emotional, data-driven, solution-focused.'}
-
-MEMORY PRIORITY & HIERARCHY DATA:
-- Persistent Mongo Memory: ${JSON.stringify(v2Context.persistentMemory || [])}
-- Relevant Chat History: ${JSON.stringify(v2Context.chatHistory || [])}
-- Primary Intent Identified: ${intent.toUpperCase()}
-
-RESPONSE INSTRUCTIONS:
-- STRUCTURED OUTPUT RULE (VERY IMPORTANT):
-  • Any set of records with repeating fields (savdolar, mahsulotlar, qoldiqlar, tranzaksiyalar, vazifalar, narxlar) MUST be output as a GitHub-flavoured markdown table with a header row and a \`|---|\` separator row. Do NOT use bullet lists for tabular data.
-  • Put raw numbers in table cells (masalan \`1250000\`), without "UZS", spaces or thousand separators, so the table can be pasted straight into Excel and summed. Write units in the column header instead: \`| Mahsulot | Soni | Summa (UZS) |\`.
-  • Add a final \`Jami\` row when the column is additive.
-- MULTIPLE ANSWER VARIANTS RULE:
-  If you offer 2 or 3 different options, plans or answers, NEVER merge them into one table or one paragraph. Render EACH variant as its own block:
-    ### Variant 1 — <qisqa nom>
-    <o'sha variantning O'Z alohida markdown jadvali>
-    **Qachon ishlatiladi:** <1 qator izoh>
-  Then close with a short \`**Tavsiyam:**\` line naming which variant you recommend and why.
-- LANGUAGE RULE: YOU MUST ALWAYS RESPOND 100% IN PURE UZBEK LANGUAGE. NEVER OUTPUT ENGLISH HEADINGS LIKE "Total Revenue", "Top Transacted Products", OR "Executive Sales & Inventory Insights". Use 100% Uzbek titles:
-  • 📊 **Store Hadiya — [Sana / Davr] Kunlik va Davriy POS Savdo Hisoboti**
-  • **Umumiy Tushum:** [Tushum] UZS
-  • **Ombor Qoldiq Qiymati:** [Qoldiq] UZS
-  • **Sotilgan va Harakatlangan Mahsulotlar (Store Hadiya):**
-  • **Operatsion va Sotuv Tahlili (Executive Insights):**
-- DATE ACCURACY:
-  When a specific date (e.g. 25-may) is requested, present the EXACT sales and product transactions that occurred on that specific date as returned by the tool. If 0 sales occurred on that specific date, state accurately in Uzbek that on that day 0 transactions (0 UZS revenue) took place while reporting the active catalog stock value (274,525,000 UZS). Never substitute today's fallback perfumes when a specific date is requested!
-${hasAttachment ? `
-ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
-- Answer about the attached file itself. Ignore the Billz/Notion context data unless the owner's question actually needs it.
-- If it is a SCREENSHOT OF A CUSTOMER CHAT (Instagram DM, Telegram, WhatsApp, comment):
-  1. First read out what the customer actually wrote and what they want (narx, o'lcham, yetkazib berish, shikoyat, chegirma...).
-  2. Then give a READY-TO-SEND reply message in the SAME LANGUAGE the customer used, inside a markdown code block so it can be copied as-is.
-  3. Keep the reply in Store Hadiya's voice: polite, short, concrete, always moving toward closing the sale (narxni ayt, mavjudligini tasdiqla, keyingi qadamni taklif qil).
-  4. If more than one approach makes sense (masalan yumshoq vs qat'iy narx pozitsiyasi), give each variant separately with its own heading and a short "Qachon ishlatiladi" izohi.
-- If it is a RECEIPT, REPORT OR TABLE image: extract the real numbers into a markdown table. Never invent a figure you cannot read — write "o'qib bo'lmadi" instead.
-- NEVER claim you cannot see images. You have been given the image directly.
-` : ''}
-- BILLZ CONSOLIDATED REPORTS (reports.consolidated) EXCLUSIVE RULES:
-  When a daily sales report is requested (e.g. "bugungi hisobot", "kechagi hisobot", "1-avgust hisoboti", "2026-08-01 hisoboti"):
-  1. You MUST filter statistics EXCLUSIVELY for the "Hadiya Store" branch. Never mix or show numbers from other branches!
-  2. If Hadiya Store branch is not found in the report result, output EXACTLY:
-     "Hadiya Store filiali hisobotda topilmadi."
-  3. If the BILLZ API returns an error, explain the API error clearly instead of generating fake or estimated information.
-  4. Never use mock data or estimate values.
-  5. Format the report cleanly as:
-     📅 Sana: [Sana]
-
-     🏪 Filial:
-     Hadiya Store
-
-     💰 Savdo:
-     [Savdo miqdori] so'm
-
-     🛒 Cheklar:
-     [Cheklar soni] ta
-
-     📦 Sotilgan mahsulotlar:
-     [Sotilgan mahsulotlar soni] ta
-
-     🧾 Cheklar tafsiloti: (tool natijasidagi 'checks' massividan HAR BIR chekni va uning ichidagi HAR BIR mahsulotni chiqar — mahsulot nomi, soni va summasi bilan. Bu bo'lim majburiy: egasi aynan chekda nima sotilganini ko'rmoqchi.)
-     1. №[chek raqami] — [vaqt] | [mijoz] | [chek summasi] so'm
-        • [Mahsulot nomi] — [soni] dona × [dona narxi] = [summa] so'm
-
-     💳 To'lov usullari bo'yicha: (FAQAT tool natijasidagi 'paymentBreakdown' massivi kelgan bo'lsa chiqar — har bir elementni o'z nomi bilan yoz: Naqd, Karta, Uzum, Click, Payme, Nasiya va h.k. 'paymentBreakdown' null bo'lsa BUTUN bo'limni tashlab ket. HECH QACHON o'zingdan to'lov usuli yoki raqam qo'shma.)
-     • [To'lov usuli nomi]: [haqiqiy raqam] so'm ([chek soni] ta chek)
-
-     ↩️ Qaytarilgan mahsulot:
-     [Qaytarilgan mahsulot] so'm
-
-     📈 Sof savdo (kirim):
-     [Sof savdo] so'm
-
-     🏬 Omborxonada qolgan tovar: (tool natijasidagi 'stock' obyektidan; yo'q bo'lsa bo'limni tashlab ket)
-     [stock.totalValue] so'm — [stock.positionsInStock] pozitsiya | [stock.totalUnits] dona
-
-     ⚠️ This report contains ONLY the Hadiya Store branch.
-
-  6. DAVRIY HISOBOT (haftalik/oylik): agar tool natijasida 'dailyBreakdown' massivi kelgan bo'lsa,
-     avval HAR BIR KUNNI alohida sarlavha bilan chiqar (sana — kunlik savdo, chek soni, mahsulot soni),
-     har bir kunning mahsulotlarini markdown jadval ko'rinishida <details><summary>...</summary> ichida ber,
-     va eng oxirida "Davr yakuni" bo'limida umumiy savdo, to'lov usullari, qaytarilgan mahsulot,
-     sof savdo va omborxona qoldig'ini chiqar. Kunlarni O'ZING o'ylab topma — faqat 'dailyBreakdown' dagilar.
-
-- CRITICAL FOR BILLZ POS / PERIOD REPORTS (7-WEEK, 1-MONTH, 7-DAY, SPECIFIC DATE):
-  Whenever billz_get_sales or billz_get_products or billz_get_consolidated_report tool outputs are provided in Fetched System Context Data, ACCEPT THOSE METRICS AS 100% COMPLETE AND AUTHORITATIVE.
-  NEVER WRITE DISCLAIMERS like "ma'lumotlar olinmagan", "imkoniyat mavjud emas", "qo'shimcha so'rov jo'nating", or "ma'lumotlar olinmadi"!`
-                },
-                {
-                  role: 'user',
-                  content: buildUserContent(userMessage, executedTools, attachedFile)
-                }
-              ],
-              temperature: 0.7
-            })
-          });
-
-          if (openAiResp.ok) {
-            const aiData = await openAiResp.json();
-            if (aiData.choices && aiData.choices[0] && aiData.choices[0].message) {
-              const realAiText = aiData.choices[0].message.content;
-
-              // Save to ChatHistory & Extract Long-Term Knowledge
-              await memoryUpdater.saveMessage(userMessage, 'user', userMessage, intent, executedTools);
-              await memoryUpdater.saveMessage(userMessage, 'assistant', realAiText, intent, executedTools);
-              await memoryUpdater.extractAndSaveKnowledge(userMessage, realAiText);
-
-              return {
-                responseText: realAiText,
-                executedTools,
-                modelMetadataBadge: `🧠 OpenAI ${modelName.toUpperCase()} V2 Executive Intelligence`
-              };
-            }
+            return {
+              responseText: realAiText,
+              executedTools,
+              modelMetadataBadge: `🧠 OpenAI ${modelName.toUpperCase()} V2 Executive Intelligence`
+            };
           }
-        } catch (err) {
-          console.log(`OpenAI ${modelName} fetch notice:`, err.message);
         }
+      } catch (err) {
+        console.log(`OpenAI ${modelName} fetch notice:`, err.message);
       }
     }
 

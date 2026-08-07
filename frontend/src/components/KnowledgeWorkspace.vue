@@ -94,7 +94,8 @@
                 : 'bg-card text-gray-300 border-line hover:bg-muted hover:text-white',
             ]"
           >
-            💬 Chatga Qaytish
+            <Icon name="chat" size="sm" />
+            Chatga Qaytish
           </button>
         </div>
       </div>
@@ -123,7 +124,7 @@
                   : 'bg-card text-gray-400 border-line hover:bg-muted hover:text-white',
             ]"
           >
-            <span>{{ cat.icon }}</span>
+            <Icon :name="cat.icon" size="xs" />
             <span>{{ cat.label }}</span>
           </button>
         </div>
@@ -250,9 +251,9 @@
           ]"
         >
           <div
-            class="w-16 h-16 rounded-3xl bg-purple-600/10 text-purple-600 flex items-center justify-center mx-auto text-3xl font-bold"
+            class="w-16 h-16 rounded-3xl bg-purple-600/10 text-purple-600 flex items-center justify-center mx-auto"
           >
-            📚
+            <Icon name="book" size="2xl" />
           </div>
           <div>
             <h3
@@ -343,7 +344,8 @@
                   v-if="item.metadata && item.metadata.fileName"
                   class="truncate flex items-center gap-1 font-semibold text-purple-500"
                 >
-                  📄 {{ item.metadata.fileName }}
+                  <Icon name="file" size="xs" />
+                  {{ item.metadata.fileName }}
                 </span>
                 <span class="ml-auto">{{ formatDate(item.updatedAt) }}</span>
               </div>
@@ -391,14 +393,16 @@
                     : 'bg-muted hover:bg-hover text-gray-300 border-line',
                 ]"
               >
-                📖 O'qish
+                <Icon name="book" size="xs" />
+                O'qish
               </button>
 
               <button
                 @click="queryAiAboutMemory(item)"
                 class="px-3 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600 text-purple-600 hover:text-white border border-purple-500/30 text-xs font-bold transition flex items-center gap-1"
               >
-                <span>🤖 AI Tahlil</span>
+                <Icon name="brain" size="xs" />
+                <span>AI Tahlil</span>
               </button>
 
               <div class="flex items-center gap-1">
@@ -412,7 +416,7 @@
                   ]"
                   title="Tahrirlash"
                 >
-                  ✏️
+                  <Icon name="edit" size="sm" />
                 </button>
                 <button
                   @click="deleteItem(item._id)"
@@ -424,7 +428,7 @@
                   ]"
                   title="O'chirish"
                 >
-                  🗑️
+                  <Icon name="delete" size="sm" />
                 </button>
               </div>
             </div>
@@ -455,9 +459,10 @@
                 </span>
                 <span
                   v-if="item.metadata && item.metadata.fileName"
-                  class="text-[10px] font-mono text-purple-500 font-semibold"
+                  class="text-[10px] font-mono text-purple-500 font-semibold flex items-center gap-1"
                 >
-                  📄 {{ item.metadata.fileName }}
+                  <Icon name="file" size="xs" />
+                  {{ item.metadata.fileName }}
                 </span>
                 <span
                   :class="[
@@ -500,19 +505,21 @@
               <button
                 @click="openViewModal(item)"
                 :class="[
-                  'px-3 py-1.5 rounded-xl text-xs font-semibold border transition',
+                  'px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1',
                   isLightTheme
                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
                     : 'bg-muted hover:bg-hover text-gray-300 border-line',
                 ]"
               >
-                📖 O'qish
+                <Icon name="book" size="xs" />
+                O'qish
               </button>
               <button
                 @click="queryAiAboutMemory(item)"
                 class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow transition flex items-center gap-1"
               >
-                🤖 AI Tahlil
+                <Icon name="brain" size="xs" />
+                AI Tahlil
               </button>
               <button
                 @click="openEditModal(item)"
@@ -524,7 +531,7 @@
                 ]"
                 title="Tahrirlash"
               >
-                ✏️
+                <Icon name="edit" size="sm" />
               </button>
               <button
                 @click="deleteItem(item._id)"
@@ -536,7 +543,7 @@
                 ]"
                 title="O'chirish"
               >
-                🗑️
+                <Icon name="delete" size="sm" />
               </button>
             </div>
           </div>
@@ -566,9 +573,9 @@
         >
           <div class="flex items-center gap-3">
             <div
-              class="w-10 h-10 rounded-2xl bg-purple-600/15 text-purple-600 border border-purple-500/30 flex items-center justify-center font-bold text-lg"
+              class="w-10 h-10 rounded-2xl bg-purple-600/15 text-purple-600 border border-purple-500/30 flex items-center justify-center"
             >
-              📚
+              <Icon name="book" size="lg" />
             </div>
             <div>
               <h3
@@ -603,7 +610,7 @@
                 : 'text-gray-400 hover:bg-hover hover:text-white',
             ]"
           >
-            ✕
+            <Icon name="close" size="md" />
           </button>
         </div>
 
@@ -650,13 +657,16 @@
                     : 'bg-[#1C1F2A] border-[#2D3242] text-white',
                 ]"
               >
-                <option value="knowledge">📚 PDF Kitob / Bilim Bazasi</option>
-                <option value="business">📊 Sotuv Logikasi & Strategiya</option>
-                <option value="project">🚀 Yangi Loyiha / Project</option>
+                <!-- Native <option> renders text only — no SVG/Icon component can appear
+                     inside it, so these stay plain labels instead of carrying an emoji
+                     that would be the one icon left un-swapped in this workspace. -->
+                <option value="knowledge">PDF Kitob / Bilim Bazasi</option>
+                <option value="business">Sotuv Logikasi & Strategiya</option>
+                <option value="project">Yangi Loyiha / Project</option>
                 <option value="architecture">
-                  🏗️ Texnik Arxitektura & Qoidalar
+                  Texnik Arxitektura & Qoidalar
                 </option>
-                <option value="sop">💼 Biznes SOP / Yo'riqnoma</option>
+                <option value="sop">Biznes SOP / Yo'riqnoma</option>
               </select>
             </div>
 
@@ -677,9 +687,9 @@
                     : 'bg-[#1C1F2A] border-[#2D3242] text-white',
                 ]"
               >
-                <option value="Critical Rule">⚡ Kritik Biznes Qoidasi</option>
-                <option value="High">🔥 Yuqori Prioritet</option>
-                <option value="Normal">📌 Standart Bilim</option>
+                <option value="Critical Rule">Kritik Biznes Qoidasi</option>
+                <option value="High">Yuqori Prioritet</option>
+                <option value="Normal">Standart Bilim</option>
               </select>
             </div>
 
@@ -801,7 +811,10 @@
               class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition flex items-center gap-2"
             >
               <span v-if="isSubmitting">Saqlanmoqda...</span>
-              <span v-else>🧠 AI Doimiy Xotirasiga Saqlash</span>
+              <template v-else>
+                <Icon name="brain" size="sm" />
+                <span>AI Doimiy Xotirasiga Saqlash</span>
+              </template>
             </button>
           </div>
         </form>
@@ -874,7 +887,7 @@
                 : 'text-gray-400 hover:bg-hover hover:text-white',
             ]"
           >
-            ✕
+            <Icon name="close" size="md" />
           </button>
         </div>
 
@@ -898,7 +911,8 @@
             "
             class="font-mono text-purple-600 font-bold flex items-center gap-1.5"
           >
-            📄 Fayl: {{ activeViewingItem.metadata.fileName }}
+            <Icon name="file" size="xs" />
+            Fayl: {{ activeViewingItem.metadata.fileName }}
           </div>
           <div
             v-if="activeViewingItem.tags && activeViewingItem.tags.length"
@@ -939,24 +953,26 @@
             <button
               @click="openEditModal(activeViewingItem)"
               :class="[
-                'px-3.5 py-2 rounded-xl text-xs font-semibold border transition',
+                'px-3.5 py-2 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5',
                 isLightTheme
                   ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
                   : 'bg-muted hover:bg-hover text-gray-300 border-line',
               ]"
             >
-              ✏️ Tahrirlash
+              <Icon name="edit" size="xs" />
+              Tahrirlash
             </button>
             <button
               @click="deleteItem(activeViewingItem._id)"
               :class="[
-                'px-3.5 py-2 rounded-xl text-xs font-semibold transition',
+                'px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5',
                 isLightTheme
                   ? 'bg-red-50 text-red-600 hover:bg-red-100'
                   : 'bg-muted text-red-400 hover:bg-red-500/20',
               ]"
             >
-              🗑️ O'chirish
+              <Icon name="delete" size="xs" />
+              O'chirish
             </button>
           </div>
 
@@ -964,7 +980,8 @@
             @click="queryAiAboutMemory(activeViewingItem)"
             class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2"
           >
-            <span>🤖 AI Bilan Ushbu Hujjatni Tahlil Qilish</span>
+            <Icon name="brain" size="sm" />
+            <span>AI Bilan Ushbu Hujjatni Tahlil Qilish</span>
           </button>
         </div>
       </div>
@@ -987,13 +1004,14 @@ export default {
       selectedCategory: "all",
       viewLayout: "grid", // 'grid' | 'list'
 
+      // icon: a semantic name resolved by the shared <Icon> component (src/components/ui/Icon.vue).
       categories: [
-        { id: "all", label: "Barchasi", icon: "📂" },
-        { id: "knowledge", label: "PDF & Bilim Bazasi", icon: "📚" },
-        { id: "business", label: "Sotuv Strategiyasi", icon: "📊" },
-        { id: "project", label: "Loyihalar", icon: "🚀" },
-        { id: "architecture", label: "Texnik Qoidalar", icon: "🏗️" },
-        { id: "sop", label: "Biznes SOP", icon: "💼" },
+        { id: "all", label: "Barchasi", icon: "library" },
+        { id: "knowledge", label: "PDF & Bilim Bazasi", icon: "book" },
+        { id: "business", label: "Sotuv Strategiyasi", icon: "business" },
+        { id: "project", label: "Loyihalar", icon: "project" },
+        { id: "architecture", label: "Texnik Qoidalar", icon: "architecture" },
+        { id: "sop", label: "Biznes SOP", icon: "sop" },
       ],
 
       // Modal state for Create / Edit

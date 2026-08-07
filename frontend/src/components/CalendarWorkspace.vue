@@ -5,205 +5,100 @@
     <DayPlanner
       v-if="plannerDayKey"
       :day-key="plannerDayKey"
+      :events="eventsByDate[plannerDayKey] || []"
       @back="closePlanner"
       @navigate="plannerDayKey = $event"
-      @changed="fetchTaskCounts"
+      @changed="fetchStripTasks"
+      @edit-event="openEditModal"
     />
 
     <template v-else>
     <!-- TOP EXECUTIVE HEADER BAR -->
-    <header :class="['border-b p-4 sm:px-6 z-10 shrink-0 backdrop-blur-xl transition-colors', isLightTheme ? 'bg-white/85 border-slate-200/80 shadow-sm' : 'bg-surface/90 border-line']">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 max-w-7xl mx-auto">
-        
-        <!-- Left: Title & Quick Stats -->
-        <div>
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 shrink-0">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    <header :class="['border-b px-4 sm:px-6 py-3 z-10 shrink-0 backdrop-blur-xl transition-colors', isLightTheme ? 'bg-white/85 border-slate-200/80 shadow-sm' : 'bg-surface/90 border-line']">
+      <div class="max-w-7xl mx-auto space-y-2.5">
+
+        <!-- Row 1: view switcher · counters · primary action.
+             Everything shares one 32px height so the row reads as a single band. -->
+        <div class="flex items-center justify-between gap-3">
+          <div :class="['flex items-center gap-0.5 p-0.5 rounded-xl border shrink-0', isLightTheme ? 'bg-slate-100 border-slate-200' : 'bg-raised border-line']">
+            <button
+              v-for="tab in viewTabs"
+              :key="tab.key"
+              @click="currentViewTab = tab.key"
+              :class="[
+                'h-8 px-3.5 rounded-[10px] text-xs font-semibold transition-all',
+                currentViewTab === tab.key
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                  : (isLightTheme ? 'text-slate-500 hover:text-slate-900' : 'text-gray-400 hover:text-white')
+              ]"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- Counters are the first thing to go when the row gets tight: they are a
+                 summary, while the tabs and the create button are controls. -->
+            <div class="hidden xl:flex items-center gap-1.5">
+              <span
+                v-for="stat in headerStats"
+                :key="stat.label"
+                :class="['flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[11px] font-medium tabular-nums', stat.chipClass]"
+              >
+                <span :class="['w-1.5 h-1.5 rounded-full', stat.dotClass]"></span>
+                <span class="font-bold">{{ stat.value }}</span>
+                <span class="opacity-70">{{ stat.label }}</span>
+              </span>
+            </div>
+
+            <button
+              @click="openCreateModal"
+              class="h-8 pl-2.5 pr-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/30 transition flex items-center gap-1.5 shrink-0"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
               </svg>
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h1 :class="['text-xl font-bold tracking-tight', isLightTheme ? 'text-slate-900' : 'text-white']">AI Executive Calendar</h1>
-              </div>
-              <p :class="['text-xs', isLightTheme ? 'text-slate-500' : 'text-gray-400']">Rejalar, uchrashuvlar va AI tomonidan avtomatik taqvim topshiriqlari</p>
-            </div>
+              Event
+            </button>
           </div>
         </div>
 
-        <!-- Middle: View Switcher (Month / Week / Day) -->
-        <div :class="['flex items-center gap-1 p-1 rounded-2xl border self-start lg:self-auto shadow-sm', isLightTheme ? 'bg-slate-100 border-slate-200' : 'bg-raised border-line']">
-          <button 
-            @click="currentViewTab = 'month'" 
-            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'month' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
-          >
-            Month View
-          </button>
-          <button 
-            @click="currentViewTab = 'week'" 
-            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'week' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
-          >
-            Week View
-          </button>
-          <button 
-            @click="currentViewTab = 'day'" 
-            :class="['px-4 py-1.5 rounded-xl text-xs font-bold transition-all', currentViewTab === 'day' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : (isLightTheme ? 'text-slate-600 hover:text-slate-900 hover:bg-white' : 'text-gray-400 hover:text-white hover:bg-hover')]"
-          >
-            Day View
-          </button>
-        </div>
-
-        <!-- Right: Actions (Create Event) -->
-        <div class="flex items-center gap-2">
+        <!-- Row 2: category filters -->
+        <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
           <button
-            @click="openCreateModal" 
-            class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
-          >
-            <span>+ Event Yaratish</span>
-          </button>
-        </div>
-
-      </div>
-
-      <!-- Quick Category Filters & AI Input Banner -->
-      <div :class="['max-w-7xl mx-auto mt-4 pt-3 border-t flex flex-col md:flex-row md:items-center justify-between gap-3', isLightTheme ? 'border-slate-200' : 'border-line']">
-        <!-- Category Filters -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none text-xs">
-          <button 
-            v-for="cat in categories" 
+            v-for="cat in categories"
             :key="cat"
             @click="selectedCategoryFilter = cat"
             :class="[
-              'px-3 py-1 rounded-xl font-semibold transition shrink-0 border',
-              selectedCategoryFilter === cat 
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
-                : (isLightTheme ? 'bg-white text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600' : 'bg-card text-gray-400 border-line hover:bg-muted hover:text-white')
+              'h-7 px-3 rounded-lg text-[11px] font-semibold transition shrink-0 border',
+              selectedCategoryFilter === cat
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : (isLightTheme ? 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600' : 'bg-card text-gray-400 border-line hover:border-indigo-500/40 hover:text-white')
             ]"
           >
             {{ cat }}
           </button>
         </div>
-
-        <!-- Stats Bar -->
-        <div :class="['flex items-center gap-4 text-[11px] font-mono shrink-0', isLightTheme ? 'text-slate-600' : 'text-gray-400']">
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> {{ completedCount }} Completed</span>
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> {{ pendingCount }} Pending</span>
-          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> {{ urgentCount }} Urgent/High</span>
-        </div>
       </div>
     </header>
-
-    <!-- AI QUICK ADD BAR -->
-    <div :class="['border-b p-3 px-4 sm:px-6 transition-colors', isLightTheme ? 'bg-white/90 border-slate-200' : 'bg-card border-line']">
-      <div class="max-w-7xl mx-auto flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
-        </div>
-        <form @submit.prevent="submitAiQuickAdd" class="flex-1 flex items-center gap-2">
-          <input 
-            v-model="aiQuickAddText" 
-            type="text" 
-            placeholder="AI Quick Add: Tabiiy tilda yozing (masalan: 'Juma kuni soat 15:00 da investor bilan meeting')" 
-            :class="[
-              'flex-1 rounded-xl px-4 py-2 text-xs outline-none transition border',
-              isLightTheme ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white' : 'bg-canvas border-line-strong text-white placeholder-gray-500 focus:border-indigo-500'
-            ]"
-          />
-          <button 
-            type="submit" 
-            :disabled="!aiQuickAddText.trim() || isAiProcessing"
-            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md transition shrink-0"
-          >
-            {{ isAiProcessing ? 'AI Tahlil...' : '+ AI Add' }}
-          </button>
-        </form>
-      </div>
-    </div>
 
     <!-- MAIN CALENDAR WORKSPACE AREA -->
     <main class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
       <div class="max-w-7xl mx-auto">
         
-        <!-- MONTH VIEW -->
+        <!-- MONTH VIEW — the weekly task board is the view; the month grid was removed
+             on request, and the strip's own ‹ / › navigation covers moving between weeks. -->
         <div v-if="currentViewTab === 'month'" class="space-y-4">
-          <!-- Month Header Controls -->
-          <div :class="['flex items-center justify-between border rounded-2xl p-4 shadow-sm transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-xl']">
-            <div class="flex items-center gap-3">
-              <button @click="changeMonth(-1)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-muted hover:bg-hover text-gray-300']">
-                ‹
-              </button>
-              <h2 :class="['text-base sm:text-lg font-bold tracking-tight font-mono', isLightTheme ? 'text-slate-900' : 'text-white']">{{ currentMonthName }} {{ currentYear }}</h2>
-              <button @click="changeMonth(1)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-muted hover:bg-hover text-gray-300']">
-                ›
-              </button>
-            </div>
-            <button @click="goToToday" :class="['px-3.5 py-1.5 rounded-xl text-xs font-bold transition border', isLightTheme ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 'bg-muted hover:bg-hover text-indigo-300 border-indigo-500/20']">
-              Bugun (Today)
-            </button>
-          </div>
-
-          <!-- Month Grid -->
-          <div :class="['border rounded-3xl p-4 shadow-md transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-2xl']">
-            <!-- Day of week headers -->
-            <div :class="['grid grid-cols-7 gap-2 mb-3 text-center text-[11px] font-extrabold uppercase tracking-wider', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
-              <span>Dush</span><span>Sesh</span><span>Chor</span><span>Pay</span><span>Jum</span><span>Shan</span><span>Yak</span>
-            </div>
-
-            <!-- Calendar Days Grid -->
-            <div class="grid grid-cols-7 gap-2 sm:gap-2.5">
-              <div 
-                v-for="cell in monthGridCells" 
-                :key="cell.dateKey"
-                @click="selectCellDate(cell.dateKey)"
-                :class="[
-                  'min-h-[115px] p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden',
-                  cell.isCurrentMonth 
-                    ? (isLightTheme ? 'bg-slate-50/80 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40' : 'bg-card border-line hover:border-indigo-500/40 hover:bg-raised')
-                    : (isLightTheme ? 'bg-slate-100/40 border-transparent text-slate-400' : 'bg-sunken/40 border-transparent text-gray-600'),
-                  cell.isToday ? (isLightTheme ? 'ring-2 ring-indigo-500 bg-indigo-50/80 border-indigo-400' : 'ring-2 ring-indigo-500 bg-[#1A1E2B]') : '',
-                  selectedDateKey === cell.dateKey ? (isLightTheme ? 'border-indigo-600 bg-indigo-100/60 shadow-md' : 'border-indigo-500/80 bg-[#1B1F2D]') : ''
-                ]"
-              >
-                <!-- Day Number Header -->
-                <div class="flex items-center justify-between mb-1 gap-1">
-                  <span :class="['text-xs font-bold font-mono', cell.isToday ? 'text-indigo-600 font-extrabold' : (isLightTheme ? 'text-slate-800' : 'text-gray-300')]">
-                    {{ cell.dayNum }}
-                  </span>
-                  <div class="flex items-center gap-1 shrink-0">
-                    <span v-if="cell.isToday" class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-600 text-white font-bold shadow-sm">
-                      BUGUN
-                    </span>
-                    <span v-if="cell.events.length > 0" class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-600 font-bold border border-indigo-500/30">
-                      {{ cell.events.length }}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Event badges in cell -->
-                <div class="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
-                  <div 
-                    v-for="evt in cell.events.slice(0, 3)" 
-                    :key="evt.id"
-                    @click.stop="openEditModal(evt)"
-                    :class="[
-                      'px-2 py-1 rounded-lg text-[10px] font-semibold truncate flex items-center justify-between border transition',
-                      getPriorityBadgeClass(evt.priority)
-                    ]"
-                  >
-                    <span class="truncate">{{ evt.title }}</span>
-                    <span class="text-[8px] opacity-80 font-mono ml-1 shrink-0">{{ evt.startTime }}</span>
-                  </div>
-                  <div v-if="cell.events.length > 3" :class="['text-[9px] font-mono text-center', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
-                    +{{ cell.events.length - 3 }} ko'proq
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
+          <!-- PER-DAY TASK TABLE — the calendar sits above it, the days run across it. -->
+          <WeekTaskStrip
+            :days="stripDays"
+            :selected-date-key="selectedDateKey"
+            :is-light-theme="isLightTheme"
+            @open-day="openPlanner"
+            @cycle-status="cycleTaskStatus"
+            @open-event="openEditModal"
+            @shift-days="shiftStripDays"
+          />
         </div>
 
         <!-- WEEK VIEW -->
@@ -258,9 +153,11 @@
         </div>
 
         <!-- DAY VIEW & SELECTED EVENTS LIST -->
+        <!-- Month view has its own per-day table (WeekTaskStrip), so this detailed event
+             stream is the Day tab's own content and no longer duplicates below the grid. -->
         <div
-          v-if="currentViewTab === 'day' || selectedDateKey"
-          :class="['space-y-4', currentViewTab === 'day' ? '' : 'mt-6 pt-6 border-t', isLightTheme ? 'border-slate-200' : 'border-line']"
+          v-if="currentViewTab === 'day'"
+          class="space-y-4"
         >
           <div :class="['flex items-center justify-between border rounded-2xl p-4 shadow-sm gap-3 transition-colors', isLightTheme ? 'bg-white border-slate-200' : 'bg-surface border-line shadow-xl']">
             <div class="flex items-center gap-3 min-w-0">
@@ -301,8 +198,9 @@
                     <span :class="['px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase font-mono', getPriorityBadgeClass(evt.priority)]">
                       {{ evt.priority }}
                     </span>
-                    <span :class="['text-[10px] font-medium px-2 py-0.5 rounded-md border', isLightTheme ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-muted text-gray-300 border-line-hover']">
-                      🏷️ {{ evt.category }}
+                    <span :class="['text-[10px] font-medium px-2 py-0.5 rounded-md border flex items-center gap-1', isLightTheme ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-muted text-gray-300 border-line-hover']">
+                      <Icon name="tag" size="xs" />
+                      {{ evt.category }}
                     </span>
                   </div>
 
@@ -311,9 +209,13 @@
 
                   <div :class="['flex items-center gap-4 text-[11px] font-mono pt-1', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
                     <span class="flex items-center gap-1">
-                      🕒 {{ evt.startTime }} - {{ evt.endTime }}
+                      <Icon name="clock" size="xs" />
+                      {{ evt.startTime }} - {{ evt.endTime }}
                     </span>
-                    <span>🗓️ {{ evt.startDate }}</span>
+                    <span class="flex items-center gap-1">
+                      <Icon name="calendar" size="xs" />
+                      {{ evt.startDate }}
+                    </span>
                   </div>
                 </div>
 
@@ -326,17 +228,17 @@
                     {{ evt.status }}
                   </button>
                   <button @click="openEditModal(evt)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-slate-100 hover:bg-slate-200 text-slate-600' : 'bg-muted hover:bg-hover text-gray-300']" title="Tahrirlash">
-                    ✏️
+                    <Icon name="edit" size="sm" />
                   </button>
                   <button @click="deleteEventItem(evt.id)" :class="['p-2 rounded-xl transition', isLightTheme ? 'bg-red-50 hover:bg-red-100 text-red-600' : 'bg-muted hover:bg-red-500/20 text-red-400']" title="O'chirish">
-                    🗑️
+                    <Icon name="delete" size="sm" />
                   </button>
                 </div>
               </div>
 
               <div v-if="selectedDayEvents.length === 0" :class="['border rounded-2xl p-8 text-center space-y-3', isLightTheme ? 'bg-white border-slate-200' : 'bg-card border-line']">
-                <div class="w-12 h-12 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center mx-auto text-xl">
-                  📅
+                <div class="w-12 h-12 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center mx-auto">
+                  <Icon name="calendar" size="lg" />
                 </div>
                 <h4 :class="['text-sm font-bold', isLightTheme ? 'text-slate-900' : 'text-white']">Ushbu kunga rejalashtirilgan vazifa yo'q</h4>
                 <p :class="['text-xs max-w-sm mx-auto', isLightTheme ? 'text-slate-500' : 'text-gray-400']">Yangi vazifa yaratish uchun yuqoridagi tugmani bosing yoki AI Chatga "Ertaga meeting bor" deb yozing.</p>
@@ -348,7 +250,8 @@
               <div :class="['border rounded-2xl p-4 space-y-3 shadow-md', isLightTheme ? 'bg-white border-slate-200' : 'bg-card border-line shadow-xl']">
                 <div :class="['flex items-center justify-between border-b pb-2', isLightTheme ? 'border-slate-200' : 'border-line']">
                   <span :class="['text-xs font-bold flex items-center gap-2', isLightTheme ? 'text-slate-900' : 'text-white']">
-                    🔔 Yaqinlashayotgan AI Eslatmalar
+                    <Icon name="bell" size="sm" />
+                    Yaqinlashayotgan AI Eslatmalar
                   </span>
                   <span class="text-[9px] bg-emerald-500/20 text-emerald-600 px-2 py-0.5 rounded font-mono font-bold">Telegram Active</span>
                 </div>
@@ -357,7 +260,10 @@
                   <div v-for="evt in upcomingReminders.slice(0, 3)" :key="evt.id" :class="['p-2.5 rounded-xl border space-y-1', isLightTheme ? 'bg-slate-50 border-slate-200' : 'bg-muted border-line-strong']">
                     <div :class="['font-bold truncate', isLightTheme ? 'text-slate-800' : 'text-white']">{{ evt.title }}</div>
                     <div :class="['text-[10px] flex items-center justify-between', isLightTheme ? 'text-slate-500' : 'text-gray-400']">
-                      <span>🕒 {{ evt.startDate }} ({{ evt.startTime }})</span>
+                      <span class="flex items-center gap-1">
+                        <Icon name="clock" size="xs" />
+                        {{ evt.startDate }} ({{ evt.startTime }})
+                      </span>
                       <span class="text-amber-600 font-mono font-bold">30 min oldin</span>
                     </div>
                   </div>
@@ -377,7 +283,7 @@
         
         <div class="flex items-center justify-between border-b border-line pb-3">
           <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span>📅</span>
+            <Icon name="calendar" size="md" />
             <span>{{ isEditMode ? 'Eventni Tahrirlash' : 'Yangi Event Yaratish' }}</span>
           </h3>
           <button @click="isModalOpen = false" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-line">
@@ -486,9 +392,9 @@
 
 <script>
 import calendarService from '../services/calendarService';
-import chatService from '../services/chatService';
 import taskService from '../services/taskService';
 import DayPlanner from './DayPlanner.vue';
+import WeekTaskStrip from './WeekTaskStrip.vue';
 import {
   MONTH_NAMES,
   WEEKDAY_NAMES,
@@ -497,20 +403,27 @@ import {
   errorText
 } from '../utils/date';
 
+// How many day columns the strip renders, and how far the ‹ / › buttons slide it.
+const STRIP_DAY_COUNT = 7;
+const STRIP_SHIFT_DAYS = 3;
+
 export default {
   name: 'CalendarWorkspace',
-  components: { DayPlanner },
+  components: { DayPlanner, WeekTaskStrip },
   data() {
     const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
     const todayKey = toDateKey(today);
 
     return {
       events: [],
       currentViewTab: 'month', // 'month', 'week', 'day'
-      currentYear: year,
-      currentMonth: month,
+      // The 'month' tab holds the per-day task board now that the month grid is gone,
+      // so it is labelled for what it shows rather than for a calendar span.
+      viewTabs: [
+        { key: 'month', label: 'Vazifalar' },
+        { key: 'week', label: 'Haftalik' },
+        { key: 'day', label: 'Kunlik' }
+      ],
       selectedDateKey: todayKey,
       todayDateKey: todayKey,
       selectedCategoryFilter: 'All',
@@ -518,14 +431,12 @@ export default {
 
       // When set, the Trello-style day planner takes over the whole workspace.
       plannerDayKey: null,
-      // { '2026-08-01': { total, done } } — powers the per-day task indicators.
-      taskCounts: {},
+      // { '2026-08-01': [task, ...] } — the full cards behind the day table below the grid.
+      tasksByDay: {},
+      // Which week the day table shows; the grid above can be scrolled independently.
+      stripAnchorKey: todayKey,
       isLoadingEvents: true,
 
-      // Quick AI Add
-      aiQuickAddText: '',
-      isAiProcessing: false,
-      
       // Modal State
       isModalOpen: false,
       isEditMode: false,
@@ -543,19 +454,7 @@ export default {
       isLightTheme: document.documentElement.classList.contains('light')
     };
   },
-  mounted() {
-    this.themeObserver = new MutationObserver(() => {
-      this.isLightTheme = document.documentElement.classList.contains('light');
-    });
-    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-  },
-  beforeUnmount() {
-    if (this.themeObserver) this.themeObserver.disconnect();
-  },
   computed: {
-    currentMonthName() {
-      return MONTH_NAMES[this.currentMonth];
-    },
     filteredEvents() {
       if (this.selectedCategoryFilter === 'All') return this.events;
       return this.events.filter(e => e.category === this.selectedCategoryFilter);
@@ -569,29 +468,33 @@ export default {
     urgentCount() {
       return this.events.filter(e => e.priority === 'Urgent' || e.priority === 'High').length;
     },
-    monthGridCells() {
-      // The grid always starts on the Monday on/before the 1st and runs whole weeks, so
-      // every cell is derived from a real Date — no manual month/year arithmetic that
-      // breaks at the January (month 0) and December (month 13) boundaries.
-      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
-      const leadingBlanks = (firstDay.getDay() + 6) % 7; // Mon = 0
-      const daysInMonth = new Date(this.currentYear, this.currentMonth + 1, 0).getDate();
-      const totalCells = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
-
-      const cells = [];
-      for (let i = 0; i < totalCells; i++) {
-        const cellDate = new Date(this.currentYear, this.currentMonth, i - leadingBlanks + 1);
-        const dateKey = toDateKey(cellDate);
-        cells.push({
-          dateKey,
-          dayNum: cellDate.getDate(),
-          isCurrentMonth: cellDate.getMonth() === this.currentMonth,
-          isToday: dateKey === this.todayDateKey,
-          events: this.eventsByDate[dateKey] || [],
-          tasks: this.taskCounts[dateKey] || null
-        });
-      }
-      return cells;
+    headerStats() {
+      return [
+        {
+          label: 'bajarildi',
+          value: this.completedCount,
+          dotClass: 'bg-emerald-500',
+          chipClass: this.isLightTheme
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+        },
+        {
+          label: 'kutilmoqda',
+          value: this.pendingCount,
+          dotClass: 'bg-amber-500',
+          chipClass: this.isLightTheme
+            ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+        },
+        {
+          label: 'shoshilinch',
+          value: this.urgentCount,
+          dotClass: 'bg-rose-500',
+          chipClass: this.isLightTheme
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+        }
+      ];
     },
     // Bucket once per render instead of re-filtering the whole list for all 42 cells.
     eventsByDate() {
@@ -623,6 +526,37 @@ export default {
 
       return result;
     },
+    // The day columns start AT the anchor (today by default) and run forward, so the
+    // current day always sits flush left and the week opens out to the right —
+    // a Monday-first window would bury today mid-scroll on a Thursday.
+    stripDays() {
+      const start = parseDateKey(this.stripAnchorKey || this.todayDateKey);
+      const dayNames = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+      const days = [];
+
+      for (let i = 0; i < STRIP_DAY_COUNT; i++) {
+        const curr = new Date(start);
+        curr.setDate(start.getDate() + i);
+        const dateKey = toDateKey(curr);
+        const tasks = this.tasksByDay[dateKey] || [];
+        const doneCount = tasks.filter(t => t.status === 'Done').length;
+
+        days.push({
+          dateKey,
+          // Indexed by the real weekday, not by column position, now that the window
+          // can start on any day.
+          dayName: dayNames[curr.getDay()],
+          dateStr: `${curr.getDate()}-${MONTH_NAMES[curr.getMonth()]}`,
+          isToday: dateKey === this.todayDateKey,
+          tasks,
+          events: this.eventsByDate[dateKey] || [],
+          doneCount,
+          completionRate: tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
+        });
+      }
+
+      return days;
+    },
     selectedDayEvents() {
       const key = this.selectedDateKey || this.todayDateKey;
       return (this.eventsByDate[key] || [])
@@ -642,17 +576,28 @@ export default {
         .sort((a, b) => (a.startDate + a.startTime).localeCompare(b.startDate + b.startTime));
     }
   },
+  // One hook per lifecycle event: the options object previously declared `mounted` and
+  // `beforeUnmount` twice, so the later pair silently replaced the earlier one and the
+  // theme observer never ran — the workspace stayed on whatever theme it loaded with.
   async mounted() {
-    await Promise.all([this.fetchEvents(), this.fetchTaskCounts()]);
+    this.themeObserver = new MutationObserver(() => {
+      this.isLightTheme = document.documentElement.classList.contains('light');
+    });
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
     window.addEventListener('calendar-updated', this.fetchEvents);
+    await Promise.all([this.fetchEvents(), this.fetchStripTasks()]);
   },
   beforeUnmount() {
+    if (this.themeObserver) this.themeObserver.disconnect();
     window.removeEventListener('calendar-updated', this.fetchEvents);
   },
   watch: {
-    // Grid scrolled to another month — reload the indicators for the new range.
-    currentMonth: 'fetchTaskCounts',
-    currentYear: 'fetchTaskCounts'
+    // The day table follows whichever day is selected in the grid.
+    selectedDateKey(key) {
+      if (key) this.stripAnchorKey = key;
+    },
+    stripAnchorKey: 'fetchStripTasks'
   },
   methods: {
     async fetchEvents() {
@@ -665,48 +610,52 @@ export default {
         this.isLoadingEvents = false;
       }
     },
-    changeMonth(delta) {
-      let m = this.currentMonth + delta;
-      if (m < 0) {
-        this.currentMonth = 11;
-        this.currentYear -= 1;
-      } else if (m > 11) {
-        this.currentMonth = 0;
-        this.currentYear += 1;
-      } else {
-        this.currentMonth = m;
-      }
-    },
-    goToToday() {
-      const today = new Date();
-      this.currentYear = today.getFullYear();
-      this.currentMonth = today.getMonth();
-      this.selectedDateKey = this.todayDateKey;
-    },
-    selectCellDate(dateKey) {
-      this.selectedDateKey = dateKey;
-      // Clicking a leading/trailing cell scrolls the grid to the month it belongs to.
-      const d = parseDateKey(dateKey);
-      if (d.getMonth() !== this.currentMonth || d.getFullYear() !== this.currentYear) {
-        this.currentMonth = d.getMonth();
-        this.currentYear = d.getFullYear();
-      }
-    },
     openPlanner(dateKey) {
       this.plannerDayKey = dateKey || this.todayDateKey;
     },
     closePlanner() {
       this.plannerDayKey = null;
-      this.fetchTaskCounts();
+      this.fetchStripTasks();
     },
-    async fetchTaskCounts() {
-      // Pad the range so the leading/trailing cells of the month grid are covered too.
-      const from = toDateKey(new Date(this.currentYear, this.currentMonth, -7));
-      const to = toDateKey(new Date(this.currentYear, this.currentMonth + 1, 14));
+    /** Loads the cards for the seven columns currently shown under the calendar. */
+    async fetchStripTasks() {
+      const days = this.stripDays;
+      if (!days.length) return;
       try {
-        this.taskCounts = await taskService.getCounts(from, to);
+        const tasks = await taskService.getTasksForRange(days[0].dateKey, days[days.length - 1].dateKey);
+        const grouped = {};
+        for (const task of tasks) {
+          (grouped[task.dayKey] = grouped[task.dayKey] || []).push(task);
+        }
+        this.tasksByDay = grouped;
       } catch (e) {
-        this.taskCounts = {};
+        this.tasksByDay = {};
+      }
+    },
+    /** delta 0 snaps back to today; otherwise the window slides three days at a time. */
+    shiftStripDays(delta) {
+      if (delta === 0) {
+        this.stripAnchorKey = this.todayDateKey;
+        return;
+      }
+      const d = parseDateKey(this.stripAnchorKey || this.todayDateKey);
+      d.setDate(d.getDate() + delta * STRIP_SHIFT_DAYS);
+      this.stripAnchorKey = toDateKey(d);
+    },
+    /**
+     * Todo → Doing → Done → Todo. The full board is one click away, but moving a card
+     * one step forward is the common case and shouldn't need a page change.
+     */
+    async cycleTaskStatus(task) {
+      const next = { Todo: 'Doing', Doing: 'Done', Done: 'Todo' }[task.status] || 'Todo';
+      const previous = task.status;
+      task.status = next; // optimistic — the column re-renders immediately
+      try {
+        await taskService.updateTask(task.id, { status: next });
+        await this.fetchStripTasks();
+      } catch (e) {
+        task.status = previous;
+        alert('Vazifa holatini yangilab bo\'lmadi: ' + errorText(e));
       }
     },
     getPriorityBadgeClass(p) {
@@ -801,22 +750,6 @@ export default {
         alert('Eventni o\'chirib bo\'lmadi: ' + errorText(e));
       }
     },
-    async submitAiQuickAdd() {
-      if (!this.aiQuickAddText.trim()) return;
-      this.isAiProcessing = true;
-      try {
-        await chatService.sendMessage({
-          conversationId: 'conv-calendar-quick',
-          content: this.aiQuickAddText
-        });
-        this.aiQuickAddText = '';
-        await this.fetchEvents();
-      } catch (e) {
-        alert('AI Quick Add bajarilmadi: ' + errorText(e));
-      } finally {
-        this.isAiProcessing = false;
-      }
-    }
   }
 };
 </script>
