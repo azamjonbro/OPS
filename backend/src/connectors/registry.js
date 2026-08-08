@@ -55,21 +55,53 @@ class BaseConnector {
   }
 }
 
+/** Bounds a promise to `ms` — resolves to `fallback` instead of hanging if it's slower. */
+function withTimeout(promise, ms, fallback) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; resolve(fallback); }
+    }, ms);
+    promise.then(
+      (val) => { if (!settled) { settled = true; clearTimeout(timer); resolve(val); } },
+      () => { if (!settled) { settled = true; clearTimeout(timer); resolve(fallback); } }
+    );
+  });
+}
+
+/**
+ * Reads and sends through the owner's OWN personal Telegram account via the MTProto
+ * userbot (services/telegramUserbotService.js) — the same connection that backfills chat
+ * history. `telegram_send_message` used to be a Bot API stub that reported `sent: true`
+ * without ever touching Telegram; every call now really sends, or reports exactly why it
+ * didn't (userbot not connected, contact not found in synced history).
+ */
 class TelegramConnector extends BaseConnector {
   constructor() {
-    super('TELEGRAM', 'Telegram Bot Integration', 'Send Telegram notifications and messages via Bot API');
+    super('TELEGRAM', 'Telegram Personal Account (MTProto Userbot)', "Read and send messages through the owner's own Telegram account, based on the synced chat history");
   }
 
   getTools() {
     return [
       {
-        name: 'telegram_send_message',
-        description: 'Send a text message to a specific Telegram chat ID or group. Only call this when the owner explicitly asks to send/post something to Telegram.',
+        name: 'telegram_read_messages',
+        description: "Who has messaged the owner on their PERSONAL Telegram account recently, based on the last MTProto history sync — one row per person with their latest message. Use for 'telegramdan kim yozdi', 'telegramda kim menga yozgan' style questions. Give `person` to instead get one contact's own recent messages (e.g. 'X telegramda nima yozgan edi').",
         parameters: {
           type: 'object',
           properties: {
-            chatId: { type: 'string', description: 'Target chat ID, defaults to the admin channel if omitted' },
-            text: { type: 'string', description: 'The full message text to send, written out by you now. If the owner asked you to draft real content, write the complete content here, not a short paraphrase.' }
+            person: { type: 'string', description: "Optional — a specific person's name/username to filter to just their messages" }
+          }
+        }
+      },
+      {
+        name: 'telegram_send_message',
+        description: "Send a REAL text message from the owner's own personal Telegram account to a specific contact. Give `person` (their name/username, as the owner refers to them) to look them up from the synced chat history — do not ask for a chatId, resolve it yourself from `person`. Only call when the owner explicitly asks to write/send/reply to someone specifically ON TELEGRAM. For 'find this person and message them' with no channel named, use contact_send_message instead.",
+        parameters: {
+          type: 'object',
+          properties: {
+            person: { type: 'string', description: "The contact's name/username to look up, e.g. 'azamjonbro'" },
+            chatId: { type: 'string', description: 'Exact Telegram chat/user id, only if already known — normally omit this and use person instead' },
+            text: { type: 'string', description: "The full message text, written by you now — short, casual, natural Uzbek, the way the owner would personally text someone, NOT formal business-letter language." }
           },
           required: ['text']
         }
@@ -86,23 +118,108 @@ class TelegramConnector extends BaseConnector {
           },
           required: ['photoUrl']
         }
+      },
+      {
+        name: 'contact_send_message',
+        description: "Find a person by name across BOTH the owner's personal Telegram history and iCloud mail AT THE SAME TIME (bounded so it never runs long), then send them a message on whichever channel they're actually found on (Telegram preferred if found on both). Use this when the owner wants to reach someone but does NOT say which channel — 'kimnidir top va unga yoz', 'X ni qidir va xabar ber'. If the owner already named a channel or gave an email address, use telegram_send_message or mail_send_email directly instead — it's faster.",
+        parameters: {
+          type: 'object',
+          properties: {
+            person: { type: 'string', description: "The person's name to search for" },
+            text: { type: 'string', description: "The full message to send, written by you now, in the owner's casual personal tone" },
+            subject: { type: 'string', description: "Email subject — only used if the person is found via mail instead of Telegram. Write a short concrete one; omit and a generic one is used." }
+          },
+          required: ['person', 'text']
+        }
       }
     ];
   }
 
   async healthCheck() {
-    return { isHealthy: true, message: 'Telegram Bot API Connected' };
+    const telegramUserbotService = require('../services/telegramUserbotService');
+    const status = telegramUserbotService.getStatus();
+    return { isHealthy: status.connected, message: status.connected ? `Ulangan: ${status.phone || 'noma\'lum'}` : 'Ulanmagan' };
   }
 
-  async executeTool(toolName, params) {
+  async executeTool(toolName, params = {}) {
     const startTime = Date.now();
+    const telegramUserbotService = require('../services/telegramUserbotService');
+
+    if (toolName === 'telegram_read_messages') {
+      try {
+        const res = await telegramUserbotService.getInboxSummary({ person: params.person });
+        return { success: true, data: res, executionMs: Date.now() - startTime };
+      } catch (err) {
+        return { success: false, error: err.message, executionMs: Date.now() - startTime };
+      }
+    }
+
     if (toolName === 'telegram_send_message') {
+      if (!telegramUserbotService.isConnected()) {
+        return { success: false, error: "Telegram shaxsiy akkaunt ulanmagan (admin panel -> Telegram Userbot orqali ulang)", executionMs: Date.now() - startTime };
+      }
+
+      let chatId = params.chatId;
+      let resolvedName = null;
+      if (!chatId && params.person) {
+        const match = await telegramUserbotService.findChatByPerson(params.person);
+        if (!match) {
+          return { success: false, error: `"${params.person}" telegram tarixida topilmadi (oxirgi sync asosida).`, executionMs: Date.now() - startTime };
+        }
+        chatId = match.chatId;
+        resolvedName = match.customerName;
+      }
+      if (!chatId) {
+        return { success: false, error: "chatId yoki person ko'rsatilmadi", executionMs: Date.now() - startTime };
+      }
+
+      const result = await telegramUserbotService.sendMessage(chatId, params.text);
       return {
-        success: true,
-        data: { sent: true, chatId: params.chatId || '@admin_channel', text: params.text, timestamp: new Date() },
+        success: result.success,
+        data: { chatId, resolvedName, text: params.text },
+        error: result.error,
         executionMs: Date.now() - startTime
       };
     }
+
+    if (toolName === 'contact_send_message') {
+      const emailService = require('../services/emailService');
+      const [tgMatch, mailMatch] = await Promise.all([
+        telegramUserbotService.findChatByPerson(params.person).catch(() => null),
+        withTimeout(emailService.searchCorrespondence(params.person, { limit: 5 }).catch(() => null), 12000, null)
+      ]);
+
+      if (tgMatch && telegramUserbotService.isConnected()) {
+        const result = await telegramUserbotService.sendMessage(tgMatch.chatId, params.text);
+        return {
+          success: result.success,
+          data: { channel: 'telegram', person: params.person, resolvedName: tgMatch.customerName, chatId: tgMatch.chatId, text: params.text },
+          error: result.error,
+          executionMs: Date.now() - startTime
+        };
+      }
+
+      if (mailMatch && mailMatch.success && mailMatch.matchedAddress) {
+        const sendRes = await emailService.sendEmail({
+          to: mailMatch.matchedAddress,
+          subject: params.subject || `Xabar — ${params.person}`,
+          body: params.text
+        });
+        return {
+          success: sendRes.success,
+          data: { channel: 'email', person: params.person, resolvedAddress: mailMatch.matchedAddress, text: params.text },
+          error: sendRes.success ? undefined : sendRes.error,
+          executionMs: Date.now() - startTime
+        };
+      }
+
+      return {
+        success: false,
+        error: `"${params.person}" na Telegram tarixida, na iCloud pochta yozishmalarida topilmadi.`,
+        executionMs: Date.now() - startTime
+      };
+    }
+
     return { success: true, data: { sent: true, photoUrl: params.photoUrl }, executionMs: Date.now() - startTime };
   }
 }

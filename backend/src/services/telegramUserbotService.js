@@ -212,6 +212,64 @@ class TelegramUserbotService {
     }
   }
 
+  /**
+   * Most recent synced chat whose customerName matches `person` (case-insensitive
+   * substring — the sync stores "firstName lastName" or, absent that, the username, so
+   * this matches either the way the owner would naturally refer to someone). Reads
+   * TelegramCustomerMessage rather than a live MTProto contact search — the sync runs
+   * every minute and already covers every private dialog, so this is both faster and
+   * covers people who haven't messaged recently but are still in the synced chat list.
+   */
+  async findChatByPerson(person) {
+    const needle = String(person || '').trim();
+    if (!needle) return null;
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const doc = await TelegramCustomerMessage.findOne({ customerName: new RegExp(escaped, 'i') })
+      .sort({ createdAt: -1 })
+      .lean();
+    return doc ? { chatId: doc.chatId, customerName: doc.customerName } : null;
+  }
+
+  /**
+   * "Who messaged me on Telegram" (no `person`) — one row per chat, their latest inbound
+   * message, newest chat first, based on the last history sync. With `person`, the recent
+   * messages exchanged with just that one contact instead.
+   */
+  async getInboxSummary({ person, limit = 20 } = {}) {
+    const needle = String(person || '').trim();
+    let rows;
+
+    if (needle) {
+      const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      rows = await TelegramCustomerMessage.find({ customerName: new RegExp(escaped, 'i') })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+    } else {
+      rows = await TelegramCustomerMessage.aggregate([
+        { $match: { direction: 'in' } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: '$chatId', chatId: { $first: '$chatId' }, customerName: { $first: '$customerName' }, text: { $first: '$text' }, direction: { $first: '$direction' }, createdAt: { $first: '$createdAt' } } },
+        { $sort: { createdAt: -1 } },
+        { $limit: limit }
+      ]);
+    }
+
+    return {
+      success: true,
+      lastSyncAt: this.lastSyncAt,
+      person: needle || null,
+      count: rows.length,
+      messages: rows.map((r) => ({
+        chatId: r.chatId,
+        customerName: r.customerName,
+        text: r.text,
+        direction: r.direction,
+        date: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
+      }))
+    };
+  }
+
   getStatus() {
     return {
       configured: this.isConfigured(),
