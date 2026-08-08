@@ -52,10 +52,22 @@ textarea,
   user-select: text;
 }
 
+/* App-like shell: kill horizontal scroll/bounce and the vertical rubber-band
+   overscroll (and pull-to-refresh) so the PWA doesn't feel like a webpage
+   you can drag past its edges. Normal in-range scrolling is untouched. */
+html {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  width: 100%;
+}
+
 @layer base {
   body {
     background-color: rgb(var(--color-canvas));
     color: #F3F4F6;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    width: 100%;
   }
 }
 
