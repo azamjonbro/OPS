@@ -30,13 +30,22 @@ const bulkImport = asyncHandler(async (req, res) => {
   }
 
   const result = await proxyPoolService.bulkImport(purpose, entries);
-  res.json({ success: true, ...result });
+  // Ack immediately — testing every imported proxy (MTProto handshakes especially) can take
+  // minutes and must not hold the HTTP request open. The frontend polls GET /proxies instead.
+  res.json({ success: true, ...result, testing: true });
+
+  proxyPoolService.testAllForPurpose(purpose).catch((err) => {
+    console.error('Proxy pool background test error:', err.message);
+  });
 }, 'Failed to import proxies');
 
 const testAll = asyncHandler(async (req, res) => {
   const { purpose } = req.params;
-  const results = await proxyPoolService.testAllForPurpose(purpose);
-  res.json({ success: true, results });
+  res.json({ success: true, testing: true });
+
+  proxyPoolService.testAllForPurpose(purpose).catch((err) => {
+    console.error('Proxy pool background test error:', err.message);
+  });
 }, 'Failed to test proxies');
 
 const remove = asyncHandler(async (req, res) => {
