@@ -62,9 +62,17 @@ class TelegramBusinessService {
     if (!this.token || this._polling) return;
     this._polling = true;
 
-    await this.apiCall('deleteWebhook', { drop_pending_updates: false });
-    console.log('📡 Telegram Business: polling for updates (getUpdates) instead of webhook');
+    // A transient network hiccup here must never leave `_polling` stuck true with no loop
+    // actually running — that would permanently block every future startPolling() call
+    // (its guard above would think polling is already active) until the process restarts.
+    // getUpdates itself will keep retrying on failure, so proceed to the loop regardless.
+    try {
+      await this.apiCall('deleteWebhook', { drop_pending_updates: false });
+    } catch (err) {
+      console.error('Telegram deleteWebhook failed (continuing to poll anyway):', err.message);
+    }
 
+    console.log('📡 Telegram Business: polling for updates (getUpdates) instead of webhook');
     this._pollLoop();
   }
 
