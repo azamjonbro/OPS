@@ -366,6 +366,58 @@ function formatMailSendReport(data, success) {
     `• **Mavzu:** ${data.subject}`;
 }
 
+/** `2026-08-09T14:36:00.000Z` → `9-Avgust, 14:36`. */
+function formatTelegramDate(iso) {
+  if (!iso) return '';
+  const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${d.getDate()}-${MONTHS[d.getMonth()]}, ${time}`;
+}
+
+function formatTelegramReadReport(res) {
+  if (!res || !res.success) {
+    return `⚠️ **Telegram tarixini o'qib bo'lmadi:** ${(res && res.error) || "Noma'lum xato"}`;
+  }
+  if (!res.count) {
+    return res.person
+      ? `🔍 **"${res.person}"** nomli kontaktdan Telegram tarixida hech qanday xabar topilmadi (oxirgi sync: ${res.lastSyncAt ? formatTelegramDate(res.lastSyncAt) : "hali sync bo'lmagan"}).`
+      : `📱 Telegram'da hech kim yozmagan (oxirgi sync: ${res.lastSyncAt ? formatTelegramDate(res.lastSyncAt) : "hali sync bo'lmagan"}).`;
+  }
+
+  const rows = res.messages.map((m, i) => {
+    const text = String(m.text || '').replace(/\|/g, '\\|').replace(/\n/g, ' ').slice(0, 140);
+    const dir = m.direction === 'out' ? '➡️ Sizdan' : '⬅️ Undan';
+    return `| ${i + 1} | ${(m.customerName || "Noma'lum").replace(/\|/g, '\\|')} | ${dir} | ${text} | ${formatTelegramDate(m.date)} |`;
+  }).join('\n');
+
+  const title = res.person ? `📱 **Telegram — "${res.person}" bilan yozishmalar**` : `📱 **Telegram — so'nggi yozganlar**`;
+  return `${title} (${res.count} ta)\n\n` +
+    `| # | Kimdan | Yo'nalish | Xabar | Sana |\n|---|---|---|---|---|\n${rows}\n\n` +
+    `ℹ️ Oxirgi tarix sinxronizatsiyasi: ${res.lastSyncAt ? formatTelegramDate(res.lastSyncAt) : "hali bo'lmagan"}.`;
+}
+
+function formatTelegramSendReport(data, success, error) {
+  if (!success) {
+    return `❌ **Telegram xabari yuborilmadi.**\n\n${error || "Noma'lum xato"}`;
+  }
+  return `✅ **Telegram xabari yuborildi.**\n\n` +
+    `• **Kimga:** ${data.resolvedName || data.chatId}\n` +
+    `• **Matn:** ${data.text}`;
+}
+
+function formatContactSendReport(data, success, error) {
+  if (!success) {
+    return `❌ **Xabar yuborilmadi.**\n\n${error || "Bu odam na Telegram tarixida, na iCloud pochta yozishmalarida topilmadi."}`;
+  }
+  const channelLabel = data.channel === 'telegram' ? '📱 Telegram' : '📧 Email';
+  const target = data.channel === 'telegram' ? (data.resolvedName || data.chatId) : data.resolvedAddress;
+  return `✅ **Xabar yuborildi** (${channelLabel} orqali topildi).\n\n` +
+    `• **Kimga:** ${target}\n` +
+    `• **Matn:** ${data.text}`;
+}
+
 function formatBillzConnectionReport(billzRes) {
   if (billzRes && billzRes.isRealData) {
     const h = billzRes.health || {};
@@ -477,6 +529,8 @@ const TOOL_LABELS = {
   scheduler_create_automation: "⏰ Avtomatik jadval saqlanmoqda",
   telegram_send_message: "📨 Telegram xabari yuborilmoqda",
   telegram_send_photo: "📨 Telegram rasmi yuborilmoqda",
+  telegram_read_messages: "📱 Telegram — oxirgi sync asosida xabarlar o'qilmoqda",
+  contact_send_message: "🔎 Odam Telegram va pochtadan qidirilib, xabar yuborilmoqda",
   slack_send_message: "💬 Slack xabari yuborilmoqda",
   whatsapp_send_message: "💬 WhatsApp xabari yuborilmoqda",
   github_run_analysis: "🛠️ Kod tahlili bajarilmoqda",
@@ -629,6 +683,12 @@ async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
     }
     case 'mail_send_email':
       return formatMailSendReport(res.data, res.success);
+    case 'telegram_read_messages':
+      return formatTelegramReadReport(res.data || res);
+    case 'telegram_send_message':
+      return formatTelegramSendReport(res.data, res.success, res.error);
+    case 'contact_send_message':
+      return formatContactSendReport(res.data, res.success, res.error);
     case 'notion_create_task':
       return formatNotionCreateReport(res, args);
     case 'billz_get_consolidated_report':
