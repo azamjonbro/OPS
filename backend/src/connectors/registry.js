@@ -247,7 +247,7 @@ class BillzConnector extends BaseConnector {
         parameters: {
           type: 'object',
           properties: {
-            date: { type: 'string', description: "The period being asked about, in the owner's own words or an ISO date: a single day ('2026-08-05', 'bugun', 'kecha', '31 iyul') or a period phrase ('oxirgi 7 kun', 'shu oy', 'bu hafta'). Omit to default to today." }
+            date: { type: 'string', description: "The period being asked about, PASSED THROUGH IN THE OWNER'S OWN WORDS whenever possible — the backend parses Uzbek dates and month names itself and does it more reliably than a guessed date. For a named month ('iyul oyi', 'avgust oyida', 'may oyi hisoboti'), pass that phrase AS WRITTEN — do NOT convert it to a single ISO date, that would collapse a whole month into one day. Only compute a concrete ISO date yourself for a relative single day ('bugun' -> today's ISO date, 'kecha' -> yesterday's). Other accepted forms: 'oxirgi 7 kun', 'shu oy', 'bu hafta', '31 iyul', '2026-08-05'. Omit entirely to default to today." }
           }
         }
       },
