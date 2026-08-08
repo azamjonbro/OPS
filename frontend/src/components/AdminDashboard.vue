@@ -125,6 +125,8 @@
             </div>
           </div>
         </div>
+
+        <ProxyPoolPanel />
       </div>
 
       <!-- TAB 2: AI MODELS & PROMPTS -->
@@ -290,11 +292,12 @@
 <script>
 import ConnectionModal from './ConnectionModal.vue';
 import TelegramUserbotModal from './TelegramUserbotModal.vue';
+import ProxyPoolPanel from './ProxyPoolPanel.vue';
 import ThemeToggle from './ui/ThemeToggle.vue';
 import { adminService } from '../services/adminService';
 
 export default {
-  components: { ConnectionModal, TelegramUserbotModal, ThemeToggle },
+  components: { ConnectionModal, TelegramUserbotModal, ProxyPoolPanel, ThemeToggle },
   data() {
     return {
       activeTab: 'integrations',

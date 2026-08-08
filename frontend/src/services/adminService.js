@@ -96,6 +96,28 @@ export const adminService = {
   async telegramUserbotSyncHistory() {
     const res = await client.post(`${ADMIN_URL}/telegram-userbot/sync-history`);
     return res.data;
+  },
+
+  // Proxy pool — DB-backed so new proxies can be pasted in from the admin panel instead of
+  // editing .env + SSH + restart every time a provider swaps IPs.
+  async getProxies(purpose) {
+    const res = await client.get(`${ADMIN_URL}/proxies`, { params: purpose ? { purpose } : {} });
+    return res.data;
+  },
+
+  async importProxies(purpose, rawText) {
+    const res = await client.post(`${ADMIN_URL}/proxies/bulk-import`, { purpose, rawText });
+    return res.data;
+  },
+
+  async testProxies(purpose) {
+    const res = await client.post(`${ADMIN_URL}/proxies/test/${purpose}`);
+    return res.data;
+  },
+
+  async deleteProxy(id) {
+    const res = await client.delete(`${ADMIN_URL}/proxies/${id}`);
+    return res.data;
   }
 };
 

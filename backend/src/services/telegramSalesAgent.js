@@ -3,6 +3,8 @@ const OwnerMemory = require('../models/ownerMemoryModel');
 const TelegramCustomerMessage = require('../models/TelegramCustomerMessage');
 const connectorRegistry = require('../connectors/registry');
 const { classifyJson } = require('./llmClassify');
+const { proxiedFetch } = require('../utils/proxiedFetch');
+const proxyPoolService = require('./proxyPoolService');
 
 const HISTORY_TURNS = 20;
 const MAX_TOOL_ROUNDS = 3;
@@ -130,16 +132,19 @@ async function runAgentLoop({ customerText, history, playbook }, key) {
   let escalated = false;
   let escalationReason = '';
 
+  const proxy = await proxyPoolService.getWorkingProxy('openai').catch(() => null);
+
   const callOpenAi = async (withTools) => {
     const body = { model: 'gpt-4o', temperature: 0.5, messages };
     if (withTools) {
       body.tools = SALES_TOOLS;
       body.tool_choice = 'auto';
     }
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    const resp = await proxiedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      proxyUrl: proxy && proxy.url
     });
     if (!resp.ok) return null;
     const data = await resp.json();
