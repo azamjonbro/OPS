@@ -988,7 +988,7 @@ class AIEngine {
     for (const modelName of modelsToTry) {
       onProgress({ phase: 'llm', label: `🧠 ${modelName.toUpperCase()} javob shakllantirmoqda...`, model: modelName });
       try {
-        const openAiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+        const openAiResp = await openAiFetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAiApiKeyTrimmed}`,
