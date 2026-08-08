@@ -9,6 +9,49 @@ const proxyPoolService = require('./proxyPoolService');
 const INTEGRATION_TYPE = 'TELEGRAM_USERBOT';
 const HISTORY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000; // 90 days — see plan: bounded to limit flood-wait risk
 
+// Lowercase and drop every space/apostrophe so "Bahodirayyub" (typed as one word) and
+// "Bahodir Ayyub" (stored as two) compare equal — a strict substring match rejected both
+// a missing space AND a single-letter misspelling ("Ayub" vs the real "Ayyub") for a
+// contact who was RIGHT THERE in the synced history, just spelled slightly differently.
+function normalizeName(s) {
+  return String(s || '').toLowerCase().replace(/[\s'`ʼ’]+/g, '');
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Best-matching contact for a typed name — substring match first, then a small typo tolerance. */
+function bestNameMatch(needleRaw, contacts, nameKey) {
+  const needle = normalizeName(needleRaw);
+  if (!needle) return null;
+
+  let best = null;
+  let bestScore = Infinity;
+  for (const c of contacts) {
+    const name = normalizeName(c[nameKey]);
+    if (!name) continue;
+    if (name.includes(needle) || needle.includes(name)) return c; // exact-enough, stop right away
+    const dist = levenshtein(needle, name);
+    const tolerance = Math.max(1, Math.ceil(Math.min(needle.length, name.length) * 0.25));
+    if (dist <= tolerance && dist < bestScore) { best = c; bestScore = dist; }
+  }
+  return best;
+}
+
 /**
  * MTProto "userbot" — logs into the owner's own Telegram account (not the Bot API) so we
  * can backfill chat history the Business Bot API structurally cannot see (it only gets
@@ -212,22 +255,26 @@ class TelegramUserbotService {
     }
   }
 
+  /** Every distinct synced chat's most recent known name — the small candidate set fuzzy name matching runs against. */
+  async _knownContacts() {
+    return TelegramCustomerMessage.aggregate([
+      { $sort: { createdAt: -1 } },
+      { $group: { _id: '$chatId', chatId: { $first: '$chatId' }, customerName: { $first: '$customerName' } } }
+    ]);
+  }
+
   /**
-   * Most recent synced chat whose customerName matches `person` (case-insensitive
-   * substring — the sync stores "firstName lastName" or, absent that, the username, so
-   * this matches either the way the owner would naturally refer to someone). Reads
-   * TelegramCustomerMessage rather than a live MTProto contact search — the sync runs
-   * every minute and already covers every private dialog, so this is both faster and
+   * Most recent synced chat whose customerName matches `person` — tolerant of a missing
+   * space ("Bahodirayyub" vs stored "Bahodir Ayyub") and a small typo, not just an exact
+   * substring, since the owner types a name from memory, not by copying it verbatim.
+   * Reads TelegramCustomerMessage rather than a live MTProto contact search — the sync
+   * runs every minute and already covers every private dialog, so this is both faster and
    * covers people who haven't messaged recently but are still in the synced chat list.
    */
   async findChatByPerson(person) {
-    const needle = String(person || '').trim();
-    if (!needle) return null;
-    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const doc = await TelegramCustomerMessage.findOne({ customerName: new RegExp(escaped, 'i') })
-      .sort({ createdAt: -1 })
-      .lean();
-    return doc ? { chatId: doc.chatId, customerName: doc.customerName } : null;
+    const contacts = await this._knownContacts();
+    const match = bestNameMatch(person, contacts, 'customerName');
+    return match ? { chatId: match.chatId, customerName: match.customerName } : null;
   }
 
   /**
@@ -240,11 +287,11 @@ class TelegramUserbotService {
     let rows;
 
     if (needle) {
-      const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      rows = await TelegramCustomerMessage.find({ customerName: new RegExp(escaped, 'i') })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .lean();
+      const contacts = await this._knownContacts();
+      const match = bestNameMatch(needle, contacts, 'customerName');
+      rows = match
+        ? await TelegramCustomerMessage.find({ chatId: match.chatId }).sort({ createdAt: -1 }).limit(limit).lean()
+        : [];
     } else {
       rows = await TelegramCustomerMessage.aggregate([
         { $match: { direction: 'in' } },
