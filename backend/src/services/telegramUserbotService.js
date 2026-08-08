@@ -51,7 +51,10 @@ class TelegramUserbotService {
       ip,
       port,
       username: process.env.TELEGRAM_PROXY_USERNAME || undefined,
-      password: process.env.TELEGRAM_PROXY_PASSWORD || undefined
+      password: process.env.TELEGRAM_PROXY_PASSWORD || undefined,
+      // The socks library's own default is 5s, which is tight for a proxy hop from a host
+      // that's already fighting network restrictions — give it more room before giving up.
+      timeout: 20
     };
   }
 
@@ -234,6 +237,15 @@ class TelegramUserbotService {
       const dialogs = await this.client.getDialogs({});
 
       for (const dialog of dialogs) {
+        // A dropped connection (proxy hiccup, DC reconnect failure) means every remaining
+        // dialog would fail individually and flood the log — stop the whole pass instead,
+        // the next scheduled/manual sync will pick up where this one left off.
+        if (!this.client.connected) {
+          console.error('Telegram Userbot sync aborted: connection dropped mid-sync');
+          stats.errors++;
+          break;
+        }
+
         if (!dialog.isUser || (dialog.entity && dialog.entity.bot)) continue; // private, human chats only
         stats.dialogsScanned++;
 

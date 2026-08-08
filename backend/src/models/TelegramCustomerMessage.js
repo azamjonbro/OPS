@@ -20,13 +20,22 @@ const TelegramCustomerMessageSchema = new mongoose.Schema({
   // history backfill (services/telegramUserbotService.js).
   source: { type: String, enum: ['business_webhook', 'userbot_sync'], default: 'business_webhook' },
   // Only set for userbot_sync rows — Telegram's own message id, used to make repeated
-  // history syncs idempotent (skip messages already imported for the same chat).
-  telegramMessageId: { type: String, default: '', index: true },
+  // history syncs idempotent (skip messages already imported for the same chat). No default:
+  // must stay genuinely absent (not '') on live rows, or the sparse unique index below would
+  // treat every second live message in the same chat as a duplicate of the first.
+  telegramMessageId: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
 
 // Backfill dedup key: a given Telegram message id must only be imported once per chat.
-// Sparse because live webhook rows never set telegramMessageId.
-TelegramCustomerMessageSchema.index({ chatId: 1, telegramMessageId: 1 }, { unique: true, sparse: true });
+// A plain `sparse` index does NOT do what it sounds like here — on a COMPOUND index, Mongo
+// only excludes a doc if *every* indexed field is missing, and chatId is always present, so
+// `sparse` alone would still index every live row as telegramMessageId: null and collide.
+// partialFilterExpression is the actual fix: only rows that genuinely set telegramMessageId
+// (i.e. userbot_sync backfill rows) enter this index at all.
+TelegramCustomerMessageSchema.index(
+  { chatId: 1, telegramMessageId: 1 },
+  { unique: true, partialFilterExpression: { telegramMessageId: { $exists: true } } }
+);
 
 module.exports = mongoose.model('TelegramCustomerMessage', TelegramCustomerMessageSchema);

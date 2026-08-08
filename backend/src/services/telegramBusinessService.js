@@ -5,10 +5,6 @@ const TelegramBusinessConnection = require('../models/TelegramBusinessConnection
 const TELEGRAM_API = 'https://api.telegram.org';
 const INTEGRATION_TYPE = 'TELEGRAM_BUSINESS';
 
-function publicBaseUrl() {
-  return (process.env.PUBLIC_BASE_URL || 'https://ops.techinfo.uz').replace(/\/+$/, '');
-}
-
 function randomSecret() {
   return require('crypto').randomBytes(24).toString('hex');
 }
@@ -238,7 +234,7 @@ class TelegramBusinessService {
     }
   }
 
-  /** Entry point for every webhook update Telegram sends us. */
+  /** Entry point for every update — from the poll loop above, or the dormant webhook route. */
   async handleUpdate(update) {
     if (!update) return;
 
