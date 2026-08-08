@@ -183,7 +183,7 @@ async function summarizeCorrespondence(res, apiKey) {
   }).join('\n\n');
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    const resp = await openAiFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -518,7 +518,7 @@ async function routeToTools(userMessage, apiKey) {
   const todayStr = toDateKey(new Date());
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    const resp = await openAiFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
