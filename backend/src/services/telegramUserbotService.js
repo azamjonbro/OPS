@@ -4,6 +4,7 @@ const { StringSession } = sessions;
 const crypto = require('../crypto');
 const Integration = require('../models/Integration');
 const TelegramCustomerMessage = require('../models/TelegramCustomerMessage');
+const proxyPoolService = require('./proxyPoolService');
 
 const INTEGRATION_TYPE = 'TELEGRAM_USERBOT';
 const HISTORY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000; // 90 days — see plan: bounded to limit flood-wait risk
@@ -39,10 +40,18 @@ class TelegramUserbotService {
   /**
    * Raw MTProto (unlike the plain-HTTPS Bot API) is network-blocked on the production host —
    * see the ops notes in services/telegramBusinessService.js. A SOCKS5 proxy with real
-   * Telegram DC access routes around it. Returns undefined (no proxy) if unconfigured, so
-   * this stays a no-op in any environment where the direct connection works fine.
+   * Telegram DC access routes around it. Prefers the DB-managed proxy pool (admin panel ->
+   * Proxy Pool, purpose "telegram_mtproto") — proxies get replaced often enough that editing
+   * .env + SSH + restart for every swap doesn't scale. Falls back to TELEGRAM_PROXY_* env
+   * vars if the pool has nothing confirmed-working yet. Returns undefined (no proxy) if
+   * neither is configured, so this stays a no-op in any environment where direct connect works.
    */
-  loadProxyConfig() {
+  async loadProxyConfig() {
+    const pooled = await proxyPoolService.getWorkingProxy('telegram_mtproto').catch(() => null);
+    if (pooled) {
+      return { socksType: 5, ip: pooled.host, port: pooled.port, username: pooled.username || undefined, password: pooled.password || undefined, timeout: 20 };
+    }
+
     const ip = (process.env.TELEGRAM_PROXY_IP || '').trim();
     const port = parseInt(process.env.TELEGRAM_PROXY_PORT || '0', 10);
     if (!ip || !port) return undefined;
@@ -95,7 +104,7 @@ class TelegramUserbotService {
   async _connectWithSession() {
     const client = new TelegramClient(new StringSession(this.sessionString), this.apiId, this.apiHash, {
       connectionRetries: 3,
-      proxy: this.loadProxyConfig()
+      proxy: await this.loadProxyConfig()
     });
     await client.connect();
     this.client = client;
@@ -134,7 +143,7 @@ class TelegramUserbotService {
 
     const client = new TelegramClient(new StringSession(''), this.apiId, this.apiHash, {
       connectionRetries: 3,
-      proxy: this.loadProxyConfig()
+      proxy: await this.loadProxyConfig()
     });
     await client.connect();
 
@@ -306,10 +315,12 @@ class TelegramUserbotService {
 
   /**
    * Same shape as billzSyncService.startDailyCronJob(): an initial run shortly after boot,
-   * then every 24h. No-ops (via syncHistory's own isConnected() check) until the owner has
+   * then every minute. No-ops (via syncHistory's own isConnected() check) until the owner has
    * completed the phone/code/2FA login once from the admin panel — after that it just runs
-   * unattended, and thanks to the early-break dedup above, a day with no new messages costs
-   * one cheap "nothing changed" pass per chat rather than a full 90-day re-walk.
+   * unattended. Thanks to the early-break dedup above, a run with no new messages costs one
+   * cheap "nothing changed" pass per chat rather than a full 90-day re-walk, and syncHistory's
+   * own `_syncing` guard means an overlapping tick (a run still going past a minute) just
+   * no-ops instead of stacking concurrent syncs.
    */
   startDailyCronJob() {
     setTimeout(() => {
@@ -318,11 +329,10 @@ class TelegramUserbotService {
 
     if (this.cronInterval) clearInterval(this.cronInterval);
     this.cronInterval = setInterval(() => {
-      console.log('⏰ Executing daily Telegram Userbot history sync...');
       this.syncHistory().catch((err) => console.error('Cron Telegram Userbot sync error:', err.message));
-    }, 86400000);
+    }, 60000);
 
-    console.log('⏰ Daily Telegram Userbot History Sync Scheduled (Every 24 Hours)');
+    console.log('⏰ Telegram Userbot History Sync Scheduled (Every 1 Minute)');
   }
 }
 

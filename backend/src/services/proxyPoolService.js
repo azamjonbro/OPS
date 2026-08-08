@@ -18,8 +18,42 @@ function buildProxyUrl(doc) {
   return `${scheme}://${auth}${doc.host}:${doc.port}`;
 }
 
+/** Actual MTProto handshake through the candidate proxy — an HTTPS reachability check isn't
+ * enough here, since raw MTProto (a different protocol/IP range) can be blocked independently
+ * of plain HTTPS even through the same proxy. Requires TELEGRAM_API_ID/HASH (same source
+ * telegramUserbotService.js reads) since a bare TCP connect isn't a meaningful enough test. */
+async function testMtprotoProxy(doc) {
+  const apiId = parseInt(process.env.TELEGRAM_API_ID || '0', 10);
+  const apiHash = (process.env.TELEGRAM_API_HASH || '').trim();
+  if (!apiId || !apiHash) return { ok: false, error: 'TELEGRAM_API_ID / TELEGRAM_API_HASH sozlanmagan' };
+
+  const { TelegramClient, sessions } = require('teleproto');
+  const client = new TelegramClient(new sessions.StringSession(''), apiId, apiHash, {
+    connectionRetries: 1,
+    proxy: {
+      socksType: 5,
+      ip: doc.host,
+      port: doc.port,
+      username: doc.username || undefined,
+      password: doc.password || undefined,
+      timeout: 10
+    }
+  });
+
+  try {
+    await client.connect();
+    await client.disconnect().catch(() => {});
+    return { ok: true, error: '' };
+  } catch (err) {
+    await client.disconnect().catch(() => {});
+    return { ok: false, error: err.message };
+  }
+}
+
 /** Real connectivity test — not just "is it in the DB" — so a dead proxy never gets used. */
 async function testProxy(doc) {
+  if (doc.purpose === 'telegram_mtproto') return testMtprotoProxy(doc);
+
   const proxyUrl = buildProxyUrl(doc);
   const testUrl = TEST_URLS[doc.purpose];
   if (!testUrl) return { ok: false, error: `No test URL for purpose "${doc.purpose}"` };
@@ -79,7 +113,18 @@ async function getWorkingProxy(purpose) {
     .sort({ priority: 1, lastCheckedAt: -1 })
     .lean();
 
-  const proxy = doc ? { url: buildProxyUrl(doc), label: doc.label || `${doc.host}:${doc.port}` } : null;
+  // Both shapes on the same object: `.url` for proxiedFetch (SocksProxyAgent takes a URL
+  // string), the raw fields for teleproto (its `proxy` option wants a plain object, not a URL).
+  const proxy = doc
+    ? {
+        url: buildProxyUrl(doc),
+        label: doc.label || `${doc.host}:${doc.port}`,
+        host: doc.host,
+        port: doc.port,
+        username: doc.username,
+        password: doc.password
+      }
+    : null;
   cache = { purpose, proxy, at: Date.now() };
   return proxy;
 }
