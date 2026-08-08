@@ -201,7 +201,7 @@
          input) was clipped by the shell's overflow-hidden on narrow windows. -->
     <main class="flex-1 min-w-0 flex flex-col justify-between h-full bg-[#0B0C0E] relative">
       <!-- Header Bar -->
-      <header class="h-16 border-b border-[#1F222A] flex items-center justify-between px-4 sm:px-6 bg-[#111317] z-20">
+      <header class="min-h-16 pt-[env(safe-area-inset-top)] border-b border-[#1F222A] flex items-center justify-between px-4 sm:px-6 bg-[#111317] z-20">
         <div class="flex items-center gap-2.5 min-w-0">
           <button @click="isMobileMenuOpen = true" class="p-2 rounded-xl bg-[#1A1D26] text-gray-300 md:hidden shrink-0">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>

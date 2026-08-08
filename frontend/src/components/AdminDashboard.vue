@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-canvas text-gray-100 font-sans flex flex-col">
     <!-- Header -->
-    <header class="h-16 border-b border-white/10 bg-surface px-6 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+    <header class="min-h-16 pt-[env(safe-area-inset-top)] border-b border-white/10 bg-surface px-6 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white shadow-glow">SA</div>
         <div>
