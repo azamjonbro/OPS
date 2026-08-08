@@ -1,5 +1,13 @@
 const path = require("path");
 const fs = require("fs");
+const dns = require("dns");
+
+// OPS NOTE (2026-08-08): on the production host, plain `curl` reliably reaches
+// api.telegram.org over IPv6, but Node's own fetch (undici) intermittently fails outright
+// ("fetch failed") against the exact same host at the exact same time — undici's Happy
+// Eyeballs handling doesn't recover as gracefully as curl's on this network. Forcing IPv4
+// first for all of Node's own DNS lookups sidesteps the flaky IPv6 path entirely.
+dns.setDefaultResultOrder("ipv4first");
 
 // Konfiguratsiya fayli: avval .env, topilmasa .env.dev.
 // Loyihaning qolgan qismi (ENDPOINTS.md, connectors/registry.js) .env.dev dan o'qiydi,
