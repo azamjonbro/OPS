@@ -246,41 +246,56 @@ const transcribeAudio = async (req, res) => {
         mimeType = 'audio/wav';
       }
 
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
-      
-      let formFields = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${extension}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-      let formParts = [Buffer.from(formFields), audioBuffer];
+      // Whisper's `language` hint only accepts a specific ISO-639-1 whitelist — Uzbek
+      // ('uz') isn't in it and gets the WHOLE request rejected (unsupported_language),
+      // not just the hint ignored. Build the multipart body fresh per attempt so a
+      // rejected language hint can be retried with auto-detection instead.
+      const buildBody = (langCode) => {
+        const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+        let formFields = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${extension}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+        let formParts = [Buffer.from(formFields), audioBuffer];
 
-      let modelPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`;
-      formParts.push(Buffer.from(modelPart));
+        let modelPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`;
+        formParts.push(Buffer.from(modelPart));
 
-      if (lang) {
-        let langCode = lang.split('-')[0].toLowerCase();
-        let langPart = `--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${langCode}\r\n`;
-        formParts.push(Buffer.from(langPart));
+        if (langCode) {
+          let langPart = `--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${langCode}\r\n`;
+          formParts.push(Buffer.from(langPart));
+        }
+
+        formParts.push(Buffer.from(`--${boundary}--\r\n`));
+        return { boundary, bodyBuffer: Buffer.concat(formParts) };
+      };
+
+      const callWhisper = async (langCode) => {
+        const { boundary, bodyBuffer } = buildBody(langCode);
+        return openAiFetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAiApiKey}`,
+            'Content-Type': `multipart/form-data; boundary=${boundary}`
+          },
+          body: bodyBuffer
+        });
+      };
+
+      const langCode = lang ? lang.split('-')[0].toLowerCase() : '';
+      let whisperResp = await callWhisper(langCode);
+
+      if (!whisperResp.ok) {
+        let errJson = await whisperResp.json().catch(() => ({}));
+        if (langCode && errJson && errJson.error && errJson.error.code === 'unsupported_language') {
+          whisperResp = await callWhisper('');
+          if (!whisperResp.ok) errJson = await whisperResp.json().catch(() => ({}));
+        }
+        if (!whisperResp.ok) console.warn('OpenAI Whisper Transcribe response notice:', errJson);
       }
-
-      formParts.push(Buffer.from(`--${boundary}--\r\n`));
-
-      const bodyBuffer = Buffer.concat(formParts);
-
-      const whisperResp = await openAiFetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAiApiKey}`,
-          'Content-Type': `multipart/form-data; boundary=${boundary}`
-        },
-        body: bodyBuffer
-      });
 
       if (whisperResp.ok) {
         const whisperData = await whisperResp.json();
         if (whisperData && whisperData.text) {
           transcribedText = whisperData.text.trim();
         }
-      } else {
-        const errJson = await whisperResp.json().catch(() => ({}));
-        console.warn('OpenAI Whisper Transcribe response notice:', errJson);
       }
     } catch (err) {
       console.warn('OpenAI Whisper Transcribe Exception:', err.message);
