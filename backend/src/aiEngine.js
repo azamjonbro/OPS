@@ -4,7 +4,18 @@ const mailSenderFilter = require('./services/mailSenderFilter');
 const billzClientService = require('./services/billzClientService');
 const spreadsheetParser = require('./services/spreadsheetParser');
 const { classifyJson } = require('./services/llmClassify');
+const proxyPoolService = require('./services/proxyPoolService');
+const { proxiedFetch } = require('./utils/proxiedFetch');
 const Schedule = require('./models/Schedule');
+
+// OpenAI geo-blocks some hosting regions outright (403 unsupported_country_region_territory)
+// — every direct OpenAI call in this file routes through the DB-managed proxy pool when one
+// is configured and working, same as llmClassify.js. No working proxy just means a direct
+// call, so this is a no-op where OpenAI isn't blocked.
+async function openAiFetch(url, options) {
+  const proxy = await proxyPoolService.getWorkingProxy('openai').catch(() => null);
+  return proxiedFetch(url, { ...options, proxyUrl: proxy && proxy.url });
+}
 
 // Local date key — toISOString() would roll back a day for any local time before 05:00
 // in UTC+5, filing "bugun" under yesterday. Also handed to the router model as "today"
