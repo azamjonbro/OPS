@@ -4,18 +4,8 @@ const mailSenderFilter = require('./services/mailSenderFilter');
 const billzClientService = require('./services/billzClientService');
 const spreadsheetParser = require('./services/spreadsheetParser');
 const { classifyJson } = require('./services/llmClassify');
-const proxyPoolService = require('./services/proxyPoolService');
-const { proxiedFetch } = require('./utils/proxiedFetch');
+const { openAiFetch } = require('./utils/openAiFetch');
 const Schedule = require('./models/Schedule');
-
-// OpenAI geo-blocks some hosting regions outright (403 unsupported_country_region_territory)
-// — every direct OpenAI call in this file routes through the DB-managed proxy pool when one
-// is configured and working, same as llmClassify.js. No working proxy just means a direct
-// call, so this is a no-op where OpenAI isn't blocked.
-async function openAiFetch(url, options) {
-  const proxy = await proxyPoolService.getWorkingProxy('openai').catch(() => null);
-  return proxiedFetch(url, { ...options, proxyUrl: proxy && proxy.url });
-}
 
 // Local date key — toISOString() would roll back a day for any local time before 05:00
 // in UTC+5, filing "bugun" under yesterday. Also handed to the router model as "today"
@@ -167,7 +157,64 @@ function formatBillzSalesReport(d) {
     returnsBlock +
     `📈 **Sof savdo (kirim):** ${money(d.netSales)}\n\n` +
     stockBlock +
+    formatPeriodAnalytics(d) +
     `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
+}
+
+/**
+ * "Eng ko'p/eng kam" superlatives (best/worst day, top/bottom seller, best-selling product
+ * by quantity) — computed purely from data the consolidated report already fetched
+ * (dailyBreakdown + the period's checks), so this costs zero extra Billz API calls.
+ */
+function formatPeriodAnalytics(d) {
+  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+  const rows = [];
+
+  if (d.soldProducts && d.soldProducts.length) {
+    const byQty = [...d.soldProducts].sort((a, b) => b.quantity - a.quantity)[0];
+    rows.push(`| 🥇 Eng ko'p sotilgan mahsulot (dona bo'yicha) | **${byQty.name}** — ${byQty.quantity} ${byQty.unit || 'dona'} (${money(byQty.totalPrice)}) |`);
+  }
+
+  const activeDays = (d.dailyBreakdown || []).filter((day) => day.checksCount > 0);
+  if (activeDays.length > 1) {
+    const byRevenueDesc = [...activeDays].sort((a, b) => b.totalSales - a.totalSales);
+    const best = byRevenueDesc[0];
+    const worst = byRevenueDesc[byRevenueDesc.length - 1];
+    rows.push(`| 📈 Eng ko'p kirim (savdo) bo'lgan kun | **${best.displayDate}** — ${money(best.totalSales)} |`);
+    rows.push(`| 📉 Eng kam kirim (savdo) bo'lgan kun | **${worst.displayDate}** — ${money(worst.totalSales)} |`);
+
+    const byChecksDesc = [...activeDays].sort((a, b) => b.checksCount - a.checksCount);
+    const busiest = byChecksDesc[0];
+    const quietest = byChecksDesc[byChecksDesc.length - 1];
+    rows.push(`| 🧾 Eng ko'p sotuv (chek soni) bo'lgan kun | **${busiest.displayDate}** — ${busiest.checksCount} ta chek |`);
+    rows.push(`| 🔻 Eng kam sotuv (chek soni) bo'lgan kun | **${quietest.displayDate}** — ${quietest.checksCount} ta chek |`);
+
+    const returnDays = activeDays.filter((day) => day.returnedAmount > 0);
+    if (returnDays.length) {
+      const mostReturns = [...returnDays].sort((a, b) => b.returnedAmount - a.returnedAmount)[0];
+      rows.push(`| ↩️ Eng ko'p chiqim (qaytarim) bo'lgan kun | **${mostReturns.displayDate}** — ${money(mostReturns.returnedAmount)} |`);
+    }
+  }
+
+  const bySeller = new Map();
+  for (const c of d.checks || []) {
+    const name = (c.cashier || '').trim();
+    if (!name) continue;
+    const agg = bySeller.get(name) || { name, totalPrice: 0, checksCount: 0 };
+    agg.totalPrice += c.totalPrice || 0;
+    agg.checksCount += 1;
+    bySeller.set(name, agg);
+  }
+  if (bySeller.size > 1) {
+    const sellers = [...bySeller.values()].sort((a, b) => b.totalPrice - a.totalPrice);
+    const top = sellers[0];
+    const bottom = sellers[sellers.length - 1];
+    rows.push(`| 👑 Eng ko'p sotuv qilgan sotuvchi | **${top.name}** — ${money(top.totalPrice)} (${top.checksCount} ta chek) |`);
+    rows.push(`| 🔻 Eng kam sotuv qilgan sotuvchi | **${bottom.name}** — ${money(bottom.totalPrice)} (${bottom.checksCount} ta chek) |`);
+  }
+
+  if (!rows.length) return '';
+  return `## 🏆 Davr Analitikasi\n\n| Ko'rsatkich | Natija |\n|---|---|\n${rows.join('\n')}\n\n`;
 }
 
 /**

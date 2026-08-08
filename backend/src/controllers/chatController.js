@@ -5,6 +5,7 @@ const AuditLog = require('../models/AuditLog');
 const aiEngine = require('../aiEngine');
 const asyncHandler = require('../utils/asyncHandler');
 const OwnerMemory = require('../models/ownerMemoryModel');
+const { openAiFetch } = require('../utils/openAiFetch');
 
 async function saveMessageRecord(convId, userContent, aiResult, attachedFile = null, replyTo = null) {
   const cleanUserStr = userContent.replace(/^🎙️ Ovozli:\s*"/, '').replace(/"$/, '');
@@ -263,7 +264,7 @@ const transcribeAudio = async (req, res) => {
 
       const bodyBuffer = Buffer.concat(formParts);
 
-      const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      const whisperResp = await openAiFetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAiApiKey}`,
