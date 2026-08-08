@@ -139,15 +139,20 @@ async function addProxy({ purpose, protocol = 'socks5', host, port, username = '
   return doc;
 }
 
-/** Bulk import + immediate test, for pasting a provider's proxy list in one shot. */
+/**
+ * Bulk import — DB writes only, no testing here. Testing 10 proxies (each an MTProto
+ * handshake with up to 3 retries at 10s apart) can take minutes; bundling it into the same
+ * request that does the import is what caused the admin panel's "Network Error" — the
+ * request just outlives any reasonable HTTP timeout. Callers should import (fast), respond,
+ * then kick off testAllForPurpose in the background and let the UI poll listProxies().
+ */
 async function bulkImport(purpose, entries) {
   const created = [];
   for (const e of entries) {
     const doc = await addProxy({ purpose, ...e });
     created.push(doc);
   }
-  const results = await testAllForPurpose(purpose);
-  return { imported: created.length, results };
+  return { imported: created.length };
 }
 
 const IPV4_RE = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
