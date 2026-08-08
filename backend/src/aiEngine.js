@@ -614,9 +614,18 @@ async function applyHumanFilterToDay(res, apiKey) {
  * this replaces the old `.includes()`/regex cascade with real reasoning over the actual
  * tool catalog, the way an MCP client picks a tool. Returns `[]` (no tools) for small talk.
  */
-async function routeToTools(userMessage, apiKey) {
+async function routeToTools(userMessage, apiKey, recentTurns = []) {
   const tools = connectorRegistry.getOpenAiToolSchemas();
   const todayStr = toDateKey(new Date());
+
+  // The last few real turns of THIS conversation, same as ChatGPT keeps the whole thread
+  // in context on every call — without this, a follow-up correction ("men avgust oyi
+  // dedim, kun emas" after getting a single-day answer) looks like a standalone,
+  // topic-less message and the router calls no tool at all instead of retrying the report.
+  const historyMessages = (recentTurns || [])
+    .slice(-6)
+    .filter((t) => t && t.content)
+    .map((t) => ({ role: t.role === 'assistant' ? 'assistant' : 'user', content: String(t.content).slice(0, 2000) }));
 
   try {
     const resp = await openAiFetch('https://api.openai.com/v1/chat/completions', {
@@ -635,15 +644,17 @@ async function routeToTools(userMessage, apiKey) {
           {
             role: 'system',
             content: `Sen Store Hadiya CEO'sining shaxsiy AI yordamchisisan. Bugungi sana: ${todayStr}.
-Foydalanuvchi xabarini o'qib, unga haqiqatan javob berish uchun QAYSI vosita(lar) kerakligini aniqla va faqat o'shalarni chaqir.
+Foydalanuvchi xabarini SUHBAT TARIXI kontekstida o'qib, unga haqiqatan javob berish uchun QAYSI vosita(lar) kerakligini aniqla va faqat o'shalarni chaqir.
 QOIDALAR:
 - Faqat xabarda ANIQ so'ralgan narsa uchun vosita tanla. Bitta so'z tasodifan boshqa mavzuni "eslatsa" ham (masalan "bo'yicha" so'zi ichida "oy" harflari bor, lekin bu oy/savdo bilan bog'liq emas), mavzu haqiqatan mos kelmasa hech narsa chaqirma.
+- SUHBATNI DAVOM ETTIRISH / TO'G'IRLASH QOIDASI (JUDA MUHIM): agar oxirgi xabar avvalgi javobni to'g'irlash, aniqlashtirish yoki davom ettirish bo'lsa (masalan "yo'q, men ... dedim", "men sendan ... so'ragandim, ... emas", "unda ... bo'lsinchi", "yo'q boshqa davr kerak"), buni YUQORIDAGI SUHBAT TARIXIDAGI mavzuning davomi deb tushun va o'sha ASL vositani, TUZATILGAN parametr bilan baribir chaqir. Buni oddiy erkin suhbat deb hisoblab, vositasiz qoldirma — foydalanuvchi allaqachon ma'lumot so'ragan va faqat aniqlashtiryapti.
 - Yozish/yaratish/yuborish vositalarini (notion_create_task, calendar_create_event, calendar_update_event, calendar_delete_event, mail_send_email, telegram_send_message, scheduler_create_automation, billz_create_product) FAQAT foydalanuvchi biror narsani ANIQ yaratish/qo'shish/yuborish/o'zgartirish/o'chirishni so'raganda chaqir. Agar niyat aslida biror narsani qidirish, o'qish yoki topish bo'lsa (masalan "borib ... ni topib ... yubor"), avval qidiruv/o'qish vositasini ishlat, yozish vositasini chaqirma.
 - Xabarda ANIQ email manzil (masalan "kimdir@domen.com") yoki "kimgadir yubor/jo'nat/yozib ber" degan qaror bo'lsa, bu doim mail_send_email (yoki tegishli bo'lsa telegram_send_message) — HECH QACHON notion_create_task emas. notion_create_task faqat egasining o'ziga, ichki eslatma/vazifa sifatida saqlash uchun, hech kimga yuborilmaydi.
 - KONTENT YARATISH QOIDASI (JUDA MUHIM): agar foydalanuvchi biror hujjat, xat, xabar, texnik topshiriq (TZ), reja yoki matn "generate/yarat/tuzib ber/yozib ber" desa, vosita argumentiga (masalan mail_send_email ning "body" maydoni yoki notion_create_task ning "title" maydoni) foydalanuvchi so'rovining o'zini yoki qisqa sarlavhani QO'YMA — o'sha hujjatning TO'LIQ, professional, batafsil mazmunini AYNAN SHU YERDA, hozir, o'zing yozib chiq (bir necha bo'lim/paragraf bo'lishi mumkin). Masalan "sayt uchun TZ generate qil" so'ralsa — argumentda haqiqiy texnik topshiriq matni bo'lishi kerak: maqsad, funksionallik, sahifalar, texnologiya, muddat kabi bo'limlar bilan — shunchaki mavzuni takrorlash emas.
-- Agar xabar shunchaki salomlashish, minnatdorchilik yoki umumiy erkin suhbat bo'lsa, hech qanday vosita chaqirma — bo'sh javob qaytar.
+- Agar xabar shunchaki salomlashish, minnatdorchilik yoki umumiy erkin suhbat bo'lsa (va suhbat tarixidagi biror so'rovni to'g'irlamayotgan bo'lsa), hech qanday vosita chaqirma — bo'sh javob qaytar.
 - Sana/vaqt talab qiladigan parametrlarni bugungi sanadan (${todayStr}) o'zing hisoblab to'ldir (masalan "ertaga" = ${todayStr} dan bir kun keyingi sana, ISO formatda).`
           },
+          ...historyMessages,
           { role: 'user', content: userMessage }
         ]
       })
@@ -760,13 +771,24 @@ async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
 }
 
 /** Owner profile + recent memory/history, fetched unconditionally (no keyword gating). */
-async function loadMemoryContext() {
+/**
+ * `conversationId` scopes chat history to THIS thread. Reads from the `Message` model
+ * (chatController.js's saveMessageRecord writes one there for EVERY turn, unconditionally,
+ * regardless of which internal branch of processUserMessage produced the answer) rather
+ * than the separate ChatHistory collection, which only some branches wrote to — a report
+ * answered via the fast single-tool formatter path never reached ChatHistory at all, so a
+ * follow-up correction to a report had no history to work from even before this used the
+ * right conversationId. Omitting conversationId (voice memo path, anywhere the caller
+ * genuinely has no thread) just returns no history rather than erroring.
+ */
+async function loadMemoryContext(conversationId) {
   const OwnerMemory = require('./models/ownerMemoryModel');
-  const ChatHistory = require('./models/chatHistoryModel');
+  const Message = require('./models/Message');
 
   let ownerProfile = null;
   let persistentMemory = [];
   let chatHistory = [];
+  let chatHistoryTurns = [];
 
   try {
     ownerProfile = await OwnerMemory.findOne({ key: 'owner-personality-profile' }).lean();
@@ -774,12 +796,19 @@ async function loadMemoryContext() {
     persistentMemory = allMemories.map((m) => `[${m.category.toUpperCase()}] ${m.title}: ${m.content}`);
   } catch (e) {}
 
-  try {
-    const recentLogs = await ChatHistory.find().sort({ timestamp: -1 }).limit(10).lean();
-    chatHistory = recentLogs.reverse().map((h) => `${h.role === 'user' ? 'User' : 'Assistant'} [${new Date(h.timestamp).toLocaleTimeString()}]: "${h.content}"`);
-  } catch (e) {}
+  if (conversationId) {
+    try {
+      const recentMsgs = await Message.find({ conversationId, role: { $in: ['user', 'assistant'] } })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+      const chronological = recentMsgs.reverse();
+      chatHistory = chronological.map((h) => `${h.role === 'user' ? 'User' : 'Assistant'} [${new Date(h.createdAt).toLocaleTimeString()}]: "${h.content}"`);
+      chatHistoryTurns = chronological.map((h) => ({ role: h.role, content: h.content }));
+    } catch (e) {}
+  }
 
-  return { ownerProfile, persistentMemory, chatHistory };
+  return { ownerProfile, persistentMemory, chatHistory, chatHistoryTurns };
 }
 
 function buildFinalSystemPrompt({ ownerProfile, persistentMemory, chatHistory, hasAttachment }) {
@@ -981,7 +1010,7 @@ class AIEngine {
    * answer either comes straight from a deterministic formatter or from a final narrative
    * pass over whatever the tools returned.
    */
-  async processUserMessage(userMessage, { userId = 'user-1', onProgress = () => {}, attachedFile = null } = {}) {
+  async processUserMessage(userMessage, { userId = 'user-1', onProgress = () => {}, attachedFile = null, conversationId = null } = {}) {
     const executedTools = [];
     const hasAttachment = !!(attachedFile && (attachedFile.isImage || attachedFile.textContent || attachedFile.unreadable || attachedFile.isSpreadsheet));
 
@@ -1035,12 +1064,19 @@ class AIEngine {
         (parsed.products.length > 50 ? `\n… va yana ${parsed.products.length - 50} ta qator.` : '');
     }
 
+    // Loaded once, up front, and reused for both tool routing and the final narrative
+    // pass — a ChatGPT-style thread needs the SAME conversation context at every step,
+    // not just when writing the final answer. Without this, a correction like "men
+    // avgust oyi dedim, kun emas" looked like a standalone, contextless message to the
+    // router and got no tool call at all.
+    const memoryContext = await loadMemoryContext(conversationId);
+
     // 1. Ask a fast model which tool(s), if any, this message actually needs. Skipped for
     // attachments — the turn is about the file itself, not about picking a data source.
     let toolCalls = [];
     if (!hasAttachment) {
       onProgress({ phase: 'route', label: "🧠 So'rov tahlil qilinmoqda..." });
-      toolCalls = await routeToTools(userMessage, openAiApiKey);
+      toolCalls = await routeToTools(userMessage, openAiApiKey, memoryContext.chatHistoryTurns);
     }
 
     // 2. Execute whatever the model chose.
@@ -1088,7 +1124,7 @@ class AIEngine {
     // attachments) gets a full narrative answer from the model over whatever context
     // was gathered.
     onProgress({ phase: 'memory', label: "🧠 Xotira va profil o'qilmoqda..." });
-    const { ownerProfile, persistentMemory, chatHistory } = await loadMemoryContext();
+    const { ownerProfile, persistentMemory, chatHistory } = memoryContext;
 
     const openAiApiKeyTrimmed = openAiApiKey;
     const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
@@ -1118,8 +1154,8 @@ class AIEngine {
 
             onProgress({ phase: 'saving', label: "💾 Suhbat xotiraga saqlanmoqda..." });
             const intentLabel = toolResults.length ? toolResults.map((t) => t.name).join(',') : 'general_chat';
-            await memoryUpdater.saveMessage(userMessage, 'user', userMessage, intentLabel, executedTools);
-            await memoryUpdater.saveMessage(userMessage, 'assistant', realAiText, intentLabel, executedTools);
+            await memoryUpdater.saveMessage(conversationId, 'user', userMessage, intentLabel, executedTools);
+            await memoryUpdater.saveMessage(conversationId, 'assistant', realAiText, intentLabel, executedTools);
             await memoryUpdater.extractAndSaveKnowledge(userMessage, realAiText);
 
             return {

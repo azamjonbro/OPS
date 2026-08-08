@@ -101,7 +101,7 @@ async function runChatTurn({ conversationId, content, attachedFile, replyTo }, o
     ? `[Foydalanuvchi quyidagi parchaga javob bermoqda — ${replyTo.role === 'user' ? 'o\'z xabari' : 'sizning oldingi javobingiz'}]:\n"""\n${replyTo.snippet}\n"""\n\n${rawContent}`
     : rawContent;
 
-  const aiResult = await aiEngine.processUserMessage(promptContent, { onProgress, attachedFile });
+  const aiResult = await aiEngine.processUserMessage(promptContent, { onProgress, attachedFile, conversationId });
 
   if (attachedFile && attachedFile.name) {
     aiResult.responseText = attachedFile.isImage
