@@ -92,6 +92,9 @@ export default {
   mounted() {
     this.fetchProxies();
   },
+  beforeUnmount() {
+    if (this._pollTimer) clearInterval(this._pollTimer);
+  },
   watch: {
     purpose() {
       this.fetchProxies();
@@ -109,11 +112,11 @@ export default {
       this.message = '';
       try {
         const res = await adminService.importProxies(this.purpose, this.rawText);
-        const working = (res.results || []).filter((r) => r.ok).length;
-        this.message = `${res.imported} ta proxy import qilindi, ${working}/${res.results.length} ishlayapti`;
-        this.messageIsError = working === 0;
+        this.message = `${res.imported} ta proxy import qilindi, fonda tekshirilmoqda… (bir necha daqiqa davom etishi mumkin)`;
+        this.messageIsError = false;
         this.rawText = '';
         await this.fetchProxies();
+        this.pollWhileTesting();
       } catch (e) {
         this.message = e.response?.data?.error || e.message;
         this.messageIsError = true;
@@ -125,17 +128,35 @@ export default {
       this.testing = true;
       this.message = '';
       try {
-        const res = await adminService.testProxies(this.purpose);
-        const working = (res.results || []).filter((r) => r.ok).length;
-        this.message = `${working}/${res.results.length} proxy ishlayapti`;
-        this.messageIsError = working === 0;
-        await this.fetchProxies();
+        await adminService.testProxies(this.purpose);
+        this.message = 'Fonda tekshirilmoqda… (bir necha daqiqa davom etishi mumkin)';
+        this.messageIsError = false;
+        this.pollWhileTesting();
       } catch (e) {
         this.message = e.response?.data?.error || e.message;
         this.messageIsError = true;
       } finally {
         this.testing = false;
       }
+    },
+    // Tests run in the background on the server — poll the list every few seconds so
+    // ISHLAYDI/ISHLAMAYDI statuses fill in without the admin needing to refresh manually.
+    pollWhileTesting() {
+      if (this._pollTimer) clearInterval(this._pollTimer);
+      let ticks = 0;
+      this._pollTimer = setInterval(async () => {
+        ticks++;
+        await this.fetchProxies();
+        const allChecked = this.proxies.every((p) => p.lastCheckOk !== null && p.lastCheckOk !== undefined);
+        if (allChecked || ticks > 30) {
+          clearInterval(this._pollTimer);
+          if (allChecked) {
+            const working = this.proxies.filter((p) => p.lastCheckOk).length;
+            this.message = `${working}/${this.proxies.length} proxy ishlayapti`;
+            this.messageIsError = working === 0;
+          }
+        }
+      }, 5000);
     },
     async remove(id) {
       try {
