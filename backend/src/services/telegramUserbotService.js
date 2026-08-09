@@ -34,17 +34,25 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+// A minimum length before a name is trusted for substring/typo matching at all. Without
+// this, a short stored name like "Z" or "Li" matches as a false-positive substring of
+// almost anything containing that letter sequence (a real incident: a search for
+// "nonexistent_test_person_xyz" matched a real contact named "Z" purely because the
+// search text happened to end in "...xyz" — a real message went to a real stranger).
+const MIN_MATCHABLE_NAME_LEN = 3;
+
 /** Best-matching contact for a typed name — substring match first, then a small typo tolerance. */
 function bestNameMatch(needleRaw, contacts, nameKey) {
   const needle = normalizeName(needleRaw);
-  if (!needle) return null;
+  if (!needle || needle.length < MIN_MATCHABLE_NAME_LEN) return null;
 
   let best = null;
   let bestScore = Infinity;
   for (const c of contacts) {
     const name = normalizeName(c[nameKey]);
-    if (!name) continue;
-    if (name.includes(needle) || needle.includes(name)) return c; // exact-enough, stop right away
+    if (!name || name.length < MIN_MATCHABLE_NAME_LEN) continue;
+    if (name === needle) return c;
+    if (name.includes(needle) || needle.includes(name)) return c;
     const dist = levenshtein(needle, name);
     const tolerance = Math.max(1, Math.ceil(Math.min(needle.length, name.length) * 0.25));
     if (dist <= tolerance && dist < bestScore) { best = c; bestScore = dist; }
