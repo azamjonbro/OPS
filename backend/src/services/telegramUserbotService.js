@@ -118,6 +118,25 @@ class TelegramUserbotService {
     return !!this.client && !!this.sessionString;
   }
 
+  /**
+   * The owner's own Telegram user id, straight from the logged-in MTProto session —
+   * used to recognize "the owner sent this from their own Telegram app" on the Business
+   * webhook side (services/telegramSalesAgent.js), which otherwise has no reliable way to
+   * tell the owner's own messages apart from a real customer's. Cached: it's the same
+   * value for the lifetime of this session.
+   */
+  async getOwnUserId() {
+    if (this._ownUserId) return this._ownUserId;
+    if (!this.isConnected()) return null;
+    try {
+      const me = await this.client.getMe();
+      this._ownUserId = me && me.id ? String(me.id) : null;
+      return this._ownUserId;
+    } catch (err) {
+      return null;
+    }
+  }
+
   /** Warms the session from Mongo at server boot — no re-login needed after a restart. */
   async loadFromDb() {
     this.loadEnvCreds();

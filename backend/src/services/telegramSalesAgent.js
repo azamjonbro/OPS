@@ -276,6 +276,27 @@ async function handleIncomingMessage(message) {
   if (!businessConnectionId || !chatId) return;
 
   const from = message.from || {};
+
+  // Telegram fires a `business_message` update for EVERY message in a connected chat,
+  // including ones the owner sends from their own Telegram app (not through the bot) — the
+  // update carries no separate "outgoing" flag, only the real sender in `from`. Without this
+  // check, the owner's own messages got logged as an incoming customer inquiry (under the
+  // OWNER'S OWN NAME as "customerName") and handed to the sales agent to auto-reply to. The
+  // MTProto userbot sync already captures these correctly as `direction: 'out'`, so this is
+  // a pure duplicate-and-misclassify to skip, not a message to save any other way.
+  // TelegramBusinessConnection.telegramUserId is populated from the `business_connection`
+  // webhook update, which isn't reliably received on this account — the userbot's own
+  // logged-in session id is the source that's actually always available.
+  const telegramUserbotService = require('./telegramUserbotService');
+  const [ownUserId, conn] = await Promise.all([
+    telegramUserbotService.getOwnUserId().catch(() => null),
+    require('../models/TelegramBusinessConnection').findOne({ businessConnectionId: String(businessConnectionId) }).lean().catch(() => null)
+  ]);
+  const ownerIds = [ownUserId, conn && conn.telegramUserId].filter(Boolean);
+  if (from.id && ownerIds.includes(String(from.id))) {
+    return;
+  }
+
   const customerName = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || "Noma'lum";
   const chatIdStr = String(chatId);
 
