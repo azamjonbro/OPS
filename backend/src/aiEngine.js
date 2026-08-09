@@ -218,6 +218,35 @@ function formatPeriodAnalytics(d) {
 }
 
 /**
+ * Focused answer for "eng ko'p sotilgan N ta mahsulot" style questions — a ranked list,
+ * not the whole daily-breakdown report. `d.soldProducts` is already aggregated across the
+ * full requested period (see billzClientService's `_aggregateProducts`), so no extra API
+ * call is needed to rank it.
+ */
+function formatTopProductsAnswer(d, count, metric) {
+  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+  const periodLabel = d.isRange ? `${d.displayDate}${d.periodLabel ? ` (${d.periodLabel})` : ''}` : d.displayDate;
+
+  if (!d.soldProducts || !d.soldProducts.length) {
+    return `📦 **${periodLabel}** davrida (${d.branchName}) sotilgan mahsulotlar topilmadi.`;
+  }
+
+  const sorted = [...d.soldProducts].sort((a, b) =>
+    metric === 'revenue' ? b.totalPrice - a.totalPrice : b.quantity - a.quantity
+  );
+  const top = sorted.slice(0, count);
+  const metricLabel = metric === 'revenue' ? 'summa' : 'dona';
+  const rows = top.map((p, i) =>
+    `| ${i + 1} | ${p.name} | ${p.quantity} ${p.unit || 'dona'} | ${money(p.totalPrice)} |`
+  ).join('\n');
+
+  return `🏆 **Eng ko'p sotilgan ${top.length} ta mahsulot** (${metricLabel} bo'yicha) — ${periodLabel}\n\n` +
+    `🏪 **Filial:** ${d.branchName}\n\n` +
+    `| # | Mahsulot | Soni | Summa |\n|---|---|---|---|\n${rows}\n\n` +
+    `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
+}
+
+/**
  * Asks the model what the correspondence was actually about. Returns null when there is
  * no key or the call fails — the caller still has the deterministic figures to show.
  */
@@ -755,12 +784,34 @@ async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
       return formatContactSendReport(res.data, res.success, res.error);
     case 'notion_create_task':
       return formatNotionCreateReport(res, args);
-    case 'billz_get_consolidated_report':
+    case 'billz_get_consolidated_report': {
       if (!res.success) {
         return `⚠️ **BILLZ API Xatosi:**\n${res.errorMessage || res.error}\n\n*Hisobotni shakllantirish uchun BILLZ API javobida xatolik yuz berdi. Soxta yoki taxminiy ma'lumotlar ko'rsatilmaydi.*`;
       }
       if (!res.isRealData) return formatBillzConnectionReport(res);
+
+      // "Eng ko'p sotilgan 5 ta mahsulot qaysi?" wants a ranked product list, not the full
+      // daily-breakdown report — ask the model which one this is instead of guessing from
+      // keywords (see memory: no regex routing for intent).
+      const productIntent = await classifyJson({
+        apiKey,
+        systemPrompt: `Sen Billz POS savdo hisoboti so'rovini tahlil qilasan. Foydalanuvchi FAQAT eng ko'p/eng kam sotilgan mahsulotlar RO'YXATINI (masalan "top 5 mahsulot", "eng ko'p sotilgan 3 ta tovar") so'rayaptimi, yoki TO'LIQ davr/kun hisobotini (savdo summasi, cheklar, to'lovlar, kunlik taqsimot va h.k.) so'rayaptimi?
+JSON qaytar: {"wantsTopProducts": boolean, "count": number, "metric": "quantity" | "revenue"}
+- wantsTopProducts: faqat mahsulotlar reytingi so'ralganda true.
+- count: nechta mahsulot so'ralgan (aytilmagan bo'lsa 5).
+- metric: "dona"/soni bo'yicha so'ralsa "quantity", pul/summa/daromad bo'yicha so'ralsa "revenue" (aytilmagan bo'lsa "quantity").`,
+        userContent: args.userMessage || args.query || '',
+        fallback: { wantsTopProducts: false, count: 5, metric: 'quantity' }
+      });
+
+      if (productIntent && productIntent.wantsTopProducts) {
+        const count = Number(productIntent.count) > 0 ? Math.min(Number(productIntent.count), 50) : 5;
+        const metric = productIntent.metric === 'revenue' ? 'revenue' : 'quantity';
+        return formatTopProductsAnswer(res.data, count, metric);
+      }
+
       return formatBillzSalesReport(res.data);
+    }
     case 'calendar_create_event':
       return res.success ? formatCalendarCreateReport(res.data) : `❌ Vazifani taqvimga qo'sha olmadim: ${res.error || "noma'lum xato"}`;
     case 'calendar_update_event':
