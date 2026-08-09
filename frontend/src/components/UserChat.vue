@@ -473,7 +473,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
             </div>
-            <div class="flex-1 space-y-2">
+            <div class="flex-1 min-w-0 space-y-2">
               <!-- Executed Tools Badges -->
               <div v-if="parseTools(msg.toolCalls).length > 0" class="flex flex-wrap gap-1.5">
                 <span 
@@ -1848,6 +1848,10 @@ export default {
   color: #E2E8F0;
   font-size: 0.875rem;
   line-height: 1.625;
+  /* Belt-and-suspenders: whatever flex ancestor holds this bubble, a wide table inside
+     must never be allowed to force the bubble (and the whole row) wider than the
+     viewport — min-width:0 is what lets a flex child actually shrink to its container. */
+  min-width: 0;
 }
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
   color: #FFFFFF;
