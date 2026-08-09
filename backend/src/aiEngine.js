@@ -65,10 +65,10 @@ function formatBillzSalesReport(d) {
     if (!products || !products.length) return '';
     const mark = (v) => (isReturn ? danger(v) : v);
     const rows = products.map((p, i) =>
-      `| ${i + 1} | ${mark(p.name)} | ${p.sku || '—'} | ${mark(`${p.quantity} ${p.unit || 'dona'}`)} | ${mark(p.unitPrice.toLocaleString())} | ${mark(p.totalPrice.toLocaleString())} |`
+      `| ${i + 1} | ${mark(p.name)} | ${mark(`${p.quantity} ${p.unit || 'dona'}`)} | ${mark(p.unitPrice.toLocaleString())} | ${mark(p.totalPrice.toLocaleString())} |`
     ).join('\n');
-    return `| # | Mahsulot | SKU | Soni | Dona narxi (so'm) | Summa (so'm) |\n` +
-           `|---|---|---|---|---|---|\n${rows}\n`;
+    return `| # | Mahsulot | Soni | Dona narxi (so'm) | Summa (so'm) |\n` +
+           `|---|---|---|---|---|\n${rows}\n`;
   };
 
   // The blank line before </details> matters: without it a body ending in a list item
@@ -80,7 +80,7 @@ function formatBillzSalesReport(d) {
   const checkLines = (checks) => checks.map((c, i) => {
     const head = `${i + 1}. **№${c.orderNumber}** — ${c.soldTime || c.soldAt || ''} | ${c.customerName} | ${money(c.totalPrice)}`;
     const items = (c.products || []).length
-      ? c.products.map((p) => `   • ${p.name}${p.sku ? ` (${p.sku})` : ''} — ${p.quantity} ${p.unit} × ${money(p.unitPrice)} = ${money(p.totalPrice)}`).join('\n')
+      ? c.products.map((p) => `   • ${p.name} — ${p.quantity} ${p.unit} × ${money(p.unitPrice)} = ${money(p.totalPrice)}`).join('\n')
       : `   • Mahsulot tafsiloti yo'q`;
     return `${head}\n${items}`;
   }).join('\n\n');

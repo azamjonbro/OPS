@@ -190,13 +190,22 @@ html.light .bg-gradient-to-r.from-purple-600 * {
   color: #FFFFFF !important;
 }
 
-/* Markdown tables in light mode */
-html.light .markdown-body table {
+/* Markdown tables in light mode — the outer frame (border/radius/shadow) lives on the
+   .md-table-scroll wrapper now, since the table itself must stay border-free so it can
+   scroll horizontally without a visible seam against the wrapper's edge. */
+html.light .md-table-scroll {
   background: #FFFFFF !important;
   border: 1px solid #E2E8F0 !important;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
   border-radius: 12px !important;
-  overflow: hidden !important;
+}
+
+html.light .markdown-body table {
+  background: #FFFFFF !important;
+}
+
+html.light .md-table-scroll table {
+  border: none !important;
 }
 
 html.light .markdown-body th {

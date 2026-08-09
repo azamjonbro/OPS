@@ -1831,7 +1831,10 @@ export default {
     renderMarkdown(content) {
       if (!content) return '';
       try {
-        return decorateIcons(marked.parse(content));
+        const html = decorateIcons(marked.parse(content));
+        // Wide report tables (many columns / long product names) must scroll inside their
+        // own box instead of squeezing every column unreadably thin on a phone screen.
+        return html.replace(/<table>[\s\S]*?<\/table>/g, (table) => `<div class="md-table-scroll">${table}</div>`);
       } catch (err) {
         return content;
       }
@@ -1909,15 +1912,31 @@ export default {
   font-style: italic;
   margin-bottom: 0.75rem;
 }
-.markdown-body table {
-  width: 100%;
-  border-collapse: collapse;
+/* Table sizes to its own content (not squeezed to 100%) so wide tables overflow the
+   wrapper instead of cramming every column unreadably thin; min-width keeps a narrow
+   table (few columns) stretched to fill the card instead of looking stranded. */
+.md-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
   margin-bottom: 0.75rem;
+  border: 1px solid #2D3748;
+  border-radius: 0.6rem;
+}
+.markdown-body table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+.md-table-scroll table {
+  border: none;
 }
 .markdown-body th, .markdown-body td {
   border: 1px solid #2D3748;
-  padding: 0.4rem 0.75rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
   text-align: left;
+  white-space: nowrap;
 }
 .markdown-body th {
   background-color: #1A1D26;
@@ -2030,9 +2049,8 @@ html.light .markdown-body .md-icon--warn2 { color: #E11D48; }
 .markdown-body details > *:not(summary) {
   margin: 0.6rem 0.75rem;
 }
-.markdown-body details table {
-  width: calc(100% - 1.5rem);
-}
+/* `details > *:not(summary)` above already gives the wrapping .md-table-scroll its
+   inset margin, same as any other panel content. */
 
 html.light .markdown-body details {
   border-color: #E2E8F0;
