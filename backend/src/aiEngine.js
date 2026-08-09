@@ -1117,6 +1117,28 @@ class AIEngine {
       });
     }
 
+    // 2b. A send tool that found more than one plausible real contact for the same name
+    // must NOT guess — a wrong guess is a real message to a real stranger (this happened
+    // twice during testing). Surface the candidates as pickable options instead; the
+    // frontend renders these as buttons that resolve through /api/chat/resolve-send.
+    if (toolResults.length === 1 && toolResults[0].res && toolResults[0].res.needsClarification) {
+      const { candidates, pendingText, person } = toolResults[0].res.data;
+      const clarificationOptions = candidates.map((c) => ({
+        label: c.customerName,
+        chatIds: [c.chatId]
+      }));
+      if (candidates.length > 1) {
+        clarificationOptions.push({ label: 'Hammasiga yubor', chatIds: candidates.map((c) => c.chatId) });
+      }
+      return {
+        responseText: `🤔 **"${person}" nomiga bir nechta kontakt mos keldi.** Qaysi biriga yuborishimni tanlang:`,
+        executedTools,
+        modelMetadataBadge,
+        clarificationOptions,
+        pendingSendText: pendingText
+      };
+    }
+
     // 3. A single tool call with a dedicated deterministic formatter answers immediately —
     // no second LLM round-trip, which keeps report-style answers fast.
     if (toolResults.length === 1) {

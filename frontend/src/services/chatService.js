@@ -34,6 +34,12 @@ export const chatService = {
     return res.data;
   },
 
+  /** Completes a send the AI paused on for contact disambiguation — see UserChat.vue's clarificationOptions buttons. */
+  async resolveSend(payload) {
+    const res = await axios.post(`${CHAT_URL}/message/resolve-send`, payload);
+    return res.data;
+  },
+
   /**
    * Streams real backend progress (which tool is running, which model is answering)
    * instead of a canned loading string. EventSource can't send a POST body, so this

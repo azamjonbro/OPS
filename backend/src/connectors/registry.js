@@ -162,12 +162,20 @@ class TelegramConnector extends BaseConnector {
       let chatId = params.chatId;
       let resolvedName = null;
       if (!chatId && params.person) {
-        const match = await telegramUserbotService.findChatByPerson(params.person);
-        if (!match) {
+        const resolved = await telegramUserbotService.resolvePerson(params.person);
+        if (resolved.status === 'not_found') {
           return { success: false, error: `"${params.person}" telegram tarixida topilmadi (oxirgi sync asosida).`, executionMs: Date.now() - startTime };
         }
-        chatId = match.chatId;
-        resolvedName = match.customerName;
+        if (resolved.status === 'ambiguous') {
+          return {
+            success: false,
+            needsClarification: true,
+            data: { candidates: resolved.candidates, pendingText: params.text, person: params.person },
+            executionMs: Date.now() - startTime
+          };
+        }
+        chatId = resolved.chatId;
+        resolvedName = resolved.customerName;
       }
       if (!chatId) {
         return { success: false, error: "chatId yoki person ko'rsatilmadi", executionMs: Date.now() - startTime };
@@ -184,16 +192,25 @@ class TelegramConnector extends BaseConnector {
 
     if (toolName === 'contact_send_message') {
       const emailService = require('../services/emailService');
-      const [tgMatch, mailMatch] = await Promise.all([
-        telegramUserbotService.findChatByPerson(params.person).catch(() => null),
+      const [tgResolved, mailMatch] = await Promise.all([
+        telegramUserbotService.resolvePerson(params.person).catch(() => ({ status: 'not_found' })),
         withTimeout(emailService.searchCorrespondence(params.person, { limit: 5 }).catch(() => null), 12000, null)
       ]);
 
-      if (tgMatch && telegramUserbotService.isConnected()) {
-        const result = await telegramUserbotService.sendMessage(tgMatch.chatId, params.text);
+      if (tgResolved.status === 'ambiguous') {
+        return {
+          success: false,
+          needsClarification: true,
+          data: { candidates: tgResolved.candidates, pendingText: params.text, person: params.person },
+          executionMs: Date.now() - startTime
+        };
+      }
+
+      if (tgResolved.status === 'found' && telegramUserbotService.isConnected()) {
+        const result = await telegramUserbotService.sendMessage(tgResolved.chatId, params.text);
         return {
           success: result.success,
-          data: { channel: 'telegram', person: params.person, resolvedName: tgMatch.customerName, chatId: tgMatch.chatId, text: params.text },
+          data: { channel: 'telegram', person: params.person, resolvedName: tgResolved.customerName, chatId: tgResolved.chatId, text: params.text },
           error: result.error,
           executionMs: Date.now() - startTime
         };

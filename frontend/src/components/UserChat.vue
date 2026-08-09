@@ -489,6 +489,20 @@
               <!-- Message Content with Markdown Parsing -->
               <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body shadow-sm" v-html="renderMarkdown(msg.content)"></div>
 
+              <!-- Contact Disambiguation: AI found 2+ plausible people for the same name and
+                   is asking which one, instead of guessing and messaging the wrong person. -->
+              <div v-if="msg.clarificationOptions && msg.clarificationOptions.length" class="flex flex-wrap gap-2 pt-1">
+                <button
+                  v-for="(opt, oi) in msg.clarificationOptions"
+                  :key="oi"
+                  @click="resolveClarification(msg, opt)"
+                  :disabled="msg.clarificationResolved"
+                  class="px-3.5 py-2 rounded-xl border border-indigo-500/40 bg-indigo-600/10 text-indigo-300 hover:bg-indigo-600/20 hover:text-white text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+
               <!-- Assistant Message Action Toolbar (Nusxalash, Javob berish, Qayta tahlil qilish) -->
               <div class="flex items-center gap-2 transition-all duration-200 text-xs font-semibold select-none pt-1">
                 <button 
@@ -1619,7 +1633,9 @@ export default {
           id: `ai-${Date.now()}`,
           role: 'assistant',
           content: data.assistantResponse,
-          toolCalls: JSON.stringify(data.executedTools || [])
+          toolCalls: JSON.stringify(data.executedTools || []),
+          clarificationOptions: data.clarificationOptions || null,
+          pendingSendText: data.pendingSendText || ''
         });
 
         if (data.executedTools && data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
@@ -1634,6 +1650,38 @@ export default {
           id: `ai-err-${Date.now()}`,
           role: 'assistant',
           content: "Xatolik yuz berdi: Backend server bilan ulanishni tekshiring."
+        });
+      } finally {
+        this.isLoading = false;
+        this.loadingStepText = '';
+        this.scrollToBottom();
+      }
+    },
+    async resolveClarification(msg, option) {
+      if (msg.clarificationResolved || this.isLoading) return;
+      msg.clarificationResolved = true;
+      this.isLoading = true;
+      this.loadingStepText = '📨 Yuborilmoqda...';
+
+      try {
+        const data = await chatService.resolveSend({
+          conversationId: this.activeConvId,
+          chatIds: option.chatIds,
+          text: msg.pendingSendText,
+          label: option.label
+        });
+
+        this.messages.push({
+          id: `ai-${Date.now()}`,
+          role: 'assistant',
+          content: data.assistantResponse,
+          toolCalls: JSON.stringify(data.executedTools || [])
+        });
+      } catch (err) {
+        this.messages.push({
+          id: `ai-err-${Date.now()}`,
+          role: 'assistant',
+          content: 'Yuborishda xatolik yuz berdi. Qaytadan urinib ko\'ring.'
         });
       } finally {
         this.isLoading = false;

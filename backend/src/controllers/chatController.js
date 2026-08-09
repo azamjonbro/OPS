@@ -129,7 +129,9 @@ async function runChatTurn({ conversationId, content, attachedFile, replyTo }, o
     userMessage: rawContent,
     assistantResponse: aiResult.responseText,
     executedTools: aiResult.executedTools,
-    modelMetadataBadge: aiResult.modelMetadataBadge
+    modelMetadataBadge: aiResult.modelMetadataBadge,
+    clarificationOptions: aiResult.clarificationOptions,
+    pendingSendText: aiResult.pendingSendText
   };
 }
 
@@ -146,6 +148,51 @@ const sendMessage = async (req, res) => {
   } catch (err) {
     console.error('sendMessage error:', err.message);
     res.status(500).json({ error: 'Xabarni qayta ishlashda xatolik yuz berdi' });
+  }
+};
+
+/**
+ * Completes a send the AI paused on because the person's name matched more than one real
+ * contact (see aiEngine.js's clarificationOptions) — the owner clicked one of the option
+ * buttons, so `chatIds` is already an exact, unambiguous target, never re-run through name
+ * matching. Sends straight through the userbot connection, no AI/tool-routing round trip.
+ */
+const resolveSend = async (req, res) => {
+  const { conversationId, chatIds, text, label } = req.body || {};
+  try {
+    if (!Array.isArray(chatIds) || !chatIds.length || !text) {
+      return res.status(400).json({ error: "chatIds va text talab qilinadi" });
+    }
+
+    const telegramUserbotService = require('../services/telegramUserbotService');
+    const results = [];
+    for (const chatId of chatIds) {
+      const result = await telegramUserbotService.sendMessage(chatId, text);
+      results.push({ chatId, ...result });
+    }
+
+    const allOk = results.every((r) => r.success);
+    const responseText = allOk
+      ? `✅ **Telegram xabari yuborildi** (${label || results.map((r) => r.chatId).join(', ')}).\n\n• **Matn:** ${text}`
+      : `⚠️ **Qisman muvaffaqiyatsiz.**\n\n${results.map((r) => `${r.chatId}: ${r.success ? 'yuborildi' : (r.error || 'xato')}`).join('\n')}`;
+
+    const aiResult = {
+      responseText,
+      executedTools: [{ tool: 'telegram_send_message', label: '📨 Telegram xabari yuborilmoqda (tanlangan kontakt)', result: { chatIds, text }, error: allOk ? undefined : 'partial failure' }],
+      modelMetadataBadge: '📨 Tanlangan kontaktga yuborildi'
+    };
+    const savedConvId = await saveMessageRecord(conversationId, `[${label || 'tanlandi'}] ${text}`, aiResult);
+
+    res.json({
+      conversationId: savedConvId,
+      userMessage: `[${label || 'tanlandi'}] ${text}`,
+      assistantResponse: aiResult.responseText,
+      executedTools: aiResult.executedTools,
+      modelMetadataBadge: aiResult.modelMetadataBadge
+    });
+  } catch (err) {
+    console.error('resolveSend error:', err.message);
+    res.status(500).json({ error: 'Yuborishda xatolik yuz berdi' });
   }
 };
 
@@ -391,6 +438,7 @@ module.exports = {
   deleteConversation,
   getMessages,
   sendMessage,
+  resolveSend,
   streamMessage,
   sendVoiceMessage,
   transcribeAudio,

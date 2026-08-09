@@ -305,6 +305,41 @@ class TelegramUserbotService {
   }
 
   /**
+   * Like findChatByPerson, but for a SEND: silently picking "the best guess" when two
+   * genuinely different real contacts both plausibly match (e.g. two different people the
+   * owner both calls "Bahodir aka") risks a real message going to the wrong person. Returns
+   * `{ status: 'found', chatId, customerName }` on a single clear match, `{ status:
+   * 'ambiguous', candidates: [...] }` when 2+ distinct chats are all plausible matches (the
+   * caller should ask the owner to pick), or `{ status: 'not_found' }`.
+   */
+  async resolvePerson(person) {
+    const needle = normalizeName(person);
+    if (!needle || needle.length < MIN_MATCHABLE_NAME_LEN) return { status: 'not_found' };
+
+    const contacts = await this._knownContacts();
+    const exact = contacts.filter((c) => normalizeName(c.customerName) === needle);
+    if (exact.length === 1) return { status: 'found', chatId: exact[0].chatId, customerName: exact[0].customerName };
+    if (exact.length > 1) {
+      return { status: 'ambiguous', candidates: exact.map((c) => ({ chatId: c.chatId, customerName: c.customerName })) };
+    }
+
+    const fuzzy = [];
+    for (const c of contacts) {
+      const name = normalizeName(c.customerName);
+      if (!name || name.length < MIN_MATCHABLE_NAME_LEN) continue;
+      if (name.includes(needle) || needle.includes(name)) { fuzzy.push({ c, dist: 0 }); continue; }
+      const dist = levenshtein(needle, name);
+      const tolerance = Math.max(1, Math.ceil(Math.min(needle.length, name.length) * 0.25));
+      if (dist <= tolerance) fuzzy.push({ c, dist });
+    }
+    if (!fuzzy.length) return { status: 'not_found' };
+    if (fuzzy.length === 1) return { status: 'found', chatId: fuzzy[0].c.chatId, customerName: fuzzy[0].c.customerName };
+
+    fuzzy.sort((a, b) => a.dist - b.dist);
+    return { status: 'ambiguous', candidates: fuzzy.slice(0, 4).map(({ c }) => ({ chatId: c.chatId, customerName: c.customerName })) };
+  }
+
+  /**
    * "Who messaged me on Telegram" (no `person`) — one row per chat, their latest inbound
    * message, newest chat first, based on the last history sync. With `person`, the recent
    * messages exchanged with just that one contact instead.
