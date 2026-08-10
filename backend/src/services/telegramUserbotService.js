@@ -391,6 +391,39 @@ class TelegramUserbotService {
     };
   }
 
+  /**
+   * Disconnects the currently logged-in Telegram account so a different one can be linked.
+   * Calls auth.LogOut first so the session is actually revoked on Telegram's side (otherwise
+   * it would keep showing up as an active session in the account's "Devices" list even after
+   * we forget it locally) — but the local state is cleared either way, since a dead/expired
+   * session should never block reconnecting with a new account.
+   */
+  async logout() {
+    if (this.client) {
+      try {
+        await this.client.invoke(new Api.auth.LogOut());
+      } catch (err) {
+        console.error('Telegram Userbot logout (auth.LogOut) error:', err.message);
+      }
+      await this.client.disconnect().catch(() => {});
+    }
+
+    this.client = null;
+    this.sessionString = '';
+    this.phone = '';
+    this.status = 'DISCONNECTED';
+    this._ownUserId = null;
+    this.lastSyncAt = null;
+    this.lastSyncStats = null;
+
+    await Integration.findOneAndUpdate(
+      { type: INTEGRATION_TYPE },
+      { status: 'DISCONNECTED', credentialsEncrypted: null, settings: JSON.stringify({}), updatedAt: new Date() }
+    ).catch(() => {});
+
+    return { success: true, status: 'DISCONNECTED' };
+  }
+
   // ---- History backfill ----
 
   /**

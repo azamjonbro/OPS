@@ -98,6 +98,11 @@ export const adminService = {
     return res.data;
   },
 
+  async telegramUserbotLogout() {
+    const res = await client.post(`${ADMIN_URL}/telegram-userbot/logout`);
+    return res.data;
+  },
+
   // Proxy pool — DB-backed so new proxies can be pasted in from the admin panel instead of
   // editing .env + SSH + restart every time a provider swaps IPs.
   async getProxies(purpose) {

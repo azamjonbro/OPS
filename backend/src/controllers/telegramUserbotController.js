@@ -23,6 +23,11 @@ const submitPassword = asyncHandler(async (req, res) => {
   res.json(result);
 }, 'Failed to submit Telegram 2FA password');
 
+const logout = asyncHandler(async (req, res) => {
+  const result = await telegramUserbotService.logout();
+  res.json(result);
+}, 'Failed to log out Telegram userbot');
+
 const syncHistory = asyncHandler(async (req, res) => {
   // Backfilling a big account can take a while — ack immediately and let the frontend
   // poll /status (syncing + lastSyncStats) rather than holding the HTTP request open.
@@ -35,4 +40,4 @@ const syncHistory = asyncHandler(async (req, res) => {
   });
 }, 'Failed to start Telegram history sync');
 
-module.exports = { getStatus, startLogin, submitCode, submitPassword, syncHistory };
+module.exports = { getStatus, startLogin, submitCode, submitPassword, syncHistory, logout };
