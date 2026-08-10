@@ -7,6 +7,7 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/integrations', adminController.getIntegrations);
 router.post('/integrations/:type', adminController.updateIntegration);
 router.post('/integrations/:type/test', adminController.testIntegration);
+router.post('/integrations/:type/disconnect', adminController.disconnectIntegration);
 router.get('/models', adminController.getModels);
 router.post('/models/:id/default', adminController.setDefaultModel);
 router.get('/logs', adminController.getLogs);

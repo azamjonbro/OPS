@@ -163,6 +163,22 @@ class TelegramBusinessService {
     return { success: true, botUsername, mode: 'long-polling' };
   }
 
+  /** Stops long-polling and forgets the bot token so a different bot can be connected. */
+  async disconnect() {
+    this.stopPolling();
+    this.token = '';
+    this.webhookSecret = '';
+    this.botUsername = '';
+    this._updateOffset = 0;
+
+    await Integration.findOneAndUpdate(
+      { type: INTEGRATION_TYPE },
+      { status: 'DISCONNECTED', credentialsEncrypted: null, updatedAt: new Date() }
+    ).catch(() => {});
+
+    return { success: true };
+  }
+
   async healthCheck() {
     if (!this.token) return { isHealthy: false, message: 'Telegram Business token sozlanmagan' };
     const meRes = await fetch(`${TELEGRAM_API}/bot${this.token}/getMe`).then((r) => r.json()).catch(() => ({ ok: false }));

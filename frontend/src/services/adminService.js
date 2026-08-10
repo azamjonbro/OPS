@@ -66,6 +66,11 @@ export const adminService = {
     return res.data;
   },
 
+  async disconnectIntegration(type) {
+    const res = await client.post(`${ADMIN_URL}/integrations/${type}/disconnect`);
+    return res.data;
+  },
+
   async saveIntegrationCredentials(payload) {
     const res = await client.post(`${ADMIN_URL}/integrations/${payload.type}`, payload);
     return res.data;

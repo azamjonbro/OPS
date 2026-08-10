@@ -36,6 +36,13 @@
         >
           {{ status.syncing || syncing ? 'Sync ishlamoqda…' : "Tarixni sync qilish (oxirgi 90 kun)" }}
         </button>
+        <button
+          @click="disconnect"
+          :disabled="loading"
+          class="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-50 text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/30 transition"
+        >
+          {{ loading ? 'Uzilmoqda…' : "Ulanishni uzish (boshqa akkaunt ulash uchun)" }}
+        </button>
       </div>
 
       <!-- Step: phone -->
@@ -154,6 +161,24 @@ export default {
       try {
         const res = await adminService.telegramUserbotSubmitPassword(this.password);
         if (!res.success) throw new Error(res.error);
+        await this.fetchStatus();
+      } catch (e) {
+        this.error = e.response?.data?.error || e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async disconnect() {
+      if (!confirm("Telegram akkountini uzmoqchimisiz? Boshqa akkaunt ulash uchun qayta login qilishingiz kerak bo'ladi.")) return;
+      this.loading = true;
+      this.error = '';
+      try {
+        const res = await adminService.telegramUserbotLogout();
+        if (!res.success) throw new Error(res.error);
+        this.step = 'phone';
+        this.phone = '';
+        this.code = '';
+        this.password = '';
         await this.fetchStatus();
       } catch (e) {
         this.error = e.response?.data?.error || e.message;

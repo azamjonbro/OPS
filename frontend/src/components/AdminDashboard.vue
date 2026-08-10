@@ -122,6 +122,13 @@
                 <Icon name="zap" size="xs" />
                 Health Test
               </button>
+              <button
+                v-if="item.status === 'CONNECTED'"
+                @click="disconnectIntegration(item)"
+                class="py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium rounded-xl border border-rose-500/30 transition flex items-center justify-center gap-1.5"
+              >
+                Uzish
+              </button>
             </div>
           </div>
         </div>
@@ -375,6 +382,16 @@ export default {
         alert(`Health Test Result for ${type}:\nStatus: ${data.isHealthy ? 'HEALTHY ✅' : 'FAILED ❌'}\nMessage: ${data.message}`);
       } catch (e) {
         alert('Test triggered. Status: CONNECTED');
+      }
+    },
+    async disconnectIntegration(item) {
+      if (!confirm(`${item.name} ulanishini uzmoqchimisiz?`)) return;
+      try {
+        const res = await adminService.disconnectIntegration(item.type);
+        if (res && res.success === false) throw new Error(res.error || 'Uzib bo\'lmadi');
+        await this.fetchIntegrations();
+      } catch (e) {
+        alert(e.response?.data?.error || e.message);
       }
     },
     openConfigModal(item) {

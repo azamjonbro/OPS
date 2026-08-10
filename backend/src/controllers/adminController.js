@@ -93,6 +93,39 @@ const updateIntegration = async (req, res) => {
   res.json({ success: true, message: `${type} integration updated & connected successfully!` });
 };
 
+/**
+ * Disconnects any connector card in the admin Connections Hub. The two Telegram
+ * connectors each hold a live external session (MTProto login / long-polling bot) that a
+ * plain DB status flip wouldn't actually tear down, so they get dedicated services;
+ * everything else is just credentials + a status flag, handled generically via the
+ * connector registry.
+ */
+const disconnectIntegration = async (req, res) => {
+  const type = req.params.type.toUpperCase();
+
+  if (type === 'TELEGRAM_USERBOT') {
+    const telegramUserbotService = require('../services/telegramUserbotService');
+    const result = await telegramUserbotService.logout();
+    return res.json(result);
+  }
+
+  if (type === 'TELEGRAM_BUSINESS') {
+    const telegramBusinessService = require('../services/telegramBusinessService');
+    const result = await telegramBusinessService.disconnect();
+    return res.json(result);
+  }
+
+  const connector = connectorRegistry.get(type);
+  if (connector) connector.disconnect();
+
+  await Integration.findOneAndUpdate(
+    { type },
+    { status: 'DISCONNECTED', credentialsEncrypted: null, updatedAt: new Date() }
+  ).catch(() => {});
+
+  res.json({ success: true });
+};
+
 const testIntegration = async (req, res) => {
   const { type } = req.params;
   const connector = connectorRegistry.get(type);
@@ -161,6 +194,7 @@ module.exports = {
   getIntegrations,
   updateIntegration,
   testIntegration,
+  disconnectIntegration,
   getModels,
   setDefaultModel,
   getLogs,
