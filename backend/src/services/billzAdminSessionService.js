@@ -41,21 +41,32 @@ class BillzAdminSessionService {
   async loadFromDb() {
     try {
       const doc = await Integration.findOne({ type: INTEGRATION_TYPE });
-      if (!doc || !doc.credentialsEncrypted) return;
+      if (!doc) {
+        console.log('💳 Billz Admin Session: no Integration doc found at boot (never saved yet, or was disconnected).');
+        return;
+      }
+      if (!doc.credentialsEncrypted) {
+        console.log(`💳 Billz Admin Session: doc found (status=${doc.status}) but credentialsEncrypted is empty.`);
+        return;
+      }
       const creds = crypto.decryptJson(doc.credentialsEncrypted);
       this.phone = creds.phone || '';
       this.password = creds.password || '';
       this.accessToken = creds.accessToken || '';
       this.tokenExpiresAt = creds.tokenExpiresAt || 0;
       this.deviceGuid = creds.deviceGuid || require('crypto').randomUUID();
-      if (this.phone) console.log(`💳 Billz Admin Session restored (${this.phone})`);
+      if (this.phone) {
+        console.log(`💳 Billz Admin Session restored (${this.phone})`);
+      } else {
+        console.log('💳 Billz Admin Session: doc + credentialsEncrypted found, but decrypted phone is empty (decryption likely failed silently).');
+      }
     } catch (err) {
       console.error('Billz Admin Session loadFromDb error:', err.message);
     }
   }
 
   async _persist(status) {
-    await Integration.findOneAndUpdate(
+    const doc = await Integration.findOneAndUpdate(
       { type: INTEGRATION_TYPE },
       {
         status: status || 'CONNECTED',
@@ -70,8 +81,9 @@ class BillzAdminSessionService {
         healthCheckAt: new Date(),
         updatedAt: new Date()
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
+    console.log(`💳 Billz Admin Session persisted: status=${doc.status}, phone=${this.phone}, credentialsEncrypted length=${(doc.credentialsEncrypted || '').length}`);
   }
 
   /** Decodes a JWT's `exp` claim (no signature check needed — we just received it fresh from Billz). */
@@ -183,6 +195,7 @@ class BillzAdminSessionService {
   }
 
   async disconnect() {
+    console.log('💳 Billz Admin Session: disconnect() called.', new Error().stack);
     this.phone = '';
     this.password = '';
     this.accessToken = '';
