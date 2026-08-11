@@ -11,7 +11,7 @@ const proxyPoolService = require('./proxyPoolService');
  * context (routeToTools, draftReply, the narrative model) don't fit this shape and stay
  * as their own fetch calls rather than being forced through here.
  */
-async function classifyJson({ apiKey, model = 'gpt-4o-mini', systemPrompt, userContent, fallback }) {
+async function classifyJson({ apiKey, model = 'gpt-5-mini', systemPrompt, userContent, fallback }) {
   if (!apiKey) return fallback;
 
   try {
@@ -25,7 +25,11 @@ async function classifyJson({ apiKey, model = 'gpt-4o-mini', systemPrompt, userC
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
-        temperature: 0,
+        // gpt-5-mini only supports the default temperature (1) — passing 0 400s.
+        // Simple JSON classification doesn't need gpt-5's chain-of-thought reasoning —
+        // 'minimal' skips it, cutting completion tokens ~5x on this high-volume path
+        // (called on every inbound Telegram message).
+        reasoning_effort: 'minimal',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },

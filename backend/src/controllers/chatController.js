@@ -60,7 +60,8 @@ const getMessages = asyncHandler(async (req, res) => {
     content: m.content,
     attachedFile: m.attachedFile ? (typeof m.attachedFile === 'string' ? JSON.parse(m.attachedFile) : m.attachedFile) : null,
     replyTo: m.replyTo || null,
-    toolCalls: m.toolCalls
+    toolCalls: m.toolCalls,
+    createdAt: m.createdAt
   })));
 }, 'Failed to fetch messages');
 

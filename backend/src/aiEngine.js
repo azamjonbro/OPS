@@ -354,8 +354,8 @@ async function summarizeCorrespondence(res, apiKey) {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        temperature: 0.3,
+        model: 'gpt-5',
+        // gpt-5 only supports the default temperature (1) — passing any other value 400s.
         messages: [
           {
             role: 'system',
@@ -757,8 +757,8 @@ async function routeToTools(userMessage, apiKey, recentTurns = []) {
         // A tool call's arguments sometimes ARE the deliverable (an email body, a Notion
         // page's real content) — this has to be capable of actually authoring that
         // content well, not just classifying, so it runs on the full model, not -mini.
-        model: 'gpt-4o',
-        temperature: 0.4,
+        model: 'gpt-5',
+        // gpt-5 only supports the default temperature (1) — passing any other value 400s.
         tools,
         tool_choice: 'auto',
         parallel_tool_calls: true,
@@ -1344,7 +1344,7 @@ class AIEngine {
     const { ownerProfile, persistentMemory, chatHistory } = memoryContext;
 
     const openAiApiKeyTrimmed = openAiApiKey;
-    const modelsToTry = ['gpt-4o', 'gpt-4o-mini'];
+    const modelsToTry = ['gpt-5', 'gpt-5-mini'];
     for (const modelName of modelsToTry) {
       onProgress({ phase: 'llm', label: `🧠 ${modelName.toUpperCase()} javob shakllantirmoqda...`, model: modelName });
       try {
@@ -1359,8 +1359,8 @@ class AIEngine {
             messages: [
               { role: 'system', content: buildFinalSystemPrompt({ ownerProfile, persistentMemory, chatHistory, hasAttachment }) },
               { role: 'user', content: buildUserContent(userMessage, executedTools, attachedFile) }
-            ],
-            temperature: 0.7
+            ]
+            // gpt-5/gpt-5-mini only support the default temperature (1) — omit it, don't set 0.7.
           })
         });
 

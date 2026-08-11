@@ -135,7 +135,8 @@ async function runAgentLoop({ customerText, history, playbook }, key) {
   const proxy = await proxyPoolService.getWorkingProxy('openai').catch(() => null);
 
   const callOpenAi = async (withTools) => {
-    const body = { model: 'gpt-4o', temperature: 0.5, messages };
+    // gpt-5 only supports the default temperature (1) — passing any other value 400s.
+    const body = { model: 'gpt-5', messages };
     if (withTools) {
       body.tools = SALES_TOOLS;
       body.tool_choice = 'auto';

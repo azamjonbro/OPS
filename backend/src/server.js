@@ -111,8 +111,8 @@ async function seedInitialData() {
     await AIModel.insertMany([
       {
         provider: "OpenAI",
-        modelName: "gpt-4o",
-        displayName: "OpenAI GPT-4o",
+        modelName: "gpt-5",
+        displayName: "OpenAI GPT-5",
         isDefault: true,
         latencyMs: 180,
       },

@@ -76,7 +76,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
               </svg>
             </div>
-            <span class="truncate font-medium">{{ conv.title }}</span>
+            <div class="flex flex-col min-w-0">
+              <span class="truncate font-medium">{{ conv.title }}</span>
+              <span v-if="conv.updatedAt" :class="['text-[9px] font-normal', activeConvId === conv.id ? 'text-white/70' : (isLightTheme ? 'text-slate-400' : 'text-gray-500')]">{{ formatConvTime(conv.updatedAt) }}</span>
+            </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button @click.stop="promptDeleteChat(conv.id)" :class="[isLightTheme ? 'text-slate-400 hover:text-red-500 hover:bg-red-50' : 'text-gray-400 hover:text-red-400 hover:bg-[#252834]', 'p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200']" title="Chatni o'chirish">
@@ -428,6 +431,7 @@
                 </div>
                 <div v-if="msg.content">{{ msg.content }}</div>
               </div>
+              <div v-if="msg.createdAt" :class="['text-[10px] font-mono text-right pr-1', isLightTheme ? 'text-slate-400' : 'text-gray-500']">{{ formatMsgTime(msg.createdAt) }}</div>
 
               <!-- User Message Action Toolbar (Nusxalash, Javob berish) -->
               <div class="flex items-center justify-end gap-2 opacity-90 hover:opacity-100 transition-all duration-200 text-xs font-semibold select-none pt-1">
@@ -488,6 +492,7 @@
 
               <!-- Message Content with Markdown Parsing -->
               <div class="bg-[#14161C] border border-[#1F222A] rounded-2xl rounded-tl-sm p-4 text-sm text-gray-200 leading-relaxed markdown-body shadow-sm" v-html="renderMarkdown(msg.content)"></div>
+              <div v-if="msg.createdAt" :class="['text-[10px] font-mono pl-1', isLightTheme ? 'text-slate-400' : 'text-gray-500']">{{ formatMsgTime(msg.createdAt) }}</div>
 
               <!-- Contact Disambiguation: AI found 2+ plausible people for the same name and
                    is asking which one, instead of guessing and messaging the wrong person. -->
@@ -1223,6 +1228,24 @@ export default {
     }
   },
   methods: {
+    /** Message bubble timestamp — just the clock time, chat is already grouped by day. */
+    formatMsgTime(dateVal) {
+      if (!dateVal) return '';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    },
+    /** Sidebar conversation timestamp — today shows just the time, older shows the date. */
+    formatConvTime(dateVal) {
+      if (!dateVal) return '';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      return sameDay
+        ? d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' });
+    },
     toggleTheme() {
       const next = themeService.toggleTheme();
       this.isLightTheme = next === 'light';
@@ -1631,7 +1654,8 @@ export default {
         id: `user-${Date.now()}`,
         role: 'user',
         content: text,
-        attachedFile: fileToSend
+        attachedFile: fileToSend,
+        createdAt: new Date().toISOString()
       });
 
       this.scrollToBottom();
