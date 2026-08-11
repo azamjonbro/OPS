@@ -1071,9 +1071,18 @@ import CalendarWorkspace from './CalendarWorkspace.vue';
 import KnowledgeWorkspace from './KnowledgeWorkspace.vue';
 import UserSettingsWorkspace from './UserSettingsWorkspace.vue';
 
+// Links inside a chat bubble (bare URLs, markdown links, Telegram-forwarded links) must open
+// in a new tab — without this they navigate the whole SPA away from the chat, losing state.
+class ChatLinkRenderer extends marked.Renderer {
+  link(linkToken) {
+    return super.link(linkToken).replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+  }
+}
+
 marked.setOptions({
   gfm: true,
-  breaks: true
+  breaks: true,
+  renderer: new ChatLinkRenderer()
 });
 
 /**
