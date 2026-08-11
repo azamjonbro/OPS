@@ -136,7 +136,10 @@ async function runAgentLoop({ customerText, history, playbook }, key) {
 
   const callOpenAi = async (withTools) => {
     // gpt-5 only supports the default temperature (1) — passing any other value 400s.
-    const body = { model: 'gpt-5', messages };
+    // 'low' keeps a customer-facing reply fast — this loop runs up to MAX_TOOL_ROUNDS times,
+    // and gpt-5's default reasoning depth easily blew the request past the timeout below,
+    // silently dropping the customer's reply.
+    const body = { model: 'gpt-5', messages, reasoning_effort: 'low' };
     if (withTools) {
       body.tools = SALES_TOOLS;
       body.tool_choice = 'auto';
@@ -145,7 +148,9 @@ async function runAgentLoop({ customerText, history, playbook }, key) {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      proxyUrl: proxy && proxy.url
+      proxyUrl: proxy && proxy.url,
+      // gpt-5's reasoning pass can run well past proxiedFetch's 15s default.
+      timeoutMs: 45000
     });
     if (!resp.ok) return null;
     const data = await resp.json();

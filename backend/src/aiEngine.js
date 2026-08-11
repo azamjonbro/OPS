@@ -368,8 +368,11 @@ QOIDALAR:
 - Markdown ro'yxat ishlat, sarlavha qo'shma.`
           },
           { role: 'user', content: `Shaxs: ${res.matchedName} ${res.matchedAddress ? `(${res.matchedAddress})` : ''}\nJami ${res.total} ta xat.\n\n${transcript}` }
-        ]
-      })
+        ],
+        reasoning_effort: 'low'
+      }),
+      // gpt-5's own reasoning pass can run well past proxiedFetch's 15s default.
+      timeoutMs: 45000
     });
 
     if (!resp.ok) return null;
@@ -782,8 +785,15 @@ QOIDALAR:
           },
           ...historyMessages,
           { role: 'user', content: userMessage }
-        ]
-      })
+        ],
+        // Enough reasoning to pick the right tool(s), not so much that a routing decision
+        // risks blowing the 15s default proxiedFetch timeout.
+        reasoning_effort: 'low'
+      }),
+      // gpt-5's own reasoning pass can run well past proxiedFetch's 15s default, especially
+      // with a full tool schema attached — that silently dropped real customer/owner replies
+      // (Telegram sales agent, main chat) until this was raised.
+      timeoutMs: 45000
     });
 
     if (!resp.ok) return [];
@@ -1361,7 +1371,10 @@ class AIEngine {
               { role: 'user', content: buildUserContent(userMessage, executedTools, attachedFile) }
             ]
             // gpt-5/gpt-5-mini only support the default temperature (1) — omit it, don't set 0.7.
-          })
+          }),
+          // gpt-5's own reasoning pass can run well past proxiedFetch's 15s default — this is
+          // the final narrative answer, worth the wait over a silently dropped reply.
+          timeoutMs: 45000
         });
 
         if (openAiResp.ok) {
