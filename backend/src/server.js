@@ -247,3 +247,16 @@ app.get("/api/integrations/billz/sales", async (req, res) => {
 
   res.json(salesData);
 });
+
+// Serves the built Vue SPA (frontend/dist) directly off this same backend/port, so a
+// standalone deployment of this server is a complete, working site on its own — the
+// separately-hosted Vercel frontend (services/api.js's default ops.techinfo.uz base) still
+// works unaffected, this is just an additional way to reach the same API + UI together.
+// Registered last so it never shadows an /api/* route above.
+const frontendDist = path.resolve(__dirname, "../../frontend/dist");
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
