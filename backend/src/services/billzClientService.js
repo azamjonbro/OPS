@@ -588,6 +588,10 @@ class BillzClientService {
       expensesRes.isRealData ? expensesRes.totalExpenses : null
     );
 
+    if (!expensesRes.isRealData) {
+      console.error('Billz expenses fetch failed for report:', expensesRes.error);
+    }
+
     return {
       success: true,
       isRealData: true,
@@ -623,6 +627,9 @@ class BillzClientService {
         totalExpenses: expensesRes.isRealData ? expensesRes.totalExpenses : null,
         expensesByCategory: expensesRes.isRealData ? expensesRes.byCategory : null,
         dailyExpenseBreakdown: expensesRes.isRealData ? expensesRes.dailyExpenseBreakdown : null,
+        // Surfaced in raw tool JSON only (not the formatted text) so a connection failure
+        // can be diagnosed from the chat's executedTools log instead of only server logs.
+        expensesFetchError: expensesRes.isRealData ? null : expensesRes.error,
         inventoryInvestment: investmentRes.isRealData ? investmentRes.totalInvestment : null,
         netProfit
       },
