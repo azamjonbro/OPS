@@ -131,7 +131,8 @@ async function runChatTurn({ conversationId, content, attachedFile, replyTo }, o
     executedTools: aiResult.executedTools,
     modelMetadataBadge: aiResult.modelMetadataBadge,
     clarificationOptions: aiResult.clarificationOptions,
-    pendingSendText: aiResult.pendingSendText
+    pendingSendText: aiResult.pendingSendText,
+    quickReplyOptions: aiResult.quickReplyOptions
   };
 }
 

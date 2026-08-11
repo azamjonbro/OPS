@@ -71,6 +71,30 @@ function formatBillzSalesReport(d) {
            `|---|---|---|---|---|\n${rows}\n`;
   };
 
+  // Owner explicitly wants "mahsulot nomi, narxi, sana, kim sotgani" as one flat table —
+  // productTable() above is a per-day aggregate with no date/cashier columns, and
+  // checkLines() below groups by receipt without a per-item date column, so neither is a
+  // literal match. This flattens each check's line items with that check's own date/cashier
+  // attached to every row (checks already carry `.cashier`/`.soldAt` per
+  // billzClientService.js's transactedItems).
+  const saleLinesTable = (checks) => {
+    if (!checks || !checks.length) return { table: '', count: 0 };
+    const rows = [];
+    let i = 1;
+    for (const c of checks) {
+      const when = c.soldTime || c.soldAt || '';
+      const who = (c.cashier || '').trim() || "noma'lum";
+      for (const p of (c.products || [])) {
+        rows.push(`| ${i++} | ${p.name} | ${p.unitPrice.toLocaleString()} | ${when} | ${who} |`);
+      }
+    }
+    if (!rows.length) return { table: '', count: 0 };
+    return {
+      table: `| # | Mahsulot | Narx (so'm) | Sana | Kim sotdi |\n|---|---|---|---|---|\n${rows.join('\n')}\n`,
+      count: rows.length
+    };
+  };
+
   // The blank line before </details> matters: without it a body ending in a list item
   // swallows the closing tag as lazy continuation and the panel closes in the wrong place.
   const collapsible = (summary, body) => body
@@ -104,6 +128,11 @@ function formatBillzSalesReport(d) {
           `📦 Mahsulotlar jadvali (${day.products.length} xil) — ochish uchun bosing`,
           productTable(day.products)
         );
+        const dayLines = saleLinesTable(day.checks);
+        const saleLines = collapsible(
+          `🧑‍💼 Sotuv tafsilotlari — mahsulot, narx, sana, kim (${dayLines.count} qator)`,
+          dayLines.table
+        );
         const checks = collapsible(
           `🧾 Cheklar tafsiloti (${day.checksCount} ta chek)`,
           checkLines(day.checks)
@@ -114,14 +143,18 @@ function formatBillzSalesReport(d) {
               productTable(day.returnedProducts, true)
             )
           : '';
-        return line + table + checks + rets;
+        return line + table + saleLines + checks + rets;
       }).join('');
     }
   } else {
-    body += (d.checks && d.checks.length)
-      ? `🧾 **Cheklar tafsiloti:**\n\n${checkLines(d.checks)}\n\n` +
-        collapsible(`📦 Kun bo'yicha mahsulotlar jadvali (${d.soldProducts.length} xil)`, productTable(d.soldProducts))
-      : `_Bu kunda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+    if (d.checks && d.checks.length) {
+      const dayLines = saleLinesTable(d.checks);
+      body += `🧾 **Cheklar tafsiloti:**\n\n${checkLines(d.checks)}\n\n` +
+        collapsible(`📦 Kun bo'yicha mahsulotlar jadvali (${d.soldProducts.length} xil)`, productTable(d.soldProducts)) +
+        collapsible(`🧑‍💼 Sotuv tafsilotlari — mahsulot, narx, sana, kim (${dayLines.count} qator)`, dayLines.table);
+    } else {
+      body += `_Bu kunda hech qanday sotuv chegi qayd etilmagan._\n\n`;
+    }
   }
 
   const payments = (d.paymentBreakdown && d.paymentBreakdown.length)
@@ -158,7 +191,65 @@ function formatBillzSalesReport(d) {
     `📈 **Sof savdo (kirim):** ${money(d.netSales)}\n\n` +
     stockBlock +
     formatPeriodAnalytics(d) +
+    formatExpenseSection(d) +
     `⚠️ Ushbu hisobotda FAQAT Hadiya Store filiali ma'lumotlari.`;
+}
+
+/**
+ * Expenses (chiqim) + net profit + inventory investment — sourced from billzGlService.js
+ * via the owner's own Billz admin session (billzAdminSessionService.js), a completely
+ * different credential from the sales/catalog integration token, since that token is
+ * confirmed permission-blocked from this ledger. `d.expenses === null` means that session
+ * isn't configured yet (never a fabricated 0 — same "ma'lumot yo'q" rule as the rest of
+ * this report).
+ */
+function formatExpenseSection(d) {
+  const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+  const collapsible = (summary, body) => body
+    ? `<details>\n<summary>${summary}</summary>\n\n${body}\n\n</details>\n\n`
+    : '';
+
+  if (d.expenses === null || d.expenses === undefined) {
+    return `## 💸 Xarajatlar\n\n_Billz admin sessiyasi ulanmagan — xarajatlar/sof foyda ma'lumoti yo'q (Connections Hub → Billz Admin Session)._\n\n`;
+  }
+
+  let body = `## 💸 Xarajatlar\n\n`;
+
+  if (!d.expenses.length) {
+    body += `_Bu davrda hech qanday xarajat qayd etilmagan._\n\n`;
+  } else {
+    const rows = d.expenses.map((e, i) =>
+      `| ${i + 1} | ${e.category} | ${e.amount.toLocaleString()} | ${e.dateAt} | ${e.createdByUserName || "noma'lum"} |`
+    ).join('\n');
+    body += collapsible(
+      `💸 Xarajatlar jadvali (${d.expenses.length} ta)`,
+      `| # | Sabab/Kategoriya | Summa (so'm) | Sana | Kim |\n|---|---|---|---|---|\n${rows}\n`
+    );
+
+    if (d.expensesByCategory && d.expensesByCategory.length > 1) {
+      const catRows = d.expensesByCategory.map((c) => `| ${c.category} | ${c.total.toLocaleString()} | ${c.count} ta |`).join('\n');
+      body += collapsible(
+        `📊 Sabab bo'yicha taqsimot`,
+        `| Kategoriya | Summa (so'm) | Soni |\n|---|---|---|\n${catRows}\n`
+      );
+    }
+
+    // Single day -> one total (below); a range also gets each day's own total, mirroring
+    // how the sales section above handles d.isRange.
+    if (d.isRange && d.dailyExpenseBreakdown && d.dailyExpenseBreakdown.length > 1) {
+      const dayRows = d.dailyExpenseBreakdown.map((day) => `| ${day.date} | ${day.total.toLocaleString()} |`).join('\n');
+      body += collapsible(
+        `📆 Kunlik xarajatlar`,
+        `| Sana | Summa (so'm) |\n|---|---|\n${dayRows}\n`
+      );
+    }
+  }
+
+  body += `💰 **Jami xarajat:** ${money(d.totalExpenses)}\n\n`;
+  body += `📦 **Tovarga investitsiya:** ${money(d.inventoryInvestment)}\n\n`;
+  body += `📈 **Sof foyda:** ${money(d.netProfit)}\n\n`;
+
+  return body;
 }
 
 /**
@@ -751,6 +842,27 @@ function formatBulkImportReport(bulkRes, parsed) {
  * skips the second LLM round-trip entirely for report-style answers. Returns `null` when
  * no dedicated formatter applies, so the caller falls through to the narrative model.
  */
+/**
+ * "Tool call ran but found nothing / failed outright" -> 2-3 clickable web-chat suggestions
+ * (see UserChat.vue's quickReplyOptions rendering) instead of leaving the owner at a dead
+ * end. Telegram inline keyboards are out of scope (the bot's poll loop doesn't even
+ * request callback_query updates) — this is web-chat only.
+ *
+ * Deliberately narrow: only covers the one case this was built for
+ * (billz_get_consolidated_report with no real data for the asked period). The fuzzier "the
+ * model's own narrative answer sounds uncertain" case has no existing detection signal in
+ * this codebase and is intentionally NOT attempted here — extend this mapping per-tool as
+ * other "found nothing" shapes come up, rather than guessing a generic detector up front.
+ */
+function suggestOptionsForFailedTool(name, res) {
+  if (name === 'billz_get_consolidated_report') {
+    const noData = !res.success || (res.isRealData && res.consolidatedData && res.consolidatedData.checksCount === 0);
+    if (!noData) return null;
+    return [{ label: 'Bugungi hisobot' }, { label: 'Kechagi hisobot' }, { label: 'Bu hafta' }];
+  }
+  return null;
+}
+
 async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
   switch (name) {
     case 'mail_read_unread': {
@@ -790,24 +902,39 @@ async function dispatchFastFormat({ name, args, res }, apiKey, onProgress) {
       }
       if (!res.isRealData) return formatBillzConnectionReport(res);
 
-      // "Eng ko'p sotilgan 5 ta mahsulot qaysi?" wants a ranked product list, not the full
-      // daily-breakdown report — ask the model which one this is instead of guessing from
-      // keywords (see memory: no regex routing for intent).
-      const productIntent = await classifyJson({
+      // "Eng ko'p sotilgan 5 ta mahsulot qaysi?" wants a ranked product list; "xarajatlar
+      // qancha" wants just the expense section; "sof foyda qancha" wants just the profit
+      // line; anything else gets the full report — ask the model which one this is instead
+      // of guessing from keywords (see memory: no regex routing for intent).
+      const reportIntent = await classifyJson({
         apiKey,
-        systemPrompt: `Sen Billz POS savdo hisoboti so'rovini tahlil qilasan. Foydalanuvchi FAQAT eng ko'p/eng kam sotilgan mahsulotlar RO'YXATINI (masalan "top 5 mahsulot", "eng ko'p sotilgan 3 ta tovar") so'rayaptimi, yoki TO'LIQ davr/kun hisobotini (savdo summasi, cheklar, to'lovlar, kunlik taqsimot va h.k.) so'rayaptimi?
-JSON qaytar: {"wantsTopProducts": boolean, "count": number, "metric": "quantity" | "revenue"}
-- wantsTopProducts: faqat mahsulotlar reytingi so'ralganda true.
-- count: nechta mahsulot so'ralgan (aytilmagan bo'lsa 5).
-- metric: "dona"/soni bo'yicha so'ralsa "quantity", pul/summa/daromad bo'yicha so'ralsa "revenue" (aytilmagan bo'lsa "quantity").`,
+        systemPrompt: `Sen Billz POS savdo hisoboti so'rovini tahlil qilasan. Foydalanuvchi nimani so'rayapti?
+JSON qaytar: {"intent": "top_products" | "expenses_only" | "profit_only" | "full_report", "count": number, "metric": "quantity" | "revenue"}
+- "top_products": FAQAT eng ko'p/eng kam sotilgan mahsulotlar RO'YXATI so'ralganda (masalan "top 5 mahsulot", "eng ko'p sotilgan 3 ta tovar").
+- "expenses_only": FAQAT xarajatlar/chiqimlar so'ralganda (masalan "xarajatlar qancha bo'ldi", "chiqimlarni ko'rsat"), savdo/foyda so'ralmagan bo'lsa.
+- "profit_only": FAQAT sof foyda so'ralganda (masalan "sof foyda qancha", "profit qancha chiqdi"), boshqa hech narsa so'ralmagan bo'lsa.
+- "full_report": savdo summasi, cheklar, to'lovlar, kunlik taqsimot yoki umumiy/to'liq hisobot so'ralganda, yoki intent aniq bo'lmasa.
+- count: nechta mahsulot so'ralgan (faqat top_products uchun, aytilmagan bo'lsa 5).
+- metric: "dona"/soni bo'yicha so'ralsa "quantity", pul/summa/daromad bo'yicha so'ralsa "revenue" (faqat top_products uchun, aytilmagan bo'lsa "quantity").`,
         userContent: args.userMessage || args.query || '',
-        fallback: { wantsTopProducts: false, count: 5, metric: 'quantity' }
+        fallback: { intent: 'full_report', count: 5, metric: 'quantity' }
       });
 
-      if (productIntent && productIntent.wantsTopProducts) {
-        const count = Number(productIntent.count) > 0 ? Math.min(Number(productIntent.count), 50) : 5;
-        const metric = productIntent.metric === 'revenue' ? 'revenue' : 'quantity';
+      const intent = (reportIntent && reportIntent.intent) || 'full_report';
+
+      if (intent === 'top_products') {
+        const count = Number(reportIntent.count) > 0 ? Math.min(Number(reportIntent.count), 50) : 5;
+        const metric = reportIntent.metric === 'revenue' ? 'revenue' : 'quantity';
         return formatTopProductsAnswer(res.data, count, metric);
+      }
+
+      if (intent === 'expenses_only') {
+        return formatExpenseSection(res.data);
+      }
+
+      if (intent === 'profit_only') {
+        const money = (v) => (v === null || v === undefined) ? "ma'lumot yo'q" : `${v.toLocaleString()} so'm`;
+        return `💰 **Sof foyda (${res.data.displayDate}):** ${money(res.data.netProfit)}`;
       }
 
       return formatBillzSalesReport(res.data);
@@ -904,6 +1031,8 @@ RESPONSE INSTRUCTIONS:
   • **Operatsion va Sotuv Tahlili (Executive Insights):**
 - DATE ACCURACY:
   When a specific date (e.g. 25-may) is requested, present the EXACT sales and product transactions that occurred on that specific date as returned by the tool. If 0 sales occurred on that specific date, state accurately in Uzbek that on that day 0 transactions (0 UZS revenue) took place while reporting the active catalog stock value. Never substitute today's fallback data when a specific date is requested!
+- EXPENSES/PROFIT/INVESTMENT DATA (billz_get_consolidated_report's expenses/totalExpenses/expensesByCategory/inventoryInvestment/netProfit fields):
+  If any of these fields is \`null\`, it means the Billz admin session isn't connected yet — say so plainly in Uzbek ("Billz admin sessiyasi ulanmagan, xarajat/foyda ma'lumoti yo'q"). NEVER invent or estimate a 0 or any other number for a null field — that is a fabricated figure the owner would make real decisions on.
 ${hasAttachment ? `
 ATTACHED FILE HANDLING (THIS TURN HAS AN ATTACHMENT — HIGHEST PRIORITY):
 - Answer about the attached file itself. Ignore the Billz/Notion context data unless the owner's question actually needs it.
@@ -1195,7 +1324,16 @@ class AIEngine {
     if (toolResults.length === 1) {
       const fastAnswer = await dispatchFastFormat(toolResults[0], openAiApiKey, onProgress);
       if (fastAnswer !== null) {
-        return { responseText: fastAnswer, executedTools, modelMetadataBadge };
+        // The tool ran but found nothing / failed outright — offer clickable alternatives
+        // instead of a dead end (web chat only; see suggestOptionsForFailedTool's doc
+        // comment for why this stays deliberately narrow for now).
+        const quickReplyOptions = suggestOptionsForFailedTool(toolResults[0].name, toolResults[0].res);
+        return {
+          responseText: fastAnswer,
+          executedTools,
+          modelMetadataBadge,
+          ...(quickReplyOptions ? { quickReplyOptions } : {})
+        };
       }
     }
 
@@ -1260,3 +1398,6 @@ class AIEngine {
 }
 
 module.exports = new AIEngine();
+// Exposed so billzReportScheduler.js can render a scheduled digest with the exact same
+// formatting code as an interactive chat answer, instead of duplicating it.
+module.exports.formatBillzSalesReport = formatBillzSalesReport;

@@ -291,6 +291,35 @@ class TelegramUserbotConnector extends BaseConnector {
   }
 }
 
+/**
+ * Owner's own Billz web-login session (billzAdminSessionService.js) — a distinct
+ * credential from the BILLZ integration token above: that token is scoped to
+ * catalog/sales endpoints and is confirmed permission-blocked from the cashbox ledger
+ * (gl-transaction — expenses, net profit, inventory investment), which only a real
+ * logged-in session can read. Registers no AI tools itself; billzGlService.js calls
+ * billzAdminSessionService directly, this connector exists only so the Connections Hub
+ * (Credentials / Health Test / Uzish) has a card for it like every other integration.
+ */
+class BillzAdminSessionConnector extends BaseConnector {
+  constructor() {
+    super('BILLZ_ADMIN_SESSION', 'Billz Admin Session (Kassa/Xarajatlar)', "Egasining shaxsiy Billz login sessiyasi — xarajatlar, sof foyda va tovar investitsiyasi (kassa/gl-transaction) ma'lumotlariga kirish uchun, chunki integratsiya tokeni bu ma'lumotlarga ruxsatsiz.");
+  }
+
+  getTools() {
+    return [];
+  }
+
+  async healthCheck() {
+    const billzAdminSessionService = require('../services/billzAdminSessionService');
+    const result = await billzAdminSessionService.testConnection();
+    return { isHealthy: result.success, message: result.success ? `Ulangan: ${billzAdminSessionService.phone}` : (result.error || 'Ulanmagan') };
+  }
+
+  async executeTool() {
+    return { success: false, error: 'BILLZ_ADMIN_SESSION registers no AI tools' };
+  }
+}
+
 class BillzConnector extends BaseConnector {
   constructor() {
     super('BILLZ', 'Billz POS Retail Integration', 'Real-time sales reports, inventory levels, and product creation');
@@ -377,7 +406,7 @@ class BillzConnector extends BaseConnector {
     return [
       {
         name: 'billz_get_consolidated_report',
-        description: "Get the full daily or period sales report for the Hadiya Store branch — revenue, receipts, sold products, payment-method split, returns, and remaining stock value. Use this for any question about sales, revenue, receipts (chek), or a specific day/week/month report ('bugungi hisobot', '31-iyul savdosi', 'oxirgi 7 kunlik savdo').",
+        description: "Get the full daily or period sales report for the Hadiya Store branch — revenue, receipts, sold products (with date and cashier), payment-method split, returns, and remaining stock value. Also covers expenses (chiqim) with their reasons/categories, net profit (sof foyda), and inventory/goods investment (tovarga investitsiya) for the same period. Use this for any question about sales, revenue, receipts (chek), expenses, net profit, inventory investment, or a specific day/week/month report ('bugungi hisobot', '31-iyul savdosi', 'oxirgi 7 kunlik savdo', 'xarajatlar qancha', 'sof foyda qancha').",
         parameters: {
           type: 'object',
           properties: {
@@ -1400,6 +1429,7 @@ class ConnectorRegistry {
     this.register(new TelegramBusinessConnector());
     this.register(new TelegramUserbotConnector());
     this.register(new BillzConnector());
+    this.register(new BillzAdminSessionConnector());
     this.register(new NotionConnector());
     this.register(new MailConnector());
     this.register(new CalendarConnector());

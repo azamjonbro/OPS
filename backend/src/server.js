@@ -50,6 +50,8 @@ const billzSyncService = require("./services/billzSyncService");
 const mailSyncService = require("./services/mailSyncService");
 const telegramBusinessService = require("./services/telegramBusinessService");
 const telegramUserbotService = require("./services/telegramUserbotService");
+const billzAdminSessionService = require("./services/billzAdminSessionService");
+const billzReportScheduler = require("./services/billzReportScheduler");
 const adminAuthService = require("./services/adminAuthService");
 const notionTaskSyncService = require("./services/notionTaskSyncService");
 const connectorRegistry = require("./connectors/registry");
@@ -199,6 +201,8 @@ async function startServer() {
     await telegramBusinessService.loadFromDb();
     await telegramUserbotService.loadFromDb();
     telegramUserbotService.startDailyCronJob();
+    await billzAdminSessionService.loadFromDb();
+    billzReportScheduler.start();
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on http://localhost:${PORT}`);

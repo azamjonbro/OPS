@@ -572,7 +572,21 @@ class BillzClientService {
     const s = salesRes.salesSummary;
     // Stock is a "right now" figure, not a period one, but the owner asks for it in the
     // same breath ("omborxonada qolgan umumiy summa"), so a period report carries it.
-    const stock = await this.getStockValue();
+    // Expenses/investment come from a completely different Billz auth mechanism (the
+    // owner's own logged-in session, not the integration token — see billzGlService.js's
+    // doc comment) and fail soft (isRealData:false) rather than erroring the whole report
+    // when that session isn't configured yet, so sales-only reports keep working.
+    const billzGlService = require('./billzGlService');
+    const [stock, expensesRes, investmentRes] = await Promise.all([
+      this.getStockValue(),
+      billzGlService.getExpensesForPeriod(period.startDate, period.endDate),
+      billzGlService.getInvestmentForPeriod(period.startDate, period.endDate)
+    ]);
+
+    const netProfit = billzGlService.computeNetProfit(
+      s.netRevenueUZS,
+      expensesRes.isRealData ? expensesRes.totalExpenses : null
+    );
 
     return {
       success: true,
@@ -604,7 +618,13 @@ class BillzClientService {
         returnedProductsList: s.returnedProductsList,
         netSales: s.netRevenueUZS,
         formattedNetSales: s.formattedNetRevenue,
-        stock
+        stock,
+        expenses: expensesRes.isRealData ? expensesRes.expenses : null,
+        totalExpenses: expensesRes.isRealData ? expensesRes.totalExpenses : null,
+        expensesByCategory: expensesRes.isRealData ? expensesRes.byCategory : null,
+        dailyExpenseBreakdown: expensesRes.isRealData ? expensesRes.dailyExpenseBreakdown : null,
+        inventoryInvestment: investmentRes.isRealData ? investmentRes.totalInvestment : null,
+        netProfit
       },
       rawSalesSummary: s
     };

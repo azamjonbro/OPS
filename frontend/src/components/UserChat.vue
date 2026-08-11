@@ -503,6 +503,23 @@
                 </button>
               </div>
 
+              <!-- Quick-reply suggestions: a tool call found nothing / failed, offer
+                   clickable alternatives instead of a dead end. Unlike the disambiguation
+                   buttons above (which bypass the AI, resolveSend already knows the exact
+                   chatId), clicking one of these resubmits the label as a normal user
+                   message so the AI actually interprets the choice. -->
+              <div v-if="msg.quickReplyOptions && msg.quickReplyOptions.length" class="flex flex-wrap gap-2 pt-1">
+                <button
+                  v-for="(opt, oi) in msg.quickReplyOptions"
+                  :key="oi"
+                  @click="sendQuickReply(msg, opt)"
+                  :disabled="msg.quickReplyResolved"
+                  class="px-3.5 py-2 rounded-xl border border-indigo-500/40 bg-indigo-600/10 text-indigo-300 hover:bg-indigo-600/20 hover:text-white text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+
               <!-- Assistant Message Action Toolbar (Nusxalash, Javob berish, Qayta tahlil qilish) -->
               <div class="flex items-center gap-2 transition-all duration-200 text-xs font-semibold select-none pt-1">
                 <button 
@@ -1635,7 +1652,8 @@ export default {
           content: data.assistantResponse,
           toolCalls: JSON.stringify(data.executedTools || []),
           clarificationOptions: data.clarificationOptions || null,
-          pendingSendText: data.pendingSendText || ''
+          pendingSendText: data.pendingSendText || '',
+          quickReplyOptions: data.quickReplyOptions || null
         });
 
         if (data.executedTools && data.executedTools.some(t => t.tool && t.tool.includes('calendar'))) {
@@ -1656,6 +1674,13 @@ export default {
         this.loadingStepText = '';
         this.scrollToBottom();
       }
+    },
+    /** Clicking a quick-reply suggestion resubmits its label as a normal user message, through the exact same pipeline as typing it — so the AI, not this click handler, interprets the choice. */
+    sendQuickReply(msg, option) {
+      if (msg.quickReplyResolved || this.isLoading) return;
+      msg.quickReplyResolved = true;
+      this.inputQuery = option.label;
+      this.sendMessage();
     },
     async resolveClarification(msg, option) {
       if (msg.clarificationResolved || this.isLoading) return;

@@ -5,7 +5,7 @@ const IntegrationSchema = new mongoose.Schema({
     type: String, 
     required: true, 
     unique: true,
-    enum: ['TELEGRAM', 'TELEGRAM_BUSINESS', 'TELEGRAM_USERBOT', 'BILLZ', 'NOTION', 'GMAIL', 'CALENDAR', 'SLACK', 'WHATSAPP']
+    enum: ['TELEGRAM', 'TELEGRAM_BUSINESS', 'TELEGRAM_USERBOT', 'BILLZ', 'BILLZ_ADMIN_SESSION', 'NOTION', 'GMAIL', 'CALENDAR', 'SLACK', 'WHATSAPP']
   },
   name: { type: String, required: true },
   status: { type: String, enum: ['CONNECTED', 'DISCONNECTED', 'ERROR'], default: 'CONNECTED' },

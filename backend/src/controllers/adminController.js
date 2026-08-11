@@ -77,6 +77,18 @@ const updateIntegration = async (req, res) => {
     });
   }
 
+  // Same reasoning as TELEGRAM_BUSINESS above — a real login round-trip before reporting
+  // success, since a silently-saved wrong password would surface only much later, as a
+  // confusing failure deep inside a scheduled report or expense query.
+  if (type.toUpperCase() === 'BILLZ_ADMIN_SESSION') {
+    const billzAdminSessionService = require('../services/billzAdminSessionService');
+    const result = await billzAdminSessionService.login(credentials && credentials.phone, credentials && credentials.password);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    return res.json({ success: true, message: `Billz admin sessiyasi ulandi (${billzAdminSessionService.phone})` });
+  }
+
   const connector = connectorRegistry.get(type);
   if (connector) {
     connector.connect(credentials, settings);
@@ -112,6 +124,12 @@ const disconnectIntegration = async (req, res) => {
   if (type === 'TELEGRAM_BUSINESS') {
     const telegramBusinessService = require('../services/telegramBusinessService');
     const result = await telegramBusinessService.disconnect();
+    return res.json(result);
+  }
+
+  if (type === 'BILLZ_ADMIN_SESSION') {
+    const billzAdminSessionService = require('../services/billzAdminSessionService');
+    const result = await billzAdminSessionService.disconnect();
     return res.json(result);
   }
 

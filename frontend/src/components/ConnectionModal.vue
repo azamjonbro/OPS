@@ -50,6 +50,21 @@
         </div>
       </div>
 
+      <!-- Billz Admin Session Fields -->
+      <div v-else-if="integration?.type === 'BILLZ_ADMIN_SESSION'" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-300 mb-1">Telefon raqam</label>
+          <input v-model="formData.phone" type="text" placeholder="+998901234567" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-300 mb-1">Parol</label>
+          <input v-model="formData.password" type="password" placeholder="••••••••" class="w-full bg-sunken border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+        </div>
+        <p class="text-[11px] text-gray-400 leading-relaxed">
+          Bu sizning shaxsiy hadiya.billz.io login hisobingiz — xarajatlar, sof foyda va tovar investitsiyasi (kassa) ma'lumotlariga kirish uchun kerak, chunki oddiy Billz API tokeni bu ma'lumotlarga ruxsatga ega emas.
+        </p>
+      </div>
+
       <!-- Notion Fields -->
       <div v-else-if="integration?.type === 'NOTION'" class="space-y-3">
         <div>
@@ -94,7 +109,9 @@ export default {
         storeId: '',
         integrationToken: '',
         databaseId: '',
-        apiToken: ''
+        apiToken: '',
+        phone: '',
+        password: ''
       }
     };
   },
