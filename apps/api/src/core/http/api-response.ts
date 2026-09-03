@@ -1,0 +1,58 @@
+import type { Request, Response } from 'express';
+import type {
+  ApiResponseMeta,
+  ApiSuccessResponse,
+  PaginatedResult,
+  PaginationMeta,
+} from '@hadiya/shared';
+
+import { HTTP_STATUS, type HttpStatus } from './http-status.js';
+
+export const buildResponseMeta = (req: Request): ApiResponseMeta => ({
+  requestId: req.id,
+  timestamp: new Date().toISOString(),
+});
+
+export interface SendSuccessOptions {
+  status?: HttpStatus;
+}
+
+/**
+ * The only way a controller writes a successful body, so every endpoint shares
+ * one envelope shape.
+ */
+export const sendSuccess = <TData>(
+  req: Request,
+  res: Response,
+  data: TData,
+  options: SendSuccessOptions = {},
+): void => {
+  const body: ApiSuccessResponse<TData> = {
+    success: true,
+    data,
+    meta: buildResponseMeta(req),
+  };
+
+  res.status(options.status ?? HTTP_STATUS.OK).json(body);
+};
+
+export const sendCreated = <TData>(req: Request, res: Response, data: TData): void => {
+  sendSuccess(req, res, data, { status: HTTP_STATUS.CREATED });
+};
+
+export const sendNoContent = (res: Response): void => {
+  res.status(HTTP_STATUS.NO_CONTENT).end();
+};
+
+export interface PaginatedData<TItem> {
+  items: TItem[];
+  pagination: PaginationMeta;
+}
+
+export const sendPaginated = <TItem>(
+  req: Request,
+  res: Response,
+  result: PaginatedResult<TItem>,
+): void => {
+  sendSuccess<PaginatedData<TItem>>(req, res, result);
+};
