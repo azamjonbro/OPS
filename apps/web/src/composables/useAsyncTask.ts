@@ -1,4 +1,4 @@
-import { readonly, ref, type DeepReadonly, type Ref } from 'vue';
+import { readonly, ref, type Ref } from 'vue';
 
 import { toErrorMessage } from '@/services/api-error';
 
@@ -45,5 +45,3 @@ export const useAsyncTask = <TResult, TArgs extends unknown[]>(
     run,
   };
 };
-
-export type { DeepReadonly };
