@@ -1,0 +1,51 @@
+#!/bin/sh
+# Hadiya 2.0 — sirlarni commit qilishdan himoya.
+# Yoqish:  git config core.hooksPath .githooks
+# Chetlab o'tish (faqat zarur bo'lsa):  git commit --no-verify
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# --- 1. .env fayllarni bloklash (.env.example dan tashqari) ----------------
+for f in $staged; do
+  base=$(basename "$f")
+  case "$base" in
+    .env.example) continue ;;
+    .env|.env.*|*.env)
+      echo "BLOKLANDI: '$f' — .env fayllar commit qilinmaydi."
+      fail=1
+      ;;
+  esac
+done
+
+# --- 2. Sir patternlarini qidirish ------------------------------------------
+patterns='sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{20}
+sk-proj-[A-Za-z0-9_-]{40}
+sk-[A-Za-z0-9]{48}
+ntn_[A-Za-z0-9]{30}
+secret_[A-Za-z0-9]{40}
+gh[pousr]_[A-Za-z0-9]{36}
+AKIA[0-9A-Z]{16}
+[0-9]{8,10}:AA[A-Za-z0-9_-]{32}
+-----BEGIN [A-Z ]*PRIVATE KEY-----'
+
+for f in $staged; do
+  [ -f "$f" ] || continue
+  echo "$patterns" | while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    if git show ":$f" 2>/dev/null | grep -qE -e "$p"; then
+      echo "BLOKLANDI: '$f' ichida sirga o'xshash qiymat bor (pattern: $p)"
+      exit 9
+    fi
+  done
+  [ $? -eq 9 ] && fail=1
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Commit to'xtatildi. Sirlarni .env ga ko'chiring (.env gitignore qilingan)."
+  echo "Agar bu false positive bo'lsa:  git commit --no-verify"
+  exit 1
+fi
+exit 0

@@ -1,2 +1,51 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+apps/web/.vite/
+coverage/
+
+# ---------------------------------------------------------------------------
+# SIRLAR — hech qanday .env fayl commit qilinmaydi.
+# Yagona istisno: .env.example (faqat placeholder qiymatlar bilan).
+# ---------------------------------------------------------------------------
 .env
-.env.dev
+.env.*
+*.env
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# kalitlar / sertifikatlar
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+secrets/
+credentials.json
+service-account*.json
+
+# telegram / session fayllar
+*.session
+*.session-journal
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# local runtime data
+.data/
+tmp/
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
