@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+/* Design tokens. Tailwind v4 generates utilities (bg-brand-600, text-ink-500…)
+   from these, so colours are defined once and never hard-coded in components. */
+@theme {
+  --color-brand-50: oklch(0.97 0.02 275);
+  --color-brand-100: oklch(0.93 0.05 275);
+  --color-brand-200: oklch(0.87 0.09 275);
+  --color-brand-300: oklch(0.79 0.13 275);
+  --color-brand-400: oklch(0.7 0.17 275);
+  --color-brand-500: oklch(0.62 0.2 275);
+  --color-brand-600: oklch(0.55 0.21 275);
+  --color-brand-700: oklch(0.47 0.19 275);
+  --color-brand-800: oklch(0.39 0.15 275);
+  --color-brand-900: oklch(0.32 0.11 275);
+
+  --color-surface: oklch(1 0 0);
+  --color-surface-muted: oklch(0.98 0.003 275);
+  --color-border-subtle: oklch(0.92 0.005 275);
+
+  --color-ink-500: oklch(0.55 0.02 275);
+  --color-ink-700: oklch(0.38 0.02 275);
+  --color-ink-900: oklch(0.22 0.02 275);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--color-surface-muted);
+    color: var(--color-ink-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+}
