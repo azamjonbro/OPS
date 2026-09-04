@@ -3,8 +3,8 @@ import type { Entity } from './entity.js';
 
 /** On-hand stock for one product at one branch. */
 export interface InventoryItem extends Entity {
-  productId: string;
-  branchId: string;
+  product: string;
+  branch: string;
   quantity: number;
 }
 
@@ -14,8 +14,8 @@ export interface InventoryItem extends Entity {
  * audited without recomputing from the beginning.
  */
 export interface InventoryMovement extends Entity {
-  productId: string;
-  branchId: string;
+  product: string;
+  branch: string;
   type: InventoryMovementType;
   quantity: number;
   balanceAfter: number;
@@ -25,8 +25,8 @@ export interface InventoryMovement extends Entity {
     id: string | null;
   };
   note: string | null;
-  /** Employee who caused the movement. */
-  createdById: string;
+  /** Id of the employee who caused the movement. */
+  createdBy: string;
   /** ISO-8601. */
   occurredAt: string;
 }

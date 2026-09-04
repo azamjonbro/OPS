@@ -7,8 +7,8 @@ export interface Customer extends Entity {
   phone: string;
   notes: string | null;
   status: CustomerStatus;
-  /** Branch the customer is registered at, or `null` for organisation-wide. */
-  branchId: string | null;
+  /** Id of the branch the customer is registered at; `null` is organisation-wide. */
+  branch: string | null;
   /**
    * Outstanding debt in minor units: positive means the customer owes money.
    * Maintained only by the sale and payment services, never set directly.

@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, LoginCredentials } from '@hadiya/shared';
+import type { LoginCredentials, User } from '@hadiya/shared';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
@@ -6,7 +6,7 @@ import { authService } from '@/services/auth.service';
 import { tokenStorage } from '@/services/token-storage';
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<AuthenticatedUser | null>(null);
+  const user = ref<User | null>(null);
   const hasToken = ref(tokenStorage.read() !== null);
   const isRestoring = ref(false);
 

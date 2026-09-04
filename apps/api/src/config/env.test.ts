@@ -23,9 +23,18 @@ const baseEnv: Env = {
   JWT_REFRESH_SECRET: undefined,
   JWT_ACCESS_TTL: '15m',
   JWT_REFRESH_TTL: '30d',
-  BILLZ_BASE_URL: undefined,
+  BILLZ_BASE_URL: 'https://api-admin.billz.ai',
   BILLZ_API_TOKEN: undefined,
+  BILLZ_TIMEOUT_MS: 15_000,
+  BILLZ_MAX_RETRIES: 2,
+  BILLZ_SHOP_IDS: [],
   OPENAI_API_KEY: undefined,
+  AI_PROVIDER: undefined,
+  AI_MODEL: undefined,
+  AI_BASE_URL: undefined,
+  AI_TIMEOUT_MS: 60_000,
+  AI_MAX_RETRIES: 2,
+  AI_MAX_OUTPUT_TOKENS: 4_096,
   ANTHROPIC_API_KEY: undefined,
   TELEGRAM_BOT_TOKEN: undefined,
 };
@@ -38,19 +47,16 @@ describe('buildConfig', () => {
     expect(built.app.isDevelopment).toBe(false);
   });
 
-  it('marks an integration as unconfigured until every credential is present', () => {
+  it('treats Billz as unconfigured until the secret token is present', () => {
+    // The host has a working default, so the token is the only thing missing.
     expect(buildConfig(baseEnv).integrations.billz.configured).toBe(false);
     expect(
-      buildConfig({ ...baseEnv, BILLZ_BASE_URL: 'https://api.billz.test' }).integrations.billz
-        .configured,
-    ).toBe(false);
-    expect(
-      buildConfig({
-        ...baseEnv,
-        BILLZ_BASE_URL: 'https://api.billz.test',
-        BILLZ_API_TOKEN: 'token',
-      }).integrations.billz.configured,
+      buildConfig({ ...baseEnv, BILLZ_API_TOKEN: 'secret' }).integrations.billz.configured,
     ).toBe(true);
+  });
+
+  it('keeps the documented Billz host as the default', () => {
+    expect(buildConfig(baseEnv).integrations.billz.baseUrl).toBe('https://api-admin.billz.ai');
   });
 
   it('reports a real package version', () => {
@@ -67,6 +73,29 @@ describe('loadEnv', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+  });
+
+  it('applies every default when nothing at all is set', async () => {
+    const { parseEnv } = await import('./env.js');
+
+    // A fresh deployment sets only what it must; everything else has to fall
+    // back rather than fail validation.
+    const env = parseEnv({ NODE_ENV: 'test' });
+
+    expect(env.CORS_ORIGINS).toEqual(['http://localhost:5173']);
+    expect(env.TRUST_PROXY).toBe(false);
+    expect(env.LOG_LEVEL).toBe('info');
+    expect(env.BILLZ_SHOP_IDS).toEqual([]);
+    expect(env.BILLZ_BASE_URL).toBe('https://api-admin.billz.ai');
+    expect(env.BILLZ_MAX_RETRIES).toBe(2);
+  });
+
+  it('reads a comma-separated list into trimmed entries', async () => {
+    const { parseEnv } = await import('./env.js');
+
+    expect(
+      parseEnv({ NODE_ENV: 'test', BILLZ_SHOP_IDS: 'shop-1, shop-2 ,' }).BILLZ_SHOP_IDS,
+    ).toEqual(['shop-1', 'shop-2']);
   });
 
   it('rejects a production environment without JWT secrets', async () => {

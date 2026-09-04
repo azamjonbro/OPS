@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, LoginCredentials, LoginResult } from '@hadiya/shared';
+import type { LoginCredentials, LoginResult, User } from '@hadiya/shared';
 
 import { api } from './http';
 
@@ -11,5 +11,5 @@ export const authService = {
   login: (credentials: LoginCredentials): Promise<LoginResult> =>
     api.post<LoginResult>('/v1/auth/login', credentials),
   logout: (): Promise<void> => api.post<void>('/v1/auth/logout'),
-  currentUser: (): Promise<AuthenticatedUser> => api.get<AuthenticatedUser>('/v1/auth/me'),
+  currentUser: (): Promise<User> => api.get<User>('/v1/auth/me'),
 };

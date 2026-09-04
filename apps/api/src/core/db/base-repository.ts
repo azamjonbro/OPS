@@ -70,7 +70,7 @@ export abstract class BaseRepository<TDocument> {
 
   async updateById(id: string, update: UpdateQuery<TDocument>): Promise<TDocument | null> {
     return this.model
-      .findByIdAndUpdate(id, update, { new: true, runValidators: true })
+      .findByIdAndUpdate(id, update, { returnDocument: 'after', runValidators: true })
       .lean<TDocument | null>()
       .exec();
   }

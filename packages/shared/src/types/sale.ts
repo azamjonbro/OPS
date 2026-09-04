@@ -6,11 +6,12 @@ import type { Entity, MinorUnits } from './entity.js';
  *
  * `name`, `sku` and the prices are snapshots taken when the sale was made: a
  * receipt must keep showing what was actually charged even after the product is
- * renamed, repriced or deactivated. `productId` still links to the live product,
+ * renamed, repriced or deactivated. `product` still links to the live product,
  * so nothing else is duplicated.
  */
 export interface SaleItem {
-  productId: string;
+  /** Id of the product that was sold. */
+  product: string;
   name: string;
   sku: string;
   unitPrice: MinorUnits;
@@ -35,11 +36,11 @@ export interface SaleTotals {
 export interface Sale extends Entity {
   /** Human-readable receipt number, unique per branch and day. */
   number: string;
-  branchId: string;
-  /** Employee who rang up the sale. */
-  employeeId: string;
+  branch: string;
+  /** Id of the employee who rang up the sale. */
+  employee: string;
   /** `null` for an anonymous walk-in. */
-  customerId: string | null;
+  customer: string | null;
   items: SaleItem[];
   totals: SaleTotals;
   status: SaleStatus;

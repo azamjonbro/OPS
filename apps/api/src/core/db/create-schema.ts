@@ -27,6 +27,11 @@ export interface CreateSchemaOptions {
  * Replaces `_id` with a string `id` so persistence details never reach the
  * wire, and drops `__v`.
  *
+ * Applied to `toJSON` only. `toObject` is how server code turns a hydrated
+ * document into a plain one — services and repositories go on reading `_id`
+ * there, and the response layer (`toApiPayload`) does the renaming for every
+ * payload, lean reads included.
+ *
  * Both parameters are `unknown` because Mongoose describes the transform's
  * arguments with conditional types over the schema's document type; while
  * `TDocument` is still generic those stay unresolved, and nothing narrower is
@@ -57,7 +62,6 @@ export const createSchema = <TDocument>(
   });
 
   schema.set('toJSON', serialization);
-  schema.set('toObject', serialization);
 
   return schema;
 };

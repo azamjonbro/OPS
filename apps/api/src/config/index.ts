@@ -10,8 +10,24 @@ export interface IntegrationConfig {
 }
 
 export interface BillzConfig extends IntegrationConfig {
-  baseUrl: string | undefined;
+  baseUrl: string;
   apiToken: string | undefined;
+  timeoutMs: number;
+  maxRetries: number;
+  /** Shops every read is restricted to; empty means the whole company. */
+  shopIds: string[];
+}
+
+/** Which model answers, and how patiently. */
+export interface AiConfig {
+  /** Explicit choice, or `null` to let the configured key decide. */
+  provider: 'openai' | 'anthropic' | null;
+  /** Empty means the provider's own default. */
+  model: string | null;
+  baseUrl: string | null;
+  timeoutMs: number;
+  maxRetries: number;
+  maxOutputTokens: number;
 }
 
 export interface AppConfig {
@@ -53,6 +69,7 @@ export interface AppConfig {
    * read here so a module can be switched on without touching the bootstrap;
    * none of these integrations are implemented yet.
    */
+  ai: AiConfig;
   integrations: {
     billz: BillzConfig;
     openai: IntegrationConfig & { apiKey: string | undefined };
@@ -113,11 +130,23 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     accessTtl: env.JWT_ACCESS_TTL,
     refreshTtl: env.JWT_REFRESH_TTL,
   },
+  ai: {
+    provider: env.AI_PROVIDER ?? null,
+    model: env.AI_MODEL ?? null,
+    baseUrl: env.AI_BASE_URL ?? null,
+    timeoutMs: env.AI_TIMEOUT_MS,
+    maxRetries: env.AI_MAX_RETRIES,
+    maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+  },
   integrations: {
     billz: {
       baseUrl: env.BILLZ_BASE_URL,
       apiToken: env.BILLZ_API_TOKEN,
-      configured: Boolean(env.BILLZ_BASE_URL && env.BILLZ_API_TOKEN),
+      timeoutMs: env.BILLZ_TIMEOUT_MS,
+      maxRetries: env.BILLZ_MAX_RETRIES,
+      shopIds: env.BILLZ_SHOP_IDS,
+      // The base URL has a default, so the token is what decides this.
+      configured: Boolean(env.BILLZ_API_TOKEN),
     },
     openai: { apiKey: env.OPENAI_API_KEY, configured: Boolean(env.OPENAI_API_KEY) },
     anthropic: { apiKey: env.ANTHROPIC_API_KEY, configured: Boolean(env.ANTHROPIC_API_KEY) },

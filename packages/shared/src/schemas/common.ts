@@ -21,6 +21,18 @@ export const paginationQuerySchema = z.object({
 
 export type PaginationQuery = z.output<typeof paginationQuerySchema>;
 
+/**
+ * Query-string values are always strings, so a flag arrives as `"true"`, not a
+ * boolean. Anything else is a validation error rather than a silent `false`.
+ */
+export const booleanQuerySchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
+  z.enum(['true', 'false', '1', '0']).transform((value) => value === 'true' || value === '1'),
+);
+
+/** Accepts an ISO-8601 date or date-time in a query string. */
+export const dateQuerySchema = z.coerce.date();
+
 export const idParamSchema = z.object({ id: objectIdSchema });
 
 export type IdParam = z.output<typeof idParamSchema>;

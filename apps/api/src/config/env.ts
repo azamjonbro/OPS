@@ -13,19 +13,35 @@ const booleanFromString = z.preprocess(
   z.enum(['true', 'false', '1', '0']).transform((value) => value === 'true' || value === '1'),
 );
 
-const commaSeparatedList = z.preprocess(
-  blankToUndefined,
-  z.string().transform((value) =>
-    value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0),
-  ),
-);
+/**
+ * A flag with a fallback.
+ *
+ * The fallback is applied in the preprocess step rather than with `.default()`:
+ * a default sits *after* the pipe, so an unset variable would reach the inner
+ * schema as `undefined` and fail validation instead of falling back.
+ */
+const booleanFromEnv = (fallback: boolean) =>
+  z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim() !== ''
+        ? value.trim().toLowerCase()
+        : String(fallback),
+    z.enum(['true', 'false', '1', '0']).transform((value) => value === 'true' || value === '1'),
+  );
+
+/** A comma-separated list with a fallback, applied for the same reason. */
+const commaSeparatedList = (fallback: readonly string[] = []) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() !== '' ? value : fallback.join(',')),
+    z.string().transform((value) =>
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    ),
+  );
 
 const optionalSecret = z.preprocess(blankToUndefined, z.string().min(1).optional());
-
-const optionalUrl = z.preprocess(blankToUndefined, z.url().optional());
 
 const envSchema = z
   .object({
@@ -34,10 +50,10 @@ const envSchema = z
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     API_BASE_PATH: z.string().startsWith('/').default('/api'),
-    CORS_ORIGINS: commaSeparatedList.default(['http://localhost:5173']),
+    CORS_ORIGINS: commaSeparatedList(['http://localhost:5173']),
     BODY_LIMIT: z.string().min(1).default('1mb'),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
-    TRUST_PROXY: booleanFromString.default(false),
+    TRUST_PROXY: booleanFromEnv(false),
 
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -56,10 +72,24 @@ const envSchema = z
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
     JWT_REFRESH_TTL: z.string().min(1).default('30d'),
 
-    BILLZ_BASE_URL: optionalUrl,
+    // Both the in-repo legacy client and the published Billz v2 wrapper use
+    // this host; it is overridable because Billz issues per-region hosts.
+    BILLZ_BASE_URL: z.preprocess(blankToUndefined, z.url().default('https://api-admin.billz.ai')),
     BILLZ_API_TOKEN: optionalSecret,
+    BILLZ_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(15_000),
+    BILLZ_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+    /** Restricts every read to these Billz shops. Empty means the whole company. */
+    BILLZ_SHOP_IDS: commaSeparatedList(),
     OPENAI_API_KEY: optionalSecret,
     ANTHROPIC_API_KEY: optionalSecret,
+    /** Which vendor to use. Left unset, the configured key decides. */
+    AI_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai', 'anthropic']).optional()),
+    /** Overrides the provider's default model. */
+    AI_MODEL: z.preprocess(blankToUndefined, z.string().min(1).max(80).optional()),
+    AI_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
+    AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
+    AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+    AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(32_000).default(4_096),
     TELEGRAM_BOT_TOKEN: optionalSecret,
   })
   .superRefine((value, ctx) => {
@@ -99,13 +129,11 @@ const formatIssues = (error: z.ZodError): string =>
     .join('\n');
 
 /**
- * Parses the environment once at startup. A misconfigured process must fail
- * immediately and loudly rather than at the first request that needs the value.
+ * Validates one set of variables. Pure, so the defaults and the production
+ * rules can be tested without a file on disk or a mutated `process.env`.
  */
-export const loadEnv = (): Env => {
-  loadEnvFiles();
-
-  const result = envSchema.safeParse(process.env);
+export const parseEnv = (source: Record<string, string | undefined>): Env => {
+  const result = envSchema.safeParse(source);
 
   if (!result.success) {
     console.error(`Invalid environment configuration:\n${formatIssues(result.error)}`);
@@ -113,4 +141,14 @@ export const loadEnv = (): Env => {
   }
 
   return result.data;
+};
+
+/**
+ * Parses the environment once at startup. A misconfigured process must fail
+ * immediately and loudly rather than at the first request that needs the value.
+ */
+export const loadEnv = (): Env => {
+  loadEnvFiles();
+
+  return parseEnv(process.env);
 };

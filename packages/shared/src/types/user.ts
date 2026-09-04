@@ -12,8 +12,8 @@ export interface User extends Entity {
   role: UserRole;
   status: UserStatus;
   phone: string | null;
-  /** Branch the employee works at; `null` means organisation-wide. */
-  branchId: string | null;
+  /** Id of the branch the employee works at; `null` means organisation-wide. */
+  branch: string | null;
   /** ISO-8601, or `null` if the account has never signed in. */
   lastLoginAt: string | null;
 }

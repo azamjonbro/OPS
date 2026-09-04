@@ -3,8 +3,9 @@
  *
  * The API stores `_id` and Date objects; the response serializer renames `_id`
  * to `id` and JSON encodes dates as ISO-8601 strings. These types describe what
- * a client actually receives, so a reference is always a string id — never a
- * populated document unless a type says so explicitly.
+ * a client actually receives. Reference fields keep the name they have in the
+ * database (`branch`, `category`, `product`) and always hold a string id — the
+ * API does not populate them.
  */
 export interface Identified {
   id: string;

@@ -6,17 +6,18 @@ import type { Entity, MinorUnits } from './entity.js';
  * sale (settling that receipt) or stands alone (settling accumulated debt).
  */
 export interface Payment extends Entity {
-  branchId: string;
-  saleId: string | null;
-  customerId: string | null;
+  branch: string;
+  /** Receipt this payment settles, when it is tied to one. */
+  sale: string | null;
+  customer: string | null;
   amount: MinorUnits;
   method: PaymentMethod;
   direction: PaymentDirection;
   status: PaymentStatus;
   /** Card terminal slip, transfer id, or any external reference. */
   reference: string | null;
-  /** Employee who took the payment. */
-  receivedById: string;
+  /** Id of the employee who took the payment. */
+  receivedBy: string;
   /** ISO-8601. */
   paidAt: string;
 }
