@@ -22,6 +22,12 @@ export const navigationSections: NavigationSection[] = [
         icon: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
       },
       {
+        label: 'Content',
+        module: 'content',
+        to: { name: 'content-plans' },
+        icon: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5',
+      },
+      {
         label: 'Assistant',
         module: 'assistant',
         to: null,

@@ -232,10 +232,7 @@ export const createContentPlanTool: RegisteredTool = {
       summary: [
         `Saved a ${result.items.length}-day plan: ${describePlan(result.plan)}.`,
         `Days: ${result.items
-          .map(
-            (item, index) =>
-              `${index + 1}) ${item.contentType} — ${item.title}`,
-          )
+          .map((item, index) => `${index + 1}) ${item.contentType} — ${item.title}`)
           .join('; ')}`,
       ].join(' '),
       data: {
@@ -264,7 +261,13 @@ export const listContentPlansTool: RegisteredTool = {
   schema: z.object({
     status: z.enum(CONTENT_PLAN_STATUSES).optional(),
     platform: z.enum(CONTENT_PLATFORMS).optional(),
-    search: z.string().trim().min(1).max(80).optional().describe('Matches the title or description'),
+    search: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .optional()
+      .describe('Matches the title or description'),
     limit: z.number().int().min(1).max(50).default(10),
   }),
   execute: async (args, context) => {
@@ -307,7 +310,9 @@ export const getContentPlanTool: RegisteredTool = {
     return {
       summary: [
         describePlan(plan),
-        plan.items.length > 0 ? `Days: ${plan.items.map(describeItem).join(' | ')}` : 'No days yet.',
+        plan.items.length > 0
+          ? `Days: ${plan.items.map(describeItem).join(' | ')}`
+          : 'No days yet.',
       ].join(' '),
       data: { ...summarisePlan(plan), items: plan.items.map(summariseItem) },
     };

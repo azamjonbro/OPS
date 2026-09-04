@@ -20,7 +20,7 @@ const status = computed(() => health.data.value?.status ?? 'unknown');
 const dependencies = computed(() => health.data.value?.dependencies ?? []);
 
 /** The delivered surface, so the roadmap below is never out of step with it. */
-const implementedModules = new Set<string>(['reports', 'reminders', 'notifications']);
+const implementedModules = new Set<string>(['reports', 'reminders', 'notifications', 'content']);
 const roadmap = computed(() =>
   APP_MODULES.map((module) => ({ name: module, implemented: implementedModules.has(module) })),
 );

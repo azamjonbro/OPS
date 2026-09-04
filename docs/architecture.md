@@ -385,7 +385,58 @@ actor's id, so a stranger's id match is impossible rather than merely rejected. 
 functions take no actor because no user is making the request; they are reachable only from a job
 the process itself enqueued.
 
-## 14. Known gaps entering the next phase
+## 14. Content engine (phase 7)
+
+Two collections, and the split between them is the central decision. A `ContentPlan` is the
+campaign; a `ContentItem` is one day. Items are not embedded, because a plan is edited one day at a
+time — "3-kunni o'zgartir", "captionni qisqartir" — and embedding would turn each of those into a
+rewrite of the whole document, re-validated in full, with two people editing different days able to
+clobber each other.
+
+**Generation is a second call, not the agent's own words.** The conversational agent runs a tool
+loop and produces prose; `generateStructured` runs a single call with no tools and produces an
+object of a known shape. Merging them would mean the tool-calling loop also had to be a JSON
+validator, and a plan improvised as tool arguments is exactly the thing that would not satisfy a
+schema. So a generating tool makes its own structured call inside itself — which is why a scripted
+provider answers twice per turn in the tests.
+
+**Nothing unvalidated is stored.** A reply is parsed with narrow recovery — a code fence removed,
+prose either side ignored, a trailing comma dropped — then validated against a Zod schema. Recovery
+never guesses at content: it fixes packaging and syntax with one possible reading, and stops. A
+failure is retried _once_ with the validation errors handed back, which fixes the common case
+without turning a failing prompt into unbounded spend, and then becomes a controlled `503`.
+
+**The model counts days, the service works out dates.** Generated items carry a `dayOffset`, not a
+date. Models are unreliable at calendars and reliable at ordering, and the indirection also means a
+generated plan can be moved later without asking the model anything.
+
+**Editing is by field.** `updateItem` writes only the fields it is given, and `regenerateItem` takes
+a `fields` list — so "hashtaglarni yangila" replaces the hashtags and leaves the caption the person
+already approved. The model is still shown the whole item, so its rewrite stays coherent; only the
+named fields are written back. A rewritten `ready` item drops to `draft`, because the copy is no
+longer the version that was approved.
+
+**Business facts are passed in, never fetched.** The content module never queries products or sales.
+The assistant decides whether a plan should be based on what is selling, gathers it with
+`get_sales_summary` or `get_products`, and passes it as `businessContext`. Otherwise every "write me
+a caption" would silently run a catalogue read, and the data in a plan would be data nobody asked
+for.
+
+**Preferences come from active memory only.** Language, tone, style, platform, brand voice and
+audience are read from Phase 5 memory with `status: 'active'`. A `pending` memory is something the
+assistant guessed and nobody confirmed; a `deleted` one was explicitly dropped. Letting either shape
+a caption would reintroduce it with nothing on screen to explain why the tone changed. Every field
+is nullable and nothing is defaulted — a missing tone means the model is told no tone.
+
+**Confirmation is enforced by the registry.** `requiresConfirmation` on a tool makes `ToolRegistry`
+refuse to run it until the validated arguments carry `confirm: true`, returning a
+`needs_confirmation` status carrying `describeConfirmation`'s summary. The guard lives in the
+registry rather than in each tool so a new destructive tool cannot forget it, and the description is
+read from the database _after_ validation, so the person is told what would actually go rather than
+what the model believed it had selected. That read is scoped like every other, so proposing to
+delete somebody else's plan fails as "not found" and never leaks the title.
+
+## 15. Known gaps entering the next phase
 
 - Refresh tokens are stateless and cannot be revoked before they expire; signing out is a
   client-side discard. A denylist belongs in the auth module before multi-device use matters.
@@ -403,6 +454,11 @@ the process itself enqueued.
 - Billz exposes no expenses, sales reports, warehouses, suppliers or purchase data to an API-key
   credential (`docs/billz-api.md`), so those parts of the domain can only come from Hadiya's own
   records.
+- Content is never published anywhere: the engine plans and writes, and `published` is a claim the
+  user makes rather than something Hadiya observes. There are no platform integrations.
+- Image generation is not implemented, so an item describes what to shoot and carries no asset.
+- A generated plan costs one model call per request and there is no caching, so regenerating the
+  same brief pays twice.
 - Telegram and e-mail are declared notification channels with no working provider: delivery needs a
   chat id or address per employee, so everything arrives in-app for now.
 - The scheduler polls every fifteen seconds, which bounds how precisely a reminder fires; a job due

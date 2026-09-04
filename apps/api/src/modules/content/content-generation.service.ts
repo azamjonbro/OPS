@@ -67,8 +67,7 @@ export interface GenerationDependencies {
 const resolvePreferences = async (
   actor: AuthenticatedUser,
   dependencies: GenerationDependencies,
-): Promise<ContentPreferences> =>
-  dependencies.preferences ?? (await loadContentPreferences(actor));
+): Promise<ContentPreferences> => dependencies.preferences ?? (await loadContentPreferences(actor));
 
 export interface GeneratePlanInput {
   /** What the plan is for, in the user's own words. */
@@ -107,12 +106,13 @@ export const generatePlan = async (
   input: GeneratePlanInput,
   dependencies: GenerationDependencies = {},
 ): Promise<GeneratedPlanResult> => {
-  const days = Math.min(Math.max(input.days ?? CONTENT_PLAN_DEFAULT_DAYS, 1), CONTENT_PLAN_MAX_DAYS);
+  const days = Math.min(
+    Math.max(input.days ?? CONTENT_PLAN_DEFAULT_DAYS, 1),
+    CONTENT_PLAN_MAX_DAYS,
+  );
   const platform = input.platform ?? 'instagram';
   const preferences = await resolvePreferences(actor, dependencies);
-  const startDate = contentService.toDay(
-    input.startDate ?? dependencies.now ?? new Date(),
-  );
+  const startDate = contentService.toDay(input.startDate ?? dependencies.now ?? new Date());
 
   const outcome: GenerationOutcome<GeneratedPlan> = await generateStructured({
     brief: buildPlanBrief({
@@ -148,7 +148,14 @@ export const generatePlan = async (
   }));
 
   if (input.save === false) {
-    return { plan: null, items, generated: outcome.data, preferences, model: outcome.model, attempts: outcome.attempts };
+    return {
+      plan: null,
+      items,
+      generated: outcome.data,
+      preferences,
+      model: outcome.model,
+      attempts: outcome.attempts,
+    };
   }
 
   const plan = await contentService.createPlan(actor, {
@@ -175,7 +182,14 @@ export const generatePlan = async (
     'content plan generated',
   );
 
-  return { plan, items, generated: outcome.data, preferences, model: outcome.model, attempts: outcome.attempts };
+  return {
+    plan,
+    items,
+    generated: outcome.data,
+    preferences,
+    model: outcome.model,
+    attempts: outcome.attempts,
+  };
 };
 
 /** Only the preferences that were actually applied land in the record. */

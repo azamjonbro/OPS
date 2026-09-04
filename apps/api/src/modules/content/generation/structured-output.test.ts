@@ -74,8 +74,11 @@ describe('validating against a schema', () => {
 
 describe('the content shapes', () => {
   it('normalises hashtags however the model wrote them', () => {
+    // Spacing and punctuation go; the casing stays, because #YangiMahsulot is
+    // readable. #SALE is dropped as a duplicate of sale, which every platform
+    // would treat as the same tag.
     expect(hashtagsSchema.parse(['#Yangi Mahsulot', 'sale', '#SALE', '  ', '#chegirma!'])).toEqual([
-      'yangimahsulot',
+      'YangiMahsulot',
       'sale',
       'chegirma',
     ]);
@@ -120,7 +123,7 @@ describe('the content shapes', () => {
       // Coerced from a string, because "0" has one possible reading.
       dayOffset: 0,
       contentType: 'post',
-      hashtags: ['yangi', 'hadiya'],
+      hashtags: ['Yangi', 'hadiya'],
     });
   });
 

@@ -24,6 +24,18 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/RemindersPage.vue'),
         meta: { title: 'Reminders', requiresAuth: true },
       },
+      {
+        path: 'content',
+        name: 'content-plans',
+        component: () => import('@/pages/ContentPlansPage.vue'),
+        meta: { title: 'Content plans', requiresAuth: true },
+      },
+      {
+        path: 'content/:id',
+        name: 'content-plan',
+        component: () => import('@/pages/ContentPlanDetailPage.vue'),
+        meta: { title: 'Content plan', requiresAuth: true },
+      },
     ],
   },
   {

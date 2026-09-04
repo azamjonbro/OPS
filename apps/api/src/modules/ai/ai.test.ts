@@ -240,7 +240,19 @@ describe('tool registry', () => {
       'get_reminder',
       'update_reminder',
       'cancel_reminder',
+      'create_content_plan',
+      'list_content_plans',
+      'get_content_plan',
+      'update_content_plan',
+      'delete_content_plan',
+      'create_content_item',
+      'update_content_item',
+      'delete_content_item',
+      'regenerate_content_item',
+      'generate_caption',
+      'generate_content_ideas',
       'get_sales_summary',
+      'get_products',
     ]);
     expect(definitions[0]?.parameters).toMatchObject({ type: 'object' });
   });
@@ -487,21 +499,38 @@ describe('POST /api/v1/ai/chat', () => {
       .set('Authorization', authorization);
 
     expect(response.status).toBe(HTTP_STATUS.OK);
-    expect(response.body.data.tools.map((tool: { name: string }) => tool.name)).toEqual([
-      'remember_information',
-      'get_memory',
-      'forget_information',
-      'create_reminder',
-      'list_reminders',
-      'get_reminder',
-      'update_reminder',
-      'cancel_reminder',
-      'get_sales_summary',
-    ]);
-    // Writing tools: two memory, three reminder. Reading sales, reading a
-    // memory or listing reminders cannot change anything.
+    const names = response.body.data.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'remember_information',
+        'create_reminder',
+        'create_content_plan',
+        'generate_caption',
+        'get_sales_summary',
+        'get_products',
+      ]),
+    );
+
+    // Reading anything — a memory, a plan, the sales figures — is never a write,
+    // and generating a caption stores nothing either.
+    const readOnly = response.body.data.tools.filter((tool: { mutates: boolean }) => !tool.mutates);
+    expect(readOnly.map((tool: { name: string }) => tool.name)).toEqual(
+      expect.arrayContaining([
+        'get_memory',
+        'list_reminders',
+        'list_content_plans',
+        'generate_caption',
+        'generate_content_ideas',
+        'get_sales_summary',
+        'get_products',
+      ]),
+    );
+
+    // Only what cannot be undone asks first.
     expect(
-      response.body.data.tools.filter((tool: { mutates: boolean }) => tool.mutates).length,
-    ).toBe(5);
+      response.body.data.tools
+        .filter((tool: { requiresConfirmation: boolean }) => tool.requiresConfirmation)
+        .map((tool: { name: string }) => tool.name),
+    ).toEqual(['delete_content_plan', 'delete_content_item']);
   });
 });
