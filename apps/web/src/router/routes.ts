@@ -4,8 +4,13 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 
 /**
- * Route metadata is typed in `router/index.ts`. Feature modules add their pages
- * as children of the application layout.
+ * Every page is loaded lazily.
+ *
+ * A till that opens quickly matters more than one that has everything in
+ * memory: the POS and the dashboard are what a cashier reaches for, and they
+ * should not wait for the reports page to download. `breadcrumb` names the
+ * ancestors a detail page hangs off, so the trail can say "Sales › Receipt"
+ * without parsing the URL.
  */
 export const routes: RouteRecordRaw[] = [
   {
@@ -19,10 +24,73 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Dashboard', requiresAuth: true },
       },
       {
-        path: 'reminders',
-        name: 'reminders',
-        component: () => import('@/pages/RemindersPage.vue'),
-        meta: { title: 'Reminders', requiresAuth: true },
+        path: 'pos',
+        name: 'pos',
+        component: () => import('@/pages/PosPage.vue'),
+        meta: { title: 'Point of sale', requiresAuth: true },
+      },
+      {
+        path: 'sales',
+        name: 'sales',
+        component: () => import('@/pages/SalesPage.vue'),
+        meta: { title: 'Sales', requiresAuth: true },
+      },
+      {
+        path: 'sales/:id',
+        name: 'sale-detail',
+        component: () => import('@/pages/SaleDetailPage.vue'),
+        meta: {
+          title: 'Receipt',
+          requiresAuth: true,
+          breadcrumb: [{ label: 'Sales', to: { name: 'sales' } }],
+        },
+      },
+      {
+        path: 'products',
+        name: 'products',
+        component: () => import('@/pages/ProductsPage.vue'),
+        meta: { title: 'Products', requiresAuth: true },
+      },
+      {
+        path: 'categories',
+        name: 'categories',
+        component: () => import('@/pages/CategoriesPage.vue'),
+        meta: { title: 'Categories', requiresAuth: true },
+      },
+      {
+        path: 'inventory',
+        name: 'inventory',
+        component: () => import('@/pages/InventoryPage.vue'),
+        meta: { title: 'Inventory', requiresAuth: true },
+      },
+      {
+        path: 'customers',
+        name: 'customers',
+        component: () => import('@/pages/CustomersPage.vue'),
+        meta: { title: 'Customers', requiresAuth: true },
+      },
+      {
+        path: 'customers/:id',
+        name: 'customer-detail',
+        component: () => import('@/pages/CustomerDetailPage.vue'),
+        meta: {
+          title: 'Customer',
+          requiresAuth: true,
+          breadcrumb: [{ label: 'Customers', to: { name: 'customers' } }],
+        },
+      },
+      {
+        path: 'expenses',
+        name: 'expenses',
+        component: () => import('@/pages/ExpensesPage.vue'),
+        meta: { title: 'Expenses', requiresAuth: true },
+      },
+      {
+        path: 'reports',
+        name: 'reports',
+        component: () => import('@/pages/ReportsPage.vue'),
+        // Mirrors the sidebar, so a typed URL behaves the same as a hidden link.
+        meta: { title: 'Reports', requiresAuth: true, minimumRole: 'manager' },
       },
       {
         path: 'content',
@@ -34,13 +102,41 @@ export const routes: RouteRecordRaw[] = [
         path: 'content/:id',
         name: 'content-plan',
         component: () => import('@/pages/ContentPlanDetailPage.vue'),
-        meta: { title: 'Content plan', requiresAuth: true },
+        meta: {
+          title: 'Content plan',
+          requiresAuth: true,
+          breadcrumb: [{ label: 'Content', to: { name: 'content-plans' } }],
+        },
       },
       {
         path: 'images',
         name: 'images',
         component: () => import('@/pages/ImagesPage.vue'),
         meta: { title: 'Images', requiresAuth: true },
+      },
+      {
+        path: 'reminders',
+        name: 'reminders',
+        component: () => import('@/pages/RemindersPage.vue'),
+        meta: { title: 'Reminders', requiresAuth: true },
+      },
+      {
+        path: 'notifications',
+        name: 'notifications',
+        component: () => import('@/pages/NotificationsPage.vue'),
+        meta: { title: 'Notifications', requiresAuth: true },
+      },
+      {
+        path: 'assistant',
+        name: 'assistant',
+        component: () => import('@/pages/AssistantPage.vue'),
+        meta: { title: 'Assistant', requiresAuth: true },
+      },
+      {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('@/pages/SettingsPage.vue'),
+        meta: { title: 'Settings', requiresAuth: true },
       },
     ],
   },

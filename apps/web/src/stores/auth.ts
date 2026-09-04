@@ -60,5 +60,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   };
 
-  return { user, hasToken, isRestoring, isAuthenticated, login, logout, restore, clearSession };
+  /** Re-reads the account after a setting has changed server-side. */
+  const refreshUser = async (): Promise<void> => {
+    if (!hasToken.value) {
+      return;
+    }
+
+    user.value = await authService.currentUser();
+  };
+
+  return {
+    user,
+    hasToken,
+    isRestoring,
+    isAuthenticated,
+    login,
+    logout,
+    restore,
+    refreshUser,
+    clearSession,
+  };
 });
