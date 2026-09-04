@@ -17,6 +17,7 @@ export interface AccessTokenClaims {
   fullName: string;
   role: UserRole;
   branchId: string | null;
+  timezone: string;
 }
 
 const encoder = new TextEncoder();
@@ -47,6 +48,7 @@ export const signAccessToken = async (user: AuthenticatedUser): Promise<string> 
     fullName: user.fullName,
     role: user.role,
     branchId: user.branchId,
+    timezone: user.timezone,
     typ: 'access',
   })
     .setProtectedHeader({ alg: ALGORITHM })

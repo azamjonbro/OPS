@@ -7,8 +7,10 @@ import { customerRouter } from './customers/index.js';
 import { expenseRouter } from './expenses/index.js';
 import { inventoryRouter } from './inventory/index.js';
 import { memoryRouter } from './memory/index.js';
+import { notificationRouter } from './notifications/index.js';
 import { paymentRouter } from './payments/index.js';
 import { productRouter } from './products/index.js';
+import { reminderRouter } from './reminders/index.js';
 import { saleRouter } from './sales/index.js';
 import { userRouter } from './users/index.js';
 import type { ApiModule } from './module.types.js';
@@ -33,6 +35,8 @@ export const apiModules: ApiModule[] = [
   { name: 'expenses', basePath: '/expenses', router: expenseRouter },
   { name: 'conversations', basePath: '/conversations', router: conversationRouter },
   { name: 'memory', basePath: '/memory', router: memoryRouter },
+  { name: 'reminders', basePath: '/reminders', router: reminderRouter },
+  { name: 'notifications', basePath: '/notifications', router: notificationRouter },
   { name: 'assistant', basePath: '/ai', router: aiRouter },
   // Integrations are namespaced so a second one does not collide with a domain.
   { name: 'billz', basePath: '/integrations/billz', router: billzRouter },

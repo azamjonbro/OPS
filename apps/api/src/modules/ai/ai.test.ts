@@ -27,16 +27,7 @@ const signIn = async () => {
   const branch = await createTestBranch();
   const session = await signInAs(app, 'manager', String(branch._id));
 
-  return {
-    ...session,
-    actor: {
-      id: String(session.user._id),
-      username: session.user.username,
-      fullName: session.user.fullName,
-      role: 'manager' as const,
-      branchId: String(branch._id),
-    },
-  };
+  return session;
 };
 
 describe('context building', () => {
@@ -244,6 +235,11 @@ describe('tool registry', () => {
       'remember_information',
       'get_memory',
       'forget_information',
+      'create_reminder',
+      'list_reminders',
+      'get_reminder',
+      'update_reminder',
+      'cancel_reminder',
       'get_sales_summary',
     ]);
     expect(definitions[0]?.parameters).toMatchObject({ type: 'object' });
@@ -495,11 +491,17 @@ describe('POST /api/v1/ai/chat', () => {
       'remember_information',
       'get_memory',
       'forget_information',
+      'create_reminder',
+      'list_reminders',
+      'get_reminder',
+      'update_reminder',
+      'cancel_reminder',
       'get_sales_summary',
     ]);
-    // Only the memory tools write; reading sales cannot change anything.
+    // Writing tools: two memory, three reminder. Reading sales, reading a
+    // memory or listing reminders cannot change anything.
     expect(
       response.body.data.tools.filter((tool: { mutates: boolean }) => tool.mutates).length,
-    ).toBe(2);
+    ).toBe(5);
   });
 });

@@ -128,7 +128,10 @@ const parseUntil = (value: string): Date => {
 };
 
 const formatUntil = (instant: Date): string =>
-  `${instant.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`;
+  `${instant
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')}`;
 
 const parsePositiveInteger = (name: string, value: string): number => {
   const parsed = Number(value);

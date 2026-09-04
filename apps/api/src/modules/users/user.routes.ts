@@ -6,6 +6,7 @@ import {
   changePasswordSchema,
   createUserSchema,
   listUsersQuerySchema,
+  updateOwnPreferencesSchema,
   updateUserSchema,
   updateUserStatusSchema,
   userIdParamSchema,
@@ -15,6 +16,11 @@ export const userRouter: Router = Router();
 
 userRouter.post('/', ...validated({ body: createUserSchema }, userController.create));
 userRouter.get('/', ...validated({ query: listUsersQuerySchema }, userController.list));
+/** Literal paths come before `/:id` so they are not read as an object id. */
+userRouter.patch(
+  '/me/preferences',
+  ...validated({ body: updateOwnPreferencesSchema }, userController.updatePreferences),
+);
 userRouter.get('/:id', ...validated({ params: userIdParamSchema }, userController.detail));
 userRouter.patch(
   '/:id',

@@ -63,16 +63,7 @@ const signIn = async () => {
   const branch = await createTestBranch();
   const session = await signInAs(app, 'manager', String(branch._id));
 
-  return {
-    branch,
-    actor: {
-      id: String(session.user._id),
-      username: session.user.username,
-      fullName: session.user.fullName,
-      role: 'manager' as const,
-      branchId: String(branch._id),
-    },
-  };
+  return { branch, actor: session.actor };
 };
 
 describe('the full loop through the real provider', () => {

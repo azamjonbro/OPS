@@ -1,4 +1,5 @@
 import { MEMORY_TOOLS } from './memory.tools.js';
+import { REMINDER_TOOLS } from './reminder.tools.js';
 import { SALES_TOOLS } from './sales.tools.js';
 import {
   ToolRegistry,
@@ -11,14 +12,16 @@ import {
  * Builds the registry the agent runs with.
  *
  * Memory lets the assistant carry preferences between conversations; the sales
- * tools give it read-only sight of the shop's own figures. Both register the
- * same way — one call each, with no change to the agent, which only ever asks
- * the registry. Billz tools plug in here identically.
+ * tools give it read-only sight of the shop's own figures; the reminder tools
+ * let it schedule work for later without knowing anything about how scheduling
+ * happens. All three register the same way — one call each, with no change to
+ * the agent, which only ever asks the registry. Billz tools plug in here
+ * identically.
  */
 export const createToolRegistry = (): ToolRegistry => {
   const registry = new ToolRegistry();
 
-  for (const tool of [...MEMORY_TOOLS, ...SALES_TOOLS]) {
+  for (const tool of [...MEMORY_TOOLS, ...REMINDER_TOOLS, ...SALES_TOOLS]) {
     registry.register(tool);
   }
 
@@ -41,4 +44,5 @@ export const resetToolRegistry = (): void => {
 export { ToolRegistry };
 export type { RegisteredTool, ToolContext, ToolResult };
 export { MEMORY_TOOLS } from './memory.tools.js';
+export { REMINDER_TOOLS } from './reminder.tools.js';
 export { SALES_TOOLS } from './sales.tools.js';

@@ -2,6 +2,7 @@
 import { APP_MODULES } from '@hadiya/shared';
 import { computed, onMounted } from 'vue';
 
+import UpcomingReminders from '@/components/reminders/UpcomingReminders.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import StatusPill from '@/components/ui/StatusPill.vue';
@@ -19,7 +20,7 @@ const status = computed(() => health.data.value?.status ?? 'unknown');
 const dependencies = computed(() => health.data.value?.dependencies ?? []);
 
 /** The delivered surface, so the roadmap below is never out of step with it. */
-const implementedModules = new Set<string>(['reports']);
+const implementedModules = new Set<string>(['reports', 'reminders', 'notifications']);
 const roadmap = computed(() =>
   APP_MODULES.map((module) => ({ name: module, implemented: implementedModules.has(module) })),
 );
@@ -106,6 +107,8 @@ const roadmap = computed(() =>
 
       <p v-else class="text-sm text-ink-500">Loading…</p>
     </BaseCard>
+
+    <UpcomingReminders />
 
     <BaseCard
       title="Module roadmap"

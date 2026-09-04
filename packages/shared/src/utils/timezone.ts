@@ -174,7 +174,10 @@ export const toCalendarDay = (instant: Date, timeZone: string): CalendarDay => {
 
 /** Midnight at the start of that instant's local day. */
 export const startOfDayInTimeZone = (instant: Date, timeZone: string): Date =>
-  zonedPartsToInstant({ ...toCalendarDay(instant, timeZone), hour: 0, minute: 0, second: 0 }, timeZone);
+  zonedPartsToInstant(
+    { ...toCalendarDay(instant, timeZone), hour: 0, minute: 0, second: 0 },
+    timeZone,
+  );
 
 /**
  * Calendar days are compared as counts, never as instants: two wall-clock days

@@ -6,6 +6,9 @@ import { connectDatabase, disconnectDatabase } from './core/db/connection.js';
 import { probeTransactionSupport } from './core/db/transaction.js';
 import { createShutdownManager, registerProcessSignalHandlers } from './core/lifecycle/shutdown.js';
 import { logger } from './core/logger/logger.js';
+import { registeredJobTypes, startScheduler, stopScheduler } from './core/scheduler/index.js';
+import { registerDefaultNotificationProviders } from './modules/notifications/index.js';
+import { recoverPendingReminders, registerReminderJobs } from './modules/reminders/index.js';
 
 const CONNECT_ATTEMPTS = 5;
 const CONNECT_BACKOFF_MS = 1_000;
@@ -88,6 +91,15 @@ const bootstrap = async (): Promise<void> => {
   // warn now instead of discovering it during the first sale.
   await probeTransactionSupport();
 
+  // Deferred work is set up before the port opens, so a reminder that came due
+  // while the process was down is already being caught up on by the time the
+  // first request arrives.
+  registerDefaultNotificationProviders();
+  registerReminderJobs();
+  await recoverPendingReminders();
+  startScheduler();
+  shutdownManager.register({ name: 'scheduler', run: stopScheduler });
+
   const server = http.createServer(createApp());
 
   await new Promise<void>((resolve, reject) => {
@@ -108,6 +120,7 @@ const bootstrap = async (): Promise<void> => {
       url: `http://${config.http.host}:${config.http.port}${config.http.basePath}`,
       env: config.app.env,
       version: config.app.version,
+      scheduler: registeredJobTypes(),
     },
     'hadiya api is listening',
   );

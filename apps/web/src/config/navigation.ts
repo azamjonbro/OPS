@@ -16,6 +16,12 @@ export const navigationSections: NavigationSection[] = [
         icon: 'M3 12h6v9H3zM10 3h4v18h-4zM15 8h6v13h-6z',
       },
       {
+        label: 'Reminders',
+        module: 'reminders',
+        to: { name: 'reminders' },
+        icon: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+      },
+      {
         label: 'Assistant',
         module: 'assistant',
         to: null,

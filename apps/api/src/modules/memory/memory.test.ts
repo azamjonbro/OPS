@@ -1,10 +1,12 @@
+import type { HydratedDocument } from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../app.js';
 import { HTTP_STATUS } from '../../core/http/http-status.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
-import { createTestBranch, signInAs } from '../../test/factories.js';
+import { actorFor, createTestBranch, signInAs } from '../../test/factories.js';
+import type { UserDocument } from '../users/user.model.js';
 import { MemoryModel } from './memory.model.js';
 import * as memoryService from './memory.service.js';
 
@@ -21,13 +23,7 @@ const signIn = async () => {
   return signInAs(app, 'cashier', String(branch._id));
 };
 
-const actorOf = (user: { _id: unknown; username: string; fullName: string }) => ({
-  id: String(user._id),
-  username: user.username,
-  fullName: user.fullName,
-  role: 'cashier' as const,
-  branchId: null,
-});
+const actorOf = (user: HydratedDocument<UserDocument>) => actorFor(user, { branchId: null });
 
 describe(`POST ${url}`, () => {
   it('remembers a preference the user states themselves', async () => {

@@ -1,4 +1,9 @@
-import type { AuthenticatedUser, AuthTokens, LoginResult } from '@hadiya/shared';
+import {
+  DEFAULT_TIMEZONE,
+  type AuthenticatedUser,
+  type AuthTokens,
+  type LoginResult,
+} from '@hadiya/shared';
 
 import { ApiError } from '../../core/http/api-error.js';
 import {
@@ -18,6 +23,9 @@ export const toActor = (user: UserDocument): AuthenticatedUser => ({
   fullName: user.fullName,
   role: user.role,
   branchId: user.branch ? String(user.branch) : null,
+  // Accounts created before the field existed have no stored zone; falling back
+  // keeps every time-shaped feature working rather than failing on a blank.
+  timezone: user.timezone || DEFAULT_TIMEZONE,
 });
 
 const issueTokens = async (user: UserDocument): Promise<AuthTokens> => ({
