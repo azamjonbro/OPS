@@ -37,3 +37,18 @@ export const formatDateTime = (value: string | Date): string => {
     timeStyle: 'short',
   }).format(date);
 };
+
+/** Date only, for a column where the time of day is noise. */
+export const formatDate = (value: string | Date): string => {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(date);
+};
+
+/** A count with its noun, pluralised: `1 sale`, `3 sales`. */
+export const pluralise = (count: number, singular: string, plural = `${singular}s`): string =>
+  `${count} ${count === 1 ? singular : plural}`;
