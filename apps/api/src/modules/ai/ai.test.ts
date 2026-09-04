@@ -251,6 +251,7 @@ describe('tool registry', () => {
       'regenerate_content_item',
       'generate_caption',
       'generate_content_ideas',
+      'generate_image',
       'get_sales_summary',
       'get_products',
     ]);
@@ -506,6 +507,7 @@ describe('POST /api/v1/ai/chat', () => {
         'create_reminder',
         'create_content_plan',
         'generate_caption',
+        'generate_image',
         'get_sales_summary',
         'get_products',
       ]),
