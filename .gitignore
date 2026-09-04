@@ -49,3 +49,6 @@ tmp/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Generated images written by the local storage driver.
+apps/api/storage/

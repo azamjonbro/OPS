@@ -3,7 +3,11 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 import { toErrorMessage } from '@/services/api-error';
-import { imageService, type GenerateImagePayload, type ListImagesParams } from '@/services/image.service';
+import {
+  imageService,
+  type GenerateImagePayload,
+  type ListImagesParams,
+} from '@/services/image.service';
 
 /**
  * Image state for the UI.

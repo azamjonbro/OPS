@@ -51,7 +51,12 @@ const isConfirmingDelete = ref(false);
 
       <template v-if="isConfirmingDelete">
         <span class="text-xs text-ink-500">Delete?</span>
-        <BaseButton size="sm" variant="secondary" :disabled="busy" @click="emit('remove', image.id)">
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          :disabled="busy"
+          @click="emit('remove', image.id)"
+        >
           Yes
         </BaseButton>
         <BaseButton size="sm" variant="ghost" @click="isConfirmingDelete = false">No</BaseButton>

@@ -56,7 +56,9 @@ const fieldClasses =
 <template>
   <form class="flex flex-col gap-4" @submit.prevent="submit">
     <label class="flex flex-col gap-1">
-      <span class="text-xs font-medium uppercase tracking-wide text-ink-500">Describe the image</span>
+      <span class="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >Describe the image</span
+      >
       <textarea
         v-model="form.prompt"
         required

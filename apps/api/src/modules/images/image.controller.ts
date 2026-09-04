@@ -12,7 +12,10 @@ import type {
   listImagesQuerySchema,
 } from './image.validators.js';
 
-export const generate: ValidatedHandler<{ body: typeof generateImageSchema }> = async (req, res) => {
+export const generate: ValidatedHandler<{ body: typeof generateImageSchema }> = async (
+  req,
+  res,
+) => {
   const result = await imageService.generateImages(requireActor(req), req.validated.body);
 
   sendCreated(req, res, result);

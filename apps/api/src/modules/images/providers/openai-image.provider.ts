@@ -115,7 +115,10 @@ const fetchImageBytes = async (
   try {
     url = new URL(rawUrl);
   } catch {
-    throw new AiProviderError('malformed_response', 'the provider returned an unreadable image URL');
+    throw new AiProviderError(
+      'malformed_response',
+      'the provider returned an unreadable image URL',
+    );
   }
 
   if (url.protocol !== 'https:' || !isAllowedHost(url.hostname)) {
@@ -135,7 +138,10 @@ const fetchImageBytes = async (
     });
 
     if (!response.ok) {
-      throw new AiProviderError('upstream_error', `the image could not be downloaded (${response.status})`);
+      throw new AiProviderError(
+        'upstream_error',
+        `the image could not be downloaded (${response.status})`,
+      );
     }
 
     const contentType = (response.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? '';

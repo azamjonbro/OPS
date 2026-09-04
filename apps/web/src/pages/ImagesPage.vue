@@ -39,22 +39,28 @@ onUnmounted(() => images.reset());
       Image generation is not configured{{ status.reason ? `: ${status.reason}` : '' }}.
     </p>
 
-    <BaseCard title="Generate an image" :description="status?.model ? `Using ${status.model}` : undefined">
+    <BaseCard
+      title="Generate an image"
+      :description="status?.model ? `Using ${status.model}` : undefined"
+    >
       <ImageGenerateForm />
     </BaseCard>
 
     <BaseCard title="Your images" description="Most recent first">
       <template #header>
-        <BaseButton variant="secondary" size="sm" :loading="images.isLoading" @click="images.load()">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          :loading="images.isLoading"
+          @click="images.load()"
+        >
           Refresh
         </BaseButton>
       </template>
 
       <p v-if="images.isLoading && !images.hasImages" class="text-sm text-ink-500">Loading…</p>
 
-      <p v-else-if="!images.hasImages" class="text-sm text-ink-500">
-        Nothing generated yet.
-      </p>
+      <p v-else-if="!images.hasImages" class="text-sm text-ink-500">Nothing generated yet.</p>
 
       <ul v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         <ImageCard

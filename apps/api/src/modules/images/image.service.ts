@@ -51,11 +51,8 @@ const ownedBy = (actor: AuthenticatedUser, extra: Record<string, unknown> = {}) 
 export const imageUrl = (assetId: string): string => `/api/v1/images/${assetId}/file`;
 
 /** Server-chosen, derived from ids only, so nothing a client sends reaches a path. */
-const storageKeyFor = (
-  userId: string,
-  assetId: string,
-  contentType: ImageContentType,
-): string => `images/${userId.toLowerCase()}/${assetId.toLowerCase()}.${IMAGE_FILE_EXTENSIONS[contentType]}`;
+const storageKeyFor = (userId: string, assetId: string, contentType: ImageContentType): string =>
+  `images/${userId.toLowerCase()}/${assetId.toLowerCase()}.${IMAGE_FILE_EXTENSIONS[contentType]}`;
 
 /** The shape a client renders: the row plus the URL its bytes are served from. */
 export interface ImageAssetView extends ImageAssetDocument {

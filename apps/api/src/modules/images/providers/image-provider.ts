@@ -1,9 +1,4 @@
-import type {
-  ImageAspectRatio,
-  ImageContentType,
-  ImageQuality,
-  ImageStyle,
-} from '@hadiya/shared';
+import type { ImageAspectRatio, ImageContentType, ImageQuality, ImageStyle } from '@hadiya/shared';
 
 /**
  * The seam between "make me a picture" and whichever model actually does it.

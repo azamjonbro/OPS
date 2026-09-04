@@ -127,7 +127,9 @@ describe(`POST ${url}/generate`, () => {
   });
 
   it('keeps the revised prompt the model reports', async () => {
-    setImageProvider(createScriptedImageProvider({ revisedPrompt: 'A gold wristwatch, studio lit' }));
+    setImageProvider(
+      createScriptedImageProvider({ revisedPrompt: 'A gold wristwatch, studio lit' }),
+    );
     const { actor } = await signIn();
 
     const result = await imageService.generateImages(actor, { prompt: 'a watch' });
@@ -458,7 +460,9 @@ describe('reading and deleting', () => {
     const imageId = String(generated.images[0]?._id);
 
     await request(app).delete(`${url}/${imageId}`).set('Authorization', authorization);
-    const second = await request(app).delete(`${url}/${imageId}`).set('Authorization', authorization);
+    const second = await request(app)
+      .delete(`${url}/${imageId}`)
+      .set('Authorization', authorization);
 
     expect(second.status).toBe(HTTP_STATUS.NOT_FOUND);
   });
@@ -502,9 +506,9 @@ describe('user isolation', () => {
     const generated = await imageService.generateImages(actor, { prompt: 'Private' });
 
     expect((await request(app).get(url)).status).toBe(HTTP_STATUS.UNAUTHORIZED);
-    expect(
-      (await request(app).get(`${url}/${String(generated.images[0]?._id)}/file`)).status,
-    ).toBe(HTTP_STATUS.UNAUTHORIZED);
+    expect((await request(app).get(`${url}/${String(generated.images[0]?._id)}/file`)).status).toBe(
+      HTTP_STATUS.UNAUTHORIZED,
+    );
   });
 });
 

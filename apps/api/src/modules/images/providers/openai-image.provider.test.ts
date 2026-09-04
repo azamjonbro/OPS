@@ -192,9 +192,9 @@ describe('images returned as a link', () => {
 
     // An upstream response is not trusted input just because it was
     // authenticated.
-    await expect(
-      provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' }),
-    ).rejects.toThrow(/unexpected host/);
+    await expect(provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' })).rejects.toThrow(
+      /unexpected host/,
+    );
   });
 
   it('refuses a plain-http link', async () => {
@@ -202,9 +202,9 @@ describe('images returned as a link', () => {
       { body: { data: [{ url: 'http://oaidalleapiprodscus.blob.core.windows.net/x.png' }] } },
     ]);
 
-    await expect(
-      provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' }),
-    ).rejects.toThrow(/unexpected host/);
+    await expect(provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' })).rejects.toThrow(
+      /unexpected host/,
+    );
   });
 
   it('refuses a download that is not an image', async () => {
@@ -213,9 +213,9 @@ describe('images returned as a link', () => {
       { bytes: Buffer.from('<html>'), contentType: 'text/html' },
     ]);
 
-    await expect(
-      provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' }),
-    ).rejects.toThrow(/not an image/);
+    await expect(provider.generate({ prompt: 'a', count: 1, aspectRatio: '1:1' })).rejects.toThrow(
+      /not an image/,
+    );
   });
 });
 
@@ -255,7 +255,10 @@ describe('malformed and failing responses', () => {
 
   it('turns a rejected key into a credential error, without echoing the body', async () => {
     const { provider } = buildProvider([
-      { status: 401, body: { error: { message: 'Incorrect API key sk-test-key', code: 'bad_key' } } },
+      {
+        status: 401,
+        body: { error: { message: 'Incorrect API key sk-test-key', code: 'bad_key' } },
+      },
     ]);
 
     const error = await provider
@@ -306,7 +309,9 @@ describe('malformed and failing responses', () => {
   });
 
   it('reports a body that is not JSON', async () => {
-    const { provider } = buildProvider([{ bytes: Buffer.from('not json'), contentType: 'text/plain' }]);
+    const { provider } = buildProvider([
+      { bytes: Buffer.from('not json'), contentType: 'text/plain' },
+    ]);
 
     const error = await provider
       .generate({ prompt: 'a', count: 1, aspectRatio: '1:1' })
