@@ -134,14 +134,71 @@ Every response uses one envelope:
 header, attached to every log line for that request, and returned in `meta` — so a user-reported
 failure can be traced to its logs.
 
-## What this phase does not include
+## Getting a usable system
 
-Authentication, users, employees, branches, products, inventory, sales, customers, payments,
-expenses, reports, the Billz integration, AI assistant/tools/memory, conversations, reminders,
-content and image generation, notifications and audit logs are **not implemented**. They are
-declared in `APP_MODULES` (`packages/shared`) and mount into `apps/api/src/modules/index.ts`
-as they are built. The web login page and `authService` call the agreed endpoint paths, which
-return `404` until the auth module exists; the router guard is written and switched on with
-`VITE_AUTH_ENFORCED=true`.
+```bash
+# 1. a database that supports transactions (production must be a replica set)
+npm run probe-transactions -w @hadiya/api
+
+# 2. the first account, once per deployment
+npm run create-owner -w @hadiya/api -- --username owner --password '<strong password>' --name 'Owner'
+
+# 3. sign in
+curl -X POST http://127.0.0.1:4000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"owner","password":"<strong password>"}'
+```
+
+Sales and stock transfers write several documents at once and use a MongoDB transaction. On a
+standalone `mongod` transactions do not exist, so the API logs a warning at start-up and performs
+those writes non-atomically — fine locally, **not acceptable in production**.
+
+## Billz integration
+
+Read-only, and reachable only through `apps/api/src/modules/billz`: no controller, no other module
+and no future AI code talks to Billz directly. The layering is
+`module service -> Billz service -> Billz HTTP client -> Billz API`, and everything crossing the
+module boundary is normalised — money in minor units, `externalId` rather than `id`, no snake_case.
+
+Set `BILLZ_API_TOKEN` to switch it on; without it the endpoints answer `503` and report themselves
+as unconfigured rather than failing obscurely. Reading requires the `manager` role, running a sync
+requires `admin`.
+
+`npm run dev` does not sync anything on its own. A sync is triggered explicitly
+(`POST /api/v1/integrations/billz/sync`), runs in the background, and is followed through
+`GET /api/v1/integrations/billz/sync/{state,logs}`. It is idempotent: records are matched through
+an external-ID mapping table, so re-running changes nothing that has not changed upstream.
+
+[docs/billz-api.md](docs/billz-api.md) lists every endpoint used, the evidence for it, and the
+capabilities Billz does not expose to an API key (expenses, sales reports, warehouses, suppliers).
+
+## Assistant, conversations and memory
+
+Conversations, messages and long-term memory are implemented and are **strictly per-user**: every
+query is scoped to the signed-in employee in the service layer, so one person's threads and
+memories are invisible to another regardless of what a client asks for.
+
+The assistant runs through `POST /api/v1/ai/chat`. It persists the question, builds a **bounded**
+context (a window of recent turns plus the memories relevant to the question — never the whole
+history), calls the model, and runs any tools the model asks for through the tool registry. Memory
+tools (`remember_information`, `get_memory`, `forget_information`) are the only route from a
+conversation to stored memory; there is no general "write a record" tool.
+
+Credentials are never remembered: passwords, API keys, tokens, card and account numbers are refused
+before anything is stored. Anything the assistant is not confident about is held as `pending` and is
+not used until a person confirms it (`POST /api/v1/memory/:id/confirm`).
+
+**A model client is not wired up yet** — that is the assistant phase's job. Until one is registered,
+`/ai/chat` answers `503` rather than inventing a reply; everything below it is complete and tested
+against a scripted provider.
+
+## What is not implemented yet
+
+Reports, reminders,
+content and image generation, notifications and audit logs are **not built**. They are declared in
+`APP_MODULES` (`packages/shared`) and mount into `apps/api/src/modules/index.ts` as they are added.
+
+The web client is still the Phase 0 shell: the router guard is implemented but switched off until
+`VITE_AUTH_ENFORCED=true`, and no business screen has been built against these endpoints yet.
 
 See [docs/architecture.md](docs/architecture.md) for the reasoning behind these choices.

@@ -49,12 +49,20 @@ describe(`GET ${config.http.basePath}/health`, () => {
 
 describe('unmatched routes', () => {
   it('returns a 404 in the error envelope', async () => {
-    const response = await request(app).get(`${config.http.basePath}/v1/does-not-exist`);
+    const response = await request(app).get(`${config.http.basePath}/does-not-exist`);
 
     expect(response.status).toBe(HTTP_STATUS.NOT_FOUND);
     expect(response.body).toMatchObject({
       success: false,
       error: { code: 'NOT_FOUND' },
     });
+  });
+
+  it('answers an unknown business route with 401, not 404, when anonymous', async () => {
+    // The guard runs before route matching, so an anonymous caller cannot use
+    // 404s to map which endpoints exist.
+    const response = await request(app).get(`${config.http.basePath}/v1/does-not-exist`);
+
+    expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
   });
 });

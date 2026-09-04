@@ -163,11 +163,189 @@ Tests are Vitest and exercise real behaviour, not mocks: pure functions directly
 through the real Express app with Supertest. `app.test.ts` asserts the envelope and that the health
 status maps to the correct HTTP code, so it passes whether or not a database is reachable.
 
-## 10. Known gaps entering the next phase
+## 10. Business data layer (phase 2)
 
-- No authentication, authorization or user model — every business endpoint depends on this.
-- No concrete Mongoose model exists yet, so `BaseRepository` and `createSchema` are compile-checked
-  but not exercised against a live collection.
+Eleven domains ship as self-contained modules — branches, employees, categories, products,
+customers, inventory, sales, payments and expenses — each with its own model, validators, service,
+controller and routes. There is no shared CRUD façade: `BaseRepository` covers plain reads and
+writes, and every rule that matters lives in the module's service, where it can be read next to
+the data it protects.
+
+**Money** is an integer count of minor units (tiyin) everywhere — schema, service and wire. No
+price, cost or total is ever a floating-point number.
+
+**Authentication** is HS256 JWT (access + refresh) signed with `jose`. Passwords are hashed with
+scrypt from Node's own crypto module, in a self-describing format so the cost parameters can be
+raised later without invalidating stored hashes. The guard is mounted over the whole `/v1` tree, so
+a module added to the registry is protected by default rather than by remembering to guard it.
+The account is re-read on every request: a suspension or a role change takes effect immediately
+instead of when the token happens to expire.
+
+**Authorization** has two parts. Role rank (`hasAtLeastRole`) gates what an action needs, and
+branch scope decides which records an actor can see or touch. `admin` and above are
+organisation-wide; everyone else is pinned to the branch on their account. Both checks live in
+services (`core/security/actor.ts` holds the primitives), so an endpoint cannot be published
+without them by forgetting a middleware.
+
+**Stock is never edited directly.** `inventory.service.recordMovement` is the only writer of an
+`InventoryItem`, and it always writes the matching `InventoryMovement` in the same breath. The
+level moves with a conditional `$inc` — the filter demands enough stock before the decrement — so
+two tills selling the last unit cannot both succeed, with or without a transaction. Movements are
+append-only: a mistake is corrected by recording an `adjustment`, never by editing history. A
+`sale` movement can only be written by the sale flow; a person can record `purchase`, `return` or
+`adjustment`, which keeps the stock card consistent with the sales ledger.
+
+**A sale** prices itself. The till sends product ids, quantities and explicit discounts; the
+service reads names and prices from the catalogue, so a tampered client cannot decide what
+something costs. Lines are embedded in the receipt rather than stored separately — a sale is read,
+printed and cancelled as one unit — and each carries a snapshot of the name, SKU and prices
+charged, so a receipt still reads correctly after the product is renamed or repriced. `product`
+still links to the live record; nothing else is duplicated. The receipt, the stock it consumes,
+the payments taken and any debt it leaves are written in one transaction: a sale cannot exist
+without having moved the stock, and stock cannot move without a receipt to show for it.
+Cancelling reverses all of it — goods return as `return` movements, payments are voided, debt is
+cleared — and keeps the receipt, marked cancelled.
+
+**Customer debt** is one number maintained by the sale and payment services only, always inside the
+transaction that caused it, and always with `$inc` so concurrent tills cannot overwrite each
+other. A receipt's contribution to the balance is exactly its `dueAmount`, which is what
+cancelling reverses.
+
+**Transactions** need a replica set. `core/db/transaction.ts` probes support once after connecting
+— by running a read _inside_ a transaction, because a standalone server accepts
+`startTransaction()` and only rejects the first command that carries it — and falls back to
+non-atomic writes with a warning where they are unavailable.
+
+**Indexes** are declared where reads actually happen: `sku` and `barcode` on products (barcode as a
+_partial_ index, since a sparse one still indexes the explicit `null` a product without a barcode
+stores, which would allow only one such product in the catalogue), `phone` on customers, `username`
+on users, `(product, branch)` on stock, and branch + date pairs on movements, sales, payments and
+expenses. Nothing is indexed speculatively.
+
+**Tests** run against a real MongoDB, never a mock: unique indexes, conditional stock updates and
+transaction rollback only exist in the database. Point `MONGO_TEST_URI` at a replica set to
+exercise the atomic paths; a standalone runs the same suite through the fallback.
+
+## 11. Billz integration (phase 3)
+
+One module owns every conversation with Billz, and it is layered so each part has a single job:
+
+```
+Hadiya (routes, sync, later the AI)
+  -> modules/billz/billz.service.ts     authorization, Billz errors -> API errors
+  -> modules/billz/services/*           resources, normalised, shop-scoped
+  -> modules/billz/client/*             auth, retry, timeouts, pagination, error normalisation
+  -> Billz API
+```
+
+Nothing above the service layer knows Billz speaks HTTP, and nothing below it knows about roles or
+Hadiya's response envelope. `client/billz-endpoints.ts` is the only file holding a Billz path.
+
+**Evidence, not invention.** Billz has no public API reference, so every endpoint used is confirmed
+by the production client recovered from this repository's own history and/or a published Billz v2
+wrapper — recorded, with the gaps, in `docs/billz-api.md`. Nothing was implemented on a guess.
+
+**The client** authenticates with the account's secret token, caches the bearer until just before
+it expires, and re-authenticates exactly once on a `401`. It retries only what is worth retrying
+(`408`, `425`, `429`, `5xx`, network, timeout), honours `Retry-After` when Billz sends one, and
+backs off exponentially otherwise. Every failure becomes a `BillzError` with a kind
+(`rate_limited`, `timeout`, `malformed_response`, …), and that kind decides the HTTP answer: an
+upstream permission problem is _our_ dependency failing, so it surfaces as `503`, never as a `401`
+to the person who asked. Logs record the endpoint, status and duration — never the query string,
+which can carry a customer's phone number, and never the body, which carries the secret.
+
+**Normalisation** happens once, in `billz.mapper.ts`. Money arrives from Billz in so'm and is
+stored as integer minor units like everywhere else in Hadiya; a field Billz omits becomes `null`
+rather than an invented zero. Billz's per-shop price and stock arrays are collapsed against
+`BILLZ_SHOP_IDS`, so a multi-shop account cannot leak another branch's figures into a report.
+
+**Synchronisation** imports branches, categories, products and customers, in that order, because a
+product needs its category and resolves it through the mapping table. Three properties define it.
+A Billz id is _never_ treated as a Mongo `_id`: `IntegrationMapping` holds the link, with unique
+indexes in both directions so the relationship stays one-to-one and a re-run cannot duplicate.
+A content hash means an unchanged record is not rewritten. And the cursor — `last_updated_date`,
+the only real incremental window Billz offers — advances only after a clean run, so a failure
+repeats its window instead of skipping it. Every run writes a `SyncLog` with counts and any error;
+a record that cannot be filed (a product whose category is missing, a customer with no phone) is
+counted as skipped and stepped over rather than ending the run.
+
+**Prepared for the AI phase.** `billz.capabilities.ts` is the surface Phase 4 will hand a model:
+sixteen named read-only functions, each with a Zod schema for its arguments and a description
+written for a model rather than a developer. It is deliberately narrower than the service layer —
+Billz's order and client _write_ endpoints are not represented at all, so no prompt can reach them
+— and every list capability caps its own size so one question cannot pull the whole catalogue into
+a context window.
+
+**Tests** never call Billz. The client takes an injected `fetch`, so authentication, pagination,
+timeouts, rate limiting, malformed payloads and every error mapping are exercised against scripted
+responses; the sync tests use stubbed services against the real test database, so the mapping,
+idempotency and cursor behaviour are checked where they actually live. The test environment pins
+fake Billz credentials, so a developer's real token in `.env` can never reach a test run.
+
+## 12. Conversations and memory (phase 5)
+
+Three collections, deliberately separate. A `Conversation` is the thread and its counters; a
+`Message` is one turn; a `Memory` is one durable fact. Messages are not embedded in the
+conversation because a thread grows without bound and every list read would drag the whole
+transcript with it.
+
+**Privacy is the query, not a check.** Every conversation and memory read filters on the actor's
+id, so a query cannot match another user's row — safer than fetching a document and then deciding
+whether the caller should have seen it. A stranger asking for a thread by id gets `404`, not `403`,
+because a `403` would confirm the id exists.
+
+**Memory identity** is `(user, type, key)`, with a partial unique index over the live statuses.
+Re-learning a preference updates it instead of leaving two answers to one question, and forgetting
+sets `status: 'deleted'` with a timestamp — the row survives, the key is freed, and a dropped
+memory cannot quietly return.
+
+**Nothing sensitive is remembered.** `memory-privacy.ts` classifies a candidate before it is
+stored and refuses outright rather than redacting: a remembered secret outlives the conversation
+and is replayed into later prompts. Matching folds `_` and `-` to spaces, because the keys that
+matter look like `wifi_password` and `company_iban`, where a `\b` anchor never fires.
+
+**Confidence decides trust.** What a person states is active immediately. What the assistant infers
+below the confidence threshold is stored as `pending`, kept out of every prompt, and surfaced in
+the chat response so the client can ask — the confirmation path, rather than a silent guess.
+
+**Context is bounded by construction.** `context-builder.service.ts` takes a window of recent
+messages and a short list of relevant memories, then trims from the oldest end to a character
+budget, dropping a tool result together with the turn that asked for it so the model never sees an
+answer to a question it cannot see. The system prompt is outside the trimmable window.
+
+**Retrieval is a seam.** `MemoryRetriever` is an interface; today's implementation scores keyword
+overlap, memory type and recency, and needs no extra infrastructure. Preferences and standing
+instructions keep a floor score so "always answer briefly" survives a question it shares no words
+with. A vector-backed retriever implements the same interface and replaces it without the context
+builder or the agent noticing — which is why no embedding column exists yet.
+
+**The tool registry is the only dispatch.** A name that is not registered is refused, and arguments
+are validated against the tool's own Zod schema before anything runs, so a hallucinated call cannot
+reach the database. The actor comes from the authenticated request, never from the model.
+
+**The model is behind an interface.** `AiProvider` is what the agent is written against, so the
+whole turn — persistence, context, tool rounds — is exercised in tests with a scripted provider and
+no paid API call. Until a real client is registered the endpoint answers `503`; a canned reply
+would look like a working assistant and poison history with text no model produced.
+
+## 13. Known gaps entering the next phase
+
+- Refresh tokens are stateless and cannot be revoked before they expire; signing out is a
+  client-side discard. A denylist belongs in the auth module before multi-device use matters.
 - Rate limiting is in-process (per instance); a shared store is needed before running more than one
-  replica.
-- The web client has no test suite yet.
+  replica, and the login endpoint deserves a stricter limit of its own.
+- Reporting reads (daily takings, margin, stock valuation) have no endpoints yet; the data they
+  need is all recorded.
+- Cancelling a sale reverses stock and payments but does not model a partial refund.
+- The web client has no test suite and no screens for any of these endpoints; phase 5 adds the
+  conversation store the chat UI will bind to, not the UI.
+- No model client is registered, so `/ai/chat` cannot answer in production yet.
+- Tool rounds are capped at three per turn; there is no streaming and no cancellation.
+- Memory retrieval is keyword and recency scoring over a bounded candidate set, which will need
+  replacing once one user holds thousands of memories.
+- Billz exposes no expenses, sales reports, warehouses, suppliers or purchase data to an API-key
+  credential (`docs/billz-api.md`), so those parts of the domain can only come from Hadiya's own
+  records.
+- A Billz sync is triggered by hand; there is no scheduler yet.
+- Billz sales are read through, not imported: Hadiya's `Sale` collection stays its own POS's record,
+  so the two never fight over one receipt.

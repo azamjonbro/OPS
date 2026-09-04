@@ -3,6 +3,7 @@ import http from 'node:http';
 import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { connectDatabase, disconnectDatabase } from './core/db/connection.js';
+import { probeTransactionSupport } from './core/db/transaction.js';
 import { createShutdownManager, registerProcessSignalHandlers } from './core/lifecycle/shutdown.js';
 import { logger } from './core/logger/logger.js';
 
@@ -54,6 +55,22 @@ const closeServer = (server: http.Server): Promise<void> =>
     });
   });
 
+/**
+ * Production start-up already refuses to run without signing keys. Outside
+ * production they stay optional so the service can boot for a health check, but
+ * every authentication endpoint will fail until they are set — which is worth
+ * saying once, loudly, at start-up rather than at the first failed login.
+ */
+const warnAboutMissingAuthSecrets = (): void => {
+  if (config.auth.accessSecret && config.auth.refreshSecret) {
+    return;
+  }
+
+  logger.warn(
+    'JWT_ACCESS_SECRET / JWT_REFRESH_SECRET are not set: sign-in and every authenticated endpoint will fail. Generate one with `openssl rand -hex 32`.',
+  );
+};
+
 const bootstrap = async (): Promise<void> => {
   const shutdownManager = createShutdownManager({
     logger,
@@ -62,8 +79,14 @@ const bootstrap = async (): Promise<void> => {
 
   registerProcessSignalHandlers(shutdownManager, logger);
 
+  warnAboutMissingAuthSecrets();
+
   await connectDatabaseWithRetry();
   shutdownManager.register({ name: 'database', run: disconnectDatabase });
+
+  // Whether writes can be atomic depends on the deployment, so probe once and
+  // warn now instead of discovering it during the first sale.
+  await probeTransactionSupport();
 
   const server = http.createServer(createApp());
 

@@ -7,6 +7,7 @@ import type {
 } from '@hadiya/shared';
 
 import { HTTP_STATUS, type HttpStatus } from './http-status.js';
+import { toApiPayload } from './serialize.js';
 
 export const buildResponseMeta = (req: Request): ApiResponseMeta => ({
   requestId: req.id,
@@ -27,17 +28,24 @@ export const sendSuccess = <TData>(
   data: TData,
   options: SendSuccessOptions = {},
 ): void => {
-  const body: ApiSuccessResponse<TData> = {
+  const body = {
     success: true,
-    data,
+    // Documents are normalised here (`_id` -> `id`) so every endpoint returns
+    // the same shape whether it read lean objects or hydrated documents.
+    data: toApiPayload(data),
     meta: buildResponseMeta(req),
-  };
+  } satisfies Omit<ApiSuccessResponse<TData>, 'data'> & { data: unknown };
 
   res.status(options.status ?? HTTP_STATUS.OK).json(body);
 };
 
 export const sendCreated = <TData>(req: Request, res: Response, data: TData): void => {
   sendSuccess(req, res, data, { status: HTTP_STATUS.CREATED });
+};
+
+/** The work was accepted but is not finished — used by the sync trigger. */
+export const sendAccepted = <TData>(req: Request, res: Response, data: TData): void => {
+  sendSuccess(req, res, data, { status: HTTP_STATUS.ACCEPTED });
 };
 
 export const sendNoContent = (res: Response): void => {

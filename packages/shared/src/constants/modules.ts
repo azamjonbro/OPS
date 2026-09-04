@@ -11,6 +11,7 @@ export const APP_MODULES = [
   'users',
   'employees',
   'branches',
+  'categories',
   'products',
   'inventory',
   'sales',

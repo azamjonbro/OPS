@@ -1,9 +1,10 @@
 import type { UserRole } from '../constants/roles.js';
+import type { User } from './user.js';
 
 /**
- * The authenticated principal as exposed to clients. Populated by the auth
- * module in a later phase; declared here so the web app and the API agree on
- * the shape from the start.
+ * The principal carried by an access token and attached to every authenticated
+ * request. Deliberately smaller than `User`: it holds only what authorization
+ * decisions need, so nothing else has to be re-read from the token.
  */
 export interface AuthenticatedUser {
   id: string;
@@ -27,6 +28,10 @@ export interface LoginCredentials {
 }
 
 export interface LoginResult {
-  user: AuthenticatedUser;
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface RefreshResult {
   tokens: AuthTokens;
 }

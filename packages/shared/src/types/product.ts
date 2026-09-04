@@ -28,7 +28,8 @@ export interface Product extends Entity {
   /** Scanned barcode (EAN/UPC); unique when present. */
   barcode: string | null;
   description: string | null;
-  categoryId: string;
+  /** Id of the category this product belongs to. */
+  category: string;
   /** Selling price in minor units. */
   price: MinorUnits;
   /** Purchase cost in minor units; used for margin reporting. */
