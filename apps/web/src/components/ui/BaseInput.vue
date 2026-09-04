@@ -8,8 +8,14 @@ import { computed, useId } from 'vue';
  * placeholder is not a label: it disappears on focus and screen readers do not
  * announce it as one. `describedby` wires the hint and the error to the field
  * so both are read out, and `aria-invalid` marks the field itself.
+ *
+ * The model is always a string, even for `type="number"`. Vue's own `v-model`
+ * coerces a number field to a number, which means a caller that trims or
+ * pattern-matches the value crashes the moment somebody types a digit — so the
+ * value is bound and read manually here, once, rather than every form having to
+ * defend against it.
  */
-const model = defineModel<string | number>({ default: '' });
+const model = defineModel<string>({ default: '' });
 
 const props = withDefaults(
   defineProps<{
@@ -62,7 +68,7 @@ const describedBy = computed(() =>
 
     <input
       :id="id"
-      v-model="model"
+      :value="model"
       :type="type"
       :placeholder="placeholder"
       :required="required"
@@ -77,6 +83,7 @@ const describedBy = computed(() =>
       :aria-describedby="describedBy"
       class="h-10 w-full rounded-lg bg-surface px-3 text-sm text-ink-900 ring-1 ring-inset transition-shadow placeholder:text-ink-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
       :class="error ? 'ring-danger-600 focus:ring-danger-600' : 'ring-border-subtle focus:ring-brand-600'"
+      @input="model = ($event.target as HTMLInputElement).value"
     />
 
     <p v-if="error" :id="errorId" class="text-xs text-danger-600">{{ error }}</p>

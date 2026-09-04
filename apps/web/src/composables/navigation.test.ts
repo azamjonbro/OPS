@@ -45,13 +45,20 @@ describe('permission-based navigation', () => {
     expect(labels()).toContain('Employees');
   });
 
-  it('drops a section once nothing in it is permitted', () => {
+  it('keeps a section that still has something in it, and drops the rest', () => {
     signIn('cashier');
 
-    // Finance holds Expenses and Reports; a cashier keeps Expenses, so the
-    // section survives — the empty-section rule is exercised by the titles.
-    const titles = useNavigation().sections.value.map((section) => section.title);
-    expect(titles).not.toContain('Administration');
+    const sections = useNavigation().sections.value;
+    const finance = sections.find((section) => section.title === 'Finance');
+    const administration = sections.find((section) => section.title === 'Administration');
+
+    // Finance keeps Expenses and loses Reports.
+    expect(finance?.items.map((item) => item.label)).toEqual(['Expenses']);
+    // Administration keeps Settings, which everybody may reach, and loses
+    // Employees. A heading over an empty list would advertise an area the
+    // person cannot get to.
+    expect(administration?.items.map((item) => item.label)).toEqual(['Settings']);
+    expect(sections.every((section) => section.items.length > 0)).toBe(true);
   });
 
   it('derives capability flags from the role', () => {
