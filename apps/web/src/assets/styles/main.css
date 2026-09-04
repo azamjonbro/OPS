@@ -1,7 +1,14 @@
 @import 'tailwindcss';
 
-/* Design tokens. Tailwind v4 generates utilities (bg-brand-600, text-ink-500…)
-   from these, so colours are defined once and never hard-coded in components. */
+/**
+ * Design tokens.
+ *
+ * Tailwind v4 generates utilities (bg-brand-600, text-ink-500…) from these, so
+ * a colour is defined once and never hard-coded in a component. Every utility
+ * resolves to `var(--color-…)` at runtime, which is what makes the dark theme a
+ * redefinition of the same names rather than a second set of classes on every
+ * element.
+ */
 @theme {
   --color-brand-50: oklch(0.97 0.02 275);
   --color-brand-100: oklch(0.93 0.05 275);
@@ -16,17 +23,66 @@
 
   --color-surface: oklch(1 0 0);
   --color-surface-muted: oklch(0.98 0.003 275);
+  --color-surface-raised: oklch(1 0 0);
   --color-border-subtle: oklch(0.92 0.005 275);
+  --color-border-strong: oklch(0.85 0.008 275);
 
+  --color-ink-400: oklch(0.68 0.02 275);
   --color-ink-500: oklch(0.55 0.02 275);
   --color-ink-700: oklch(0.38 0.02 275);
   --color-ink-900: oklch(0.22 0.02 275);
+
+  /* Status colours, so a badge or a metric never reaches for a raw palette. */
+  --color-positive-50: oklch(0.96 0.03 155);
+  --color-positive-600: oklch(0.58 0.14 155);
+  --color-positive-700: oklch(0.48 0.13 155);
+  --color-warning-50: oklch(0.97 0.04 85);
+  --color-warning-600: oklch(0.68 0.15 70);
+  --color-warning-700: oklch(0.55 0.14 65);
+  --color-danger-50: oklch(0.96 0.03 25);
+  --color-danger-600: oklch(0.58 0.19 25);
+  --color-danger-700: oklch(0.5 0.18 25);
+}
+
+/**
+ * The dark theme.
+ *
+ * Only the tokens change, and the roles stay consistent: `surface` is what a
+ * card sits on, `surface-muted` is the page behind it. In dark mode a raised
+ * card must be *lighter* than the page, so the two swap rather than simply
+ * inverting, which is what stops a dark UI from reading as flat.
+ */
+[data-theme='dark'] {
+  --color-surface: oklch(0.24 0.012 275);
+  --color-surface-muted: oklch(0.19 0.012 275);
+  --color-surface-raised: oklch(0.28 0.014 275);
+  --color-border-subtle: oklch(0.33 0.014 275);
+  --color-border-strong: oklch(0.42 0.016 275);
+
+  --color-ink-400: oklch(0.6 0.015 275);
+  --color-ink-500: oklch(0.72 0.015 275);
+  --color-ink-700: oklch(0.86 0.012 275);
+  --color-ink-900: oklch(0.97 0.005 275);
+
+  --color-brand-50: oklch(0.3 0.05 275);
+  --color-brand-100: oklch(0.34 0.07 275);
+  --color-brand-200: oklch(0.4 0.1 275);
+
+  --color-positive-50: oklch(0.28 0.05 155);
+  --color-warning-50: oklch(0.3 0.06 80);
+  --color-danger-50: oklch(0.29 0.06 25);
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
+    /* Tells the browser which form-control palette to paint. */
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
   }
 
   body {
@@ -34,8 +90,34 @@
     color: var(--color-ink-900);
   }
 
+  /* A visible focus ring on every interactive element, never removed. */
   :focus-visible {
     outline: 2px solid var(--color-brand-500);
     outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Reachable by keyboard, invisible until focused: the skip link. */
+  .sr-only-focusable:not(:focus) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
