@@ -1,4 +1,5 @@
 import {
+  DEFAULT_TIMEZONE,
   hasAtLeastRole,
   type AuthenticatedUser,
   type PaginatedResult,
@@ -77,6 +78,7 @@ export const createUser = async (
     status: 'active',
     phone: input.phone ?? null,
     branch: toObjectIdOrNull(branchId),
+    timezone: input.timezone ?? DEFAULT_TIMEZONE,
     lastLoginAt: null,
   });
 
@@ -166,6 +168,10 @@ export const updateUser = async (
     update.role = input.role;
   }
 
+  if (input.timezone !== undefined) {
+    update.timezone = input.timezone;
+  }
+
   if (input.branchId !== undefined) {
     if (input.branchId) {
       await assertBranchExists(input.branchId);
@@ -186,6 +192,23 @@ export const updateUser = async (
   }
 
   const updated = await userRepository.updateById(id, update);
+
+  if (!updated) {
+    throw ApiError.notFound('Employee not found');
+  }
+
+  return updated;
+};
+
+/**
+ * A person's own settings, which need no role: the only account this can touch
+ * is the one making the request.
+ */
+export const updateOwnPreferences = async (
+  actor: AuthenticatedUser,
+  input: { timezone: string },
+): Promise<UserDocument> => {
+  const updated = await userRepository.updateById(actor.id, { timezone: input.timezone });
 
   if (!updated) {
     throw ApiError.notFound('Employee not found');

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
+import NotificationBell from '@/components/notifications/NotificationBell.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
@@ -43,6 +44,7 @@ const roleLabel = computed(() => auth.user?.role ?? 'no active session');
     </div>
 
     <div class="flex items-center gap-3">
+      <NotificationBell />
       <div class="hidden text-right sm:block">
         <p class="text-sm font-medium text-ink-900">{{ displayName }}</p>
         <p class="text-xs capitalize text-ink-500">{{ roleLabel }}</p>

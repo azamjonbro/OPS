@@ -18,6 +18,12 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/DashboardPage.vue'),
         meta: { title: 'Dashboard', requiresAuth: true },
       },
+      {
+        path: 'reminders',
+        name: 'reminders',
+        component: () => import('@/pages/RemindersPage.vue'),
+        meta: { title: 'Reminders', requiresAuth: true },
+      },
     ],
   },
   {

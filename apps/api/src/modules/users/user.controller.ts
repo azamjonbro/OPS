@@ -11,6 +11,7 @@ import type {
   changePasswordSchema,
   createUserSchema,
   listUsersQuerySchema,
+  updateOwnPreferencesSchema,
   updateUserSchema,
   updateUserStatusSchema,
   userIdParamSchema,
@@ -43,6 +44,14 @@ export const update: ValidatedHandler<{
     req.validated.params.id,
     req.validated.body,
   );
+
+  sendSuccess(req, res, user);
+};
+
+export const updatePreferences: ValidatedHandler<{
+  body: typeof updateOwnPreferencesSchema;
+}> = async (req, res) => {
+  const user = await userService.updateOwnPreferences(requireActor(req), req.validated.body);
 
   sendSuccess(req, res, user);
 };

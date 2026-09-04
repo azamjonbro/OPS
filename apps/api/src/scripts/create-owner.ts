@@ -7,6 +7,8 @@
  * It refuses to run when any account already exists, so it cannot be used to
  * quietly add a privileged user to a live system.
  */
+import { DEFAULT_TIMEZONE, isValidTimeZone } from '@hadiya/shared';
+
 import { connectDatabase, disconnectDatabase } from '../core/db/connection.js';
 import { hashPassword } from '../core/security/password.js';
 import { logger } from '../core/logger/logger.js';
@@ -24,15 +26,22 @@ const run = async (): Promise<void> => {
   const username = readFlag('username')?.trim().toLowerCase();
   const password = readFlag('password');
   const fullName = readFlag('name')?.trim();
+  // Reminders are set and shown in it, so it is worth getting right at the
+  // start; the account default covers a deployment that leaves it out.
+  const timezone = readFlag('timezone')?.trim() || DEFAULT_TIMEZONE;
 
   if (!username || !password || !fullName) {
     throw new Error(
-      'Usage: create-owner --username <username> --password <password> --name <full name>',
+      'Usage: create-owner --username <username> --password <password> --name <full name> [--timezone <IANA zone>]',
     );
   }
 
   if (password.length < MINIMUM_PASSWORD_LENGTH) {
     throw new Error(`The password must be at least ${MINIMUM_PASSWORD_LENGTH} characters`);
+  }
+
+  if (!isValidTimeZone(timezone)) {
+    throw new Error(`"${timezone}" is not an IANA time zone name`);
   }
 
   await connectDatabase();
@@ -54,10 +63,14 @@ const run = async (): Promise<void> => {
       status: 'active',
       phone: null,
       branch: null,
+      timezone,
       lastLoginAt: null,
     });
 
-    logger.info({ username: owner.username, id: String(owner._id) }, 'owner account created');
+    logger.info(
+      { username: owner.username, id: String(owner._id), timezone: owner.timezone },
+      'owner account created',
+    );
   } finally {
     await disconnectDatabase();
   }

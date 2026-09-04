@@ -1,4 +1,9 @@
-import { MEMORY_CONTEXT_LIMIT, type AuthenticatedUser, type ContextSummary } from '@hadiya/shared';
+import {
+  formatInTimeZone,
+  MEMORY_CONTEXT_LIMIT,
+  type AuthenticatedUser,
+  type ContextSummary,
+} from '@hadiya/shared';
 
 import * as conversationService from '../../conversations/conversation.service.js';
 import type { MessageDocument } from '../../conversations/message.model.js';
@@ -40,13 +45,24 @@ const estimateTokens = (messages: AiPromptMessage[]): number =>
  * rather than injected as fake user turns, so the model can tell what it was
  * told about the person from what the person actually said.
  */
-export const buildSystemPrompt = (actor: AuthenticatedUser, memories: MemoryDocument[]): string => {
+export const buildSystemPrompt = (
+  actor: AuthenticatedUser,
+  memories: MemoryDocument[],
+  now: Date = new Date(),
+): string => {
   const lines = [
     'You are Hadiya, the assistant inside a retail business management system.',
     `You are speaking with ${actor.fullName} (role: ${actor.role}).`,
     'Answer in the language the user writes in.',
     'Use your tools when a stored preference or a saved fact could change the answer.',
     'Never store passwords, API keys, card numbers or other credentials in memory.',
+    '',
+    // Without this the model has no idea what "tomorrow" is and will invent a
+    // date. Both the local reading and the zone are given, because a reminder
+    // is set in the user's wall clock and never in UTC.
+    `The current time for this user is ${formatInTimeZone(now, actor.timezone)}.`,
+    `Their time zone is ${actor.timezone}; give every reminder time as their local wall clock, and never convert to UTC yourself.`,
+    'If a requested time is vague, ask for an exact one rather than guessing.',
   ];
 
   if (memories.length > 0) {
@@ -149,6 +165,8 @@ export interface BuildContextInput {
   userMessage: string;
   recentMessageLimit?: number;
   memoryLimit?: number;
+  /** Injected so a test can assert on the time the model was told. */
+  now?: Date;
 }
 
 export const buildContext = async (
@@ -169,7 +187,7 @@ export const buildContext = async (
   ]);
 
   const memories = scoredMemories.map((entry) => entry.memory);
-  const systemPrompt = buildSystemPrompt(actor, memories);
+  const systemPrompt = buildSystemPrompt(actor, memories, input.now);
 
   // The system prompt is not part of the trimmable window: dropping the
   // instructions to make room for old chatter would be the wrong trade.

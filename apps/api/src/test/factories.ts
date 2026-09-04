@@ -1,4 +1,4 @@
-import type { UserRole } from '@hadiya/shared';
+import { DEFAULT_TIMEZONE, type AuthenticatedUser, type UserRole } from '@hadiya/shared';
 import type { Express } from 'express';
 import type { HydratedDocument } from 'mongoose';
 import request from 'supertest';
@@ -48,6 +48,7 @@ export const createTestUser = async (
     status: 'active',
     phone: null,
     branch: branchId,
+    timezone: DEFAULT_TIMEZONE,
     lastLoginAt: null,
     ...overrides,
   });
@@ -85,6 +86,23 @@ export const createTestProduct = (
     ...overrides,
   });
 
+/**
+ * The principal a service call would receive for a stored user. Built here so
+ * a new field on `AuthenticatedUser` is added once rather than in every suite.
+ */
+export const actorFor = (
+  user: HydratedDocument<UserDocument>,
+  overrides: Partial<AuthenticatedUser> = {},
+): AuthenticatedUser => ({
+  id: String(user._id),
+  username: user.username,
+  fullName: user.fullName,
+  role: user.role,
+  branchId: user.branch ? String(user.branch) : null,
+  timezone: user.timezone,
+  ...overrides,
+});
+
 /** Signs in through the real login endpoint and returns a bearer header. */
 export const signIn = async (app: Express, username: string): Promise<string> => {
   const response = await request(app)
@@ -109,8 +127,17 @@ export const signInAs = async (
   app: Express,
   role: UserRole,
   branchId: string | null,
-): Promise<{ user: HydratedDocument<UserDocument>; authorization: string }> => {
-  const user = await createTestUser(role, branchId);
+  overrides: Partial<UserDocument> = {},
+): Promise<{
+  user: HydratedDocument<UserDocument>;
+  authorization: string;
+  actor: AuthenticatedUser;
+}> => {
+  const user = await createTestUser(role, branchId, overrides);
 
-  return { user, authorization: await signIn(app, user.username) };
+  return {
+    user,
+    authorization: await signIn(app, user.username),
+    actor: actorFor(user),
+  };
 };

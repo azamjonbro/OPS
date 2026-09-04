@@ -1,4 +1,10 @@
-import { USER_ROLES, USER_STATUSES, type UserRole, type UserStatus } from '@hadiya/shared';
+import {
+  DEFAULT_TIMEZONE,
+  USER_ROLES,
+  USER_STATUSES,
+  type UserRole,
+  type UserStatus,
+} from '@hadiya/shared';
 import { model, Schema, type Model, type Types } from 'mongoose';
 
 import { createSchema } from '../../core/db/create-schema.js';
@@ -13,6 +19,12 @@ export interface UserDocument {
   status: UserStatus;
   phone: string | null;
   branch: Types.ObjectId | null;
+  /**
+   * IANA zone the employee's wall clock is read in. It belongs to the account
+   * rather than to the browser: a reminder set from a phone abroad still means
+   * ten o'clock at the shop.
+   */
+  timezone: string;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +45,7 @@ const userSchema = createSchema<UserDocument>({
   status: { type: String, required: true, enum: USER_STATUSES, default: 'active' },
   phone: { type: String, default: null, trim: true, maxlength: 32 },
   branch: { type: Schema.Types.ObjectId, ref: 'Branch', default: null },
+  timezone: { type: String, required: true, trim: true, maxlength: 64, default: DEFAULT_TIMEZONE },
   lastLoginAt: { type: Date, default: null },
 });
 
