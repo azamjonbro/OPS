@@ -13,6 +13,13 @@ export interface AuthenticatedUser {
   role: UserRole;
   /** Branch the user is scoped to, or `null` for organisation-wide access. */
   branchId: string | null;
+  /**
+   * IANA zone the user's wall clock is read in. Carried on the principal
+   * because almost everything time-shaped needs it — a reminder for "10:00",
+   * the current time the assistant is told — and re-reading the account on
+   * every such call would be the same lookup done later and less reliably.
+   */
+  timezone: string;
 }
 
 export interface AuthTokens {
