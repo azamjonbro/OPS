@@ -160,8 +160,16 @@ export const generateImages = async (
 
   if (!provider.isConfigured) {
     // Asks the provider to produce its own refusal, so the reason is the
-    // provider's rather than a guess made here.
-    await provider.generate({ prompt: input.prompt, count: 1, aspectRatio: '1:1' });
+    // provider's rather than a guess made here — but mapped like every other
+    // provider failure, so an unconfigured deployment answers 503 rather than
+    // letting an unexpected throw reach the client as a 500.
+    try {
+      await provider.generate({ prompt: input.prompt, count: 1, aspectRatio: '1:1' });
+    } catch (error) {
+      throw generationFailed(error);
+    }
+
+    throw ApiError.dependencyUnavailable('Image generation is not available');
   }
 
   const contentItemId = isObjectIdString(input.contentItemId) ? input.contentItemId : null;

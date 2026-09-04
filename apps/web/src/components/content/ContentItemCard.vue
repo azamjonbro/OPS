@@ -2,6 +2,7 @@
 import type { ContentItem } from '@hadiya/shared';
 import { ref } from 'vue';
 
+import ContentItemImages from '@/components/content/ContentItemImages.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 
 /**
@@ -106,6 +107,8 @@ const STATUS_CLASSES: Record<string, string> = {
         placeholder="hashtags separated by spaces"
       />
     </div>
+
+    <ContentItemImages v-if="!isEditing" :content-item-id="item.id" />
 
     <div class="flex flex-wrap items-center gap-2">
       <template v-if="isEditing">

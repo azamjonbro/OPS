@@ -28,6 +28,12 @@ export const navigationSections: NavigationSection[] = [
         icon: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5',
       },
       {
+        label: 'Images',
+        module: 'images',
+        to: { name: 'images' },
+        icon: 'M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6',
+      },
+      {
         label: 'Assistant',
         module: 'assistant',
         to: null,

@@ -36,6 +36,12 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/ContentPlanDetailPage.vue'),
         meta: { title: 'Content plan', requiresAuth: true },
       },
+      {
+        path: 'images',
+        name: 'images',
+        component: () => import('@/pages/ImagesPage.vue'),
+        meta: { title: 'Images', requiresAuth: true },
+      },
     ],
   },
   {
