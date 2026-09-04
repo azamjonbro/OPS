@@ -3,6 +3,7 @@ export * from './types/api.js';
 export * from './types/auth.js';
 export * from './types/branch.js';
 export * from './types/category.js';
+export * from './types/content.js';
 export * from './types/conversation.js';
 export * from './types/customer.js';
 export * from './types/entity.js';
@@ -19,6 +20,7 @@ export * from './types/sale.js';
 export * from './types/scheduler.js';
 export * from './types/user.js';
 
+export * from './constants/content.js';
 export * from './constants/conversations.js';
 export * from './constants/customers.js';
 export * from './constants/expenses.js';
