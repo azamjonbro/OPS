@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from '@hadiya/shared';
+import type { AuthenticatedUser, ToolCallStatus } from '@hadiya/shared';
 import { z } from 'zod';
 
 import { createLogger } from '../../../core/logger/logger.js';
@@ -34,8 +34,39 @@ export interface RegisteredTool<TSchema extends z.ZodType = z.ZodType> {
    * writing tools are the ones worth auditing.
    */
   mutates: boolean;
+  /**
+   * Whether the person has to agree before this runs.
+   *
+   * Reserved for what cannot be undone. Creating is cheap to reverse — delete
+   * the thing — but a destroyed plan is gone, and a model that misread
+   * "eskisini o'chir" would destroy it on its own reading of the sentence. Such
+   * a tool must accept a `confirm` boolean; the registry refuses to run it
+   * until that is `true`, so the guard cannot be forgotten inside the tool.
+   */
+  requiresConfirmation?: boolean;
+  /**
+   * What the model should tell the person it is about to do. Runs *before* the
+   * action, with the same validated arguments, so the description is of the
+   * real target rather than of what the model believed it had selected.
+   */
+  describeConfirmation?: (
+    args: z.output<TSchema>,
+    context: ToolContext,
+  ) => Promise<string> | string;
   execute: (args: z.output<TSchema>, context: ToolContext) => Promise<ToolResult>;
 }
+
+/**
+ * Whether a tool that needs confirmation has been given it.
+ *
+ * The flag is read off the validated arguments rather than declared separately,
+ * so there is one place a tool says "yes, go ahead" and the schema documents it
+ * to the model like any other argument.
+ */
+const isConfirmed = (args: unknown): boolean =>
+  typeof args === 'object' &&
+  args !== null &&
+  (args as { confirm?: unknown }).confirm === true;
 
 /**
  * The one place a model's tool requests are turned into code.
@@ -82,7 +113,7 @@ export class ToolRegistry {
     name: string,
     rawArguments: unknown,
     context: ToolContext,
-  ): Promise<{ result: ToolResult; status: 'succeeded' | 'failed'; durationMs: number }> {
+  ): Promise<{ result: ToolResult; status: ToolCallStatus; durationMs: number }> {
     const startedAt = Date.now();
     const tool = this.tools.get(name);
 
@@ -105,6 +136,24 @@ export class ToolRegistry {
         status: 'failed',
         durationMs: Date.now() - startedAt,
         result: { summary: `Invalid arguments for "${name}": ${issues}` },
+      };
+    }
+
+    // Destructive tools stop here until the person has agreed. Enforced by the
+    // registry rather than by each tool, so a new one cannot forget the guard —
+    // and enforced *after* validation, so what is described is what would run.
+    if (tool.requiresConfirmation && !isConfirmed(parsed.data)) {
+      const description = tool.describeConfirmation
+        ? await tool.describeConfirmation(parsed.data, context)
+        : `run "${name}"`;
+
+      return {
+        status: 'needs_confirmation',
+        durationMs: Date.now() - startedAt,
+        result: {
+          summary: `Confirmation needed: ${description}. Ask the user to confirm, then call "${name}" again with confirm: true. Do not assume they agreed.`,
+          data: { needsConfirmation: true, tool: name },
+        },
       };
     }
 

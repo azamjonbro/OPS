@@ -13,8 +13,15 @@ export const CONVERSATION_STATUSES = ['active', 'archived'] as const;
 
 export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number];
 
-/** How a tool call ended, kept so a failed call is visible in the transcript. */
-export const TOOL_CALL_STATUSES = ['succeeded', 'failed'] as const;
+/**
+ * How a tool call ended, kept so a failed call is visible in the transcript.
+ *
+ * `needs_confirmation` is not a failure: the tool was reached and understood,
+ * and it is waiting for the person to agree before anything is destroyed. It is
+ * recorded as its own status so a replayed thread shows that a delete was
+ * proposed and not yet carried out.
+ */
+export const TOOL_CALL_STATUSES = ['succeeded', 'failed', 'needs_confirmation'] as const;
 
 export type ToolCallStatus = (typeof TOOL_CALL_STATUSES)[number];
 
