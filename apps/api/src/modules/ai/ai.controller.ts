@@ -35,6 +35,12 @@ export const status = (req: Request, res: Response): void => {
     ...provider,
     tools: getToolRegistry()
       .list()
-      .map((tool) => ({ name: tool.name, description: tool.description, mutates: tool.mutates })),
+      .map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        mutates: tool.mutates,
+        // Surfaced so a client can warn before a destructive call is proposed.
+        requiresConfirmation: tool.requiresConfirmation ?? false,
+      })),
   });
 };

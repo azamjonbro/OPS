@@ -63,6 +63,9 @@ export const buildSystemPrompt = (
     `The current time for this user is ${formatInTimeZone(now, actor.timezone)}.`,
     `Their time zone is ${actor.timezone}; give every reminder time as their local wall clock, and never convert to UTC yourself.`,
     'If a requested time is vague, ask for an exact one rather than guessing.',
+    // Content work is where a model is most tempted to invent a product or a
+    // price, and where the tools it needs are least obvious from the request.
+    'For content work, base posts on real products and figures: read them with get_products or get_sales_summary first and pass what you found as businessContext. Never invent a product, a price or a discount.',
   ];
 
   if (memories.length > 0) {
