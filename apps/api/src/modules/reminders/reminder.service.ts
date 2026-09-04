@@ -58,8 +58,9 @@ const ownedBy = (actor: AuthenticatedUser, extra: Record<string, unknown> = {}) 
 export const occurrenceKey = (reminderId: string, scheduledAt: Date): string =>
   `${REMINDER_JOB_TYPE}:${reminderId}:${scheduledAt.getTime()}`;
 
-const scheduleOccurrence = async (reminder: ReminderDocument): Promise<void> => {
-  await enqueueJob({
+/** Returns whether a job was actually created, or one already existed. */
+const scheduleOccurrence = async (reminder: ReminderDocument): Promise<boolean> => {
+  const { created } = await enqueueJob({
     type: REMINDER_JOB_TYPE,
     key: occurrenceKey(String(reminder._id), reminder.scheduledAt),
     payload: {
@@ -71,6 +72,8 @@ const scheduleOccurrence = async (reminder: ReminderDocument): Promise<void> => 
     runAt: reminder.scheduledAt,
     maxAttempts: REMINDER_DELIVERY_MAX_ATTEMPTS,
   });
+
+  return created;
 };
 
 /** Drops every outstanding job for a reminder, whatever occurrence it was for. */
@@ -582,8 +585,11 @@ export const recoverPendingReminders = async (now: Date = new Date()): Promise<n
   let recovered = 0;
 
   for (const reminder of due) {
-    await scheduleOccurrence(reminder);
-    recovered += 1;
+    // Only a genuine insert counts: a reminder that already has its job is the
+    // normal case and re-queuing it is a no-op, not a recovery.
+    if (await scheduleOccurrence(reminder)) {
+      recovered += 1;
+    }
   }
 
   if (recovered > 0) {

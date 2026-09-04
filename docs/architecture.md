@@ -328,7 +328,64 @@ whole turn — persistence, context, tool rounds — is exercised in tests with 
 no paid API call. Until a real client is registered the endpoint answers `503`; a canned reply
 would look like a working assistant and poison history with text no model produced.
 
-## 13. Known gaps entering the next phase
+## 13. Reminders, scheduling and notifications (phase 6)
+
+Four pieces, in a straight line: a tool asks the reminder service for something, the service writes
+a `Reminder` and a `ScheduledJob`, a worker runs the job when it comes due, and a notification
+provider delivers it. Nothing in the AI layer knows how scheduling works, and nothing in the
+scheduler knows what a reminder is — `reminder.jobs.ts` is the only seam between them, and it is
+registered at start-up rather than imported by either side.
+
+**Jobs are rows, not timers.** A `setTimeout` lives in one process's memory: it is lost on deploy,
+on a crash, and on the second instance never having had it. `ScheduledJob` is a document with a due
+time, so a restart loses nothing and the claim query asks for everything due _at or before_ now —
+which is also how an outage is caught up on rather than silently skipped.
+
+**Claiming is one atomic write.** `findOneAndUpdate` flips `pending` to `running`, takes a lease and
+increments `attempts` in a single operation; two workers racing produce one winner and one `null`,
+with no read-then-write window between them. A job still `running` after the lease expires is
+assumed to belong to a dead process and is claimable again, which is how work in flight survives a
+crash. The dead worker's attempt still counts, so a job that kills its worker cannot retry forever.
+
+**One key, one execution.** Every occurrence has an idempotency key — `reminder.deliver:<id>:<ms>` —
+under a unique index, and enqueuing only ever inserts: an existing row is returned untouched, even a
+long-finished one. The same key is the notification's `dedupeKey`, so the guarantee holds one level
+down too: a retry after a partial failure finds its own earlier row instead of writing a second copy
+into the inbox.
+
+**Two time fields, both load-bearing.** `scheduledAt` is a UTC instant, the only representation that
+cannot be misread; `timezone` is the wall clock the person meant it in, and it cannot be recovered
+from the instant. Repeats are rebuilt as "09:00 on the next matching day in Tashkent" rather than as
+"add 168 hours", so a weekly reminder holds its local hour across a daylight-saving change instead
+of drifting. `utils/timezone.ts` does the conversion with `Intl`, which already carries the full
+IANA database, rather than adding a dependency that ships its own copy.
+
+**Recurrence is RFC 5545.** A repeat is stored as an RRULE string — `FREQ=WEEKLY;BYDAY=MO`, the same
+text an `.ics` file carries — not a shape invented here. Only the supported subset parses; `FREQ=YEARLY`
+or an ordinal `2MO` is refused rather than half-understood, because a rule that parses but is
+evaluated wrongly fires on the wrong days forever and nothing about the record looks broken. The
+assistant sends structured fields and the rule is built from them, so a model that has never read
+the spec cannot produce a subtly wrong one.
+
+**Ambiguity is a question, not a default.** "Bugun kechqurun eslat" resolves only if the user has
+told us what evening means to them (a Phase 5 memory, `evening_reminder_time`); otherwise the tool
+answers with the question to ask. A bare date behaves the same way — midnight would be a guess, and
+the wrong one. The clarification comes back as a successful tool result rather than a failure, so
+the model reads it as something to ask rather than something that broke.
+
+**Delivery is behind a provider interface.** The reminder service asks for a message on some
+channels; the registry decides what that means. In-app is implemented and always available; Telegram
+is registered, reports itself unavailable, and is skipped with a recorded reason. If no channel
+accepted the message the service throws, the scheduler retries with exponential backoff, and once
+the attempts are spent the reminder is marked `failed` with the reason — a notification that went
+nowhere is visible rather than silent.
+
+**Isolation is the query again.** Every request-facing reminder and notification call filters on the
+actor's id, so a stranger's id match is impossible rather than merely rejected. The scheduler-facing
+functions take no actor because no user is making the request; they are reachable only from a job
+the process itself enqueued.
+
+## 14. Known gaps entering the next phase
 
 - Refresh tokens are stateless and cannot be revoked before they expire; signing out is a
   client-side discard. A denylist belongs in the auth module before multi-device use matters.
@@ -346,6 +403,11 @@ would look like a working assistant and poison history with text no model produc
 - Billz exposes no expenses, sales reports, warehouses, suppliers or purchase data to an API-key
   credential (`docs/billz-api.md`), so those parts of the domain can only come from Hadiya's own
   records.
-- A Billz sync is triggered by hand; there is no scheduler yet.
+- Telegram and e-mail are declared notification channels with no working provider: delivery needs a
+  chat id or address per employee, so everything arrives in-app for now.
+- The scheduler polls every fifteen seconds, which bounds how precisely a reminder fires; a job due
+  between ticks waits for the next one.
+- Finished jobs are purged by `purgeFinishedJobs`, which nothing calls on a schedule yet.
+- A Billz sync is still triggered by hand, although the scheduler that would run it now exists.
 - Billz sales are read through, not imported: Hadiya's `Sale` collection stays its own POS's record,
   so the two never fight over one receipt.
