@@ -164,8 +164,8 @@ const confirmRemove = async (): Promise<void> => {
       size="sm"
     >
       <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
-        <BaseInput v-model="form.name" label="Name" required :error="nameError" maxlength="120" />
-        <BaseInput v-model="form.description" label="Description" placeholder="Optional" maxlength="500" />
+        <BaseInput v-model="form.name" label="Name" required :error="nameError" :maxlength="120" />
+        <BaseInput v-model="form.description" label="Description" placeholder="Optional" :maxlength="500" />
         <p v-if="formError" class="text-sm text-danger-600" role="alert">{{ formError }}</p>
       </form>
 

@@ -147,7 +147,7 @@ const submit = async (): Promise<void> => {
   >
     <form class="grid gap-4 sm:grid-cols-2" novalidate @submit.prevent="submit">
       <div class="sm:col-span-2">
-        <BaseInput v-model="form.name" label="Name" required :error="errors.name" maxlength="200" />
+        <BaseInput v-model="form.name" label="Name" required :error="errors.name" :maxlength="200" />
       </div>
 
       <BaseInput
@@ -208,7 +208,7 @@ const submit = async (): Promise<void> => {
       </label>
 
       <div class="sm:col-span-2">
-        <BaseInput v-model="form.description" label="Description" placeholder="Optional" maxlength="2000" />
+        <BaseInput v-model="form.description" label="Description" placeholder="Optional" :maxlength="2000" />
       </div>
 
       <p v-if="formError" class="text-sm text-danger-600 sm:col-span-2" role="alert">
