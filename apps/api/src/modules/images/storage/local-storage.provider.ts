@@ -95,8 +95,10 @@ export class LocalStorageProvider implements StorageProvider {
 
     try {
       data = await readFile(absolute);
-    } catch (error) {
-      throw new StorageError(`"${key}" is not in storage`, { cause: error } as ErrorOptions);
+    } catch {
+      // The underlying errno is deliberately not carried through: the caller
+      // can do nothing with it, and it names an absolute path on the server.
+      throw new StorageError(`"${key}" is not in storage`);
     }
 
     return {
