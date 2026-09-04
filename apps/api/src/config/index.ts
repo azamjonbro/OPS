@@ -30,6 +30,23 @@ export interface AiConfig {
   maxOutputTokens: number;
 }
 
+/** Which model draws, and how patiently. */
+export interface ImageConfig {
+  /** Explicit choice, or `null` to let the configured key decide. */
+  provider: 'openai' | null;
+  model: string;
+  baseUrl: string | null;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
+/** Where generated images are kept. */
+export interface StorageConfig {
+  driver: 'local';
+  /** Absolute path on disk for the local driver. */
+  localDir: string;
+}
+
 export interface AppConfig {
   app: {
     name: string;
@@ -70,6 +87,8 @@ export interface AppConfig {
    * none of these integrations are implemented yet.
    */
   ai: AiConfig;
+  image: ImageConfig;
+  storage: StorageConfig;
   integrations: {
     billz: BillzConfig;
     openai: IntegrationConfig & { apiKey: string | undefined };
@@ -137,6 +156,23 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     timeoutMs: env.AI_TIMEOUT_MS,
     maxRetries: env.AI_MAX_RETRIES,
     maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+  },
+  image: {
+    provider: env.IMAGE_PROVIDER ?? null,
+    // The default is the current general-purpose image model; overridable so a
+    // model upgrade is a configuration change.
+    model: env.IMAGE_MODEL ?? 'gpt-image-1',
+    baseUrl: env.IMAGE_BASE_URL ?? null,
+    timeoutMs: env.IMAGE_TIMEOUT_MS,
+    maxRetries: env.IMAGE_MAX_RETRIES,
+  },
+  storage: {
+    driver: env.STORAGE_DRIVER,
+    // Resolved once, against the package root rather than the working
+    // directory, so the location does not depend on where the process started.
+    localDir: path.isAbsolute(env.STORAGE_LOCAL_DIR)
+      ? env.STORAGE_LOCAL_DIR
+      : path.join(API_ROOT, env.STORAGE_LOCAL_DIR),
   },
   integrations: {
     billz: {

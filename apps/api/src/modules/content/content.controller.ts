@@ -1,8 +1,4 @@
-import {
-  sendCreated,
-  sendPaginated,
-  sendSuccess,
-} from '../../core/http/api-response.js';
+import { sendCreated, sendPaginated, sendSuccess } from '../../core/http/api-response.js';
 import { requireActor } from '../../core/security/actor.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import * as generationService from './content-generation.service.js';

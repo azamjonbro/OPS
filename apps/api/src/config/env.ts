@@ -90,6 +90,19 @@ const envSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(32_000).default(4_096),
+
+    /** Image generation. The vendor key is shared with the text model. */
+    IMAGE_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
+    IMAGE_MODEL: z.preprocess(blankToUndefined, z.string().min(1).max(80).optional()),
+    IMAGE_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
+    /** An image takes far longer than a sentence; the default reflects that. */
+    IMAGE_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(120_000),
+    IMAGE_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
+
+    /** Where generated images are kept. `local` is disk; `s3` is not built yet. */
+    STORAGE_DRIVER: z.preprocess(blankToUndefined, z.enum(['local']).default('local')),
+    /** Relative paths resolve against the API package root. */
+    STORAGE_LOCAL_DIR: z.string().min(1).default('storage'),
     TELEGRAM_BOT_TOKEN: optionalSecret,
   })
   .superRefine((value, ctx) => {

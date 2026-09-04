@@ -28,7 +28,10 @@ import {
 export const contentRouter: Router = Router();
 
 /* Plans. */
-contentRouter.post('/plans', ...validated({ body: createContentPlanSchema }, contentController.createPlan));
+contentRouter.post(
+  '/plans',
+  ...validated({ body: createContentPlanSchema }, contentController.createPlan),
+);
 contentRouter.get(
   '/plans',
   ...validated({ query: listContentPlansQuerySchema }, contentController.listPlans),

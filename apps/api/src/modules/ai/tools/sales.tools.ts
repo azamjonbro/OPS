@@ -1,4 +1,9 @@
-import { formatMoney, type SaleStatus } from '@hadiya/shared';
+import {
+  formatMoney,
+  parseLocalDateTime,
+  zonedPartsToInstant,
+  type SaleStatus,
+} from '@hadiya/shared';
 import { z } from 'zod';
 
 import * as saleService from '../../sales/sale.service.js';
@@ -17,16 +22,36 @@ const dateSchema = z
   .min(4)
   .describe('ISO-8601 date, e.g. 2026-09-04. Use the same day twice for a single day.');
 
-const toDay = (value: string, endOfDay: boolean): Date => {
-  const date = new Date(value);
+/**
+ * A bare date means a whole day — and whose day matters.
+ *
+ * "Bugungi savdo" is the user's today, read on their own wall clock, so the
+ * range is built in their zone rather than the server's. Those differ by hours,
+ * and for a shop in Tashkent asking late in the evening the server's day has
+ * already moved on: the takings of the day they are standing in would be
+ * reported as belonging to tomorrow, or missing altogether.
+ */
+const toDay = (value: string, endOfDay: boolean, timeZone: string): Date => {
+  const text = value.trim();
+  const local = parseLocalDateTime(text);
+
+  if (local && local.time === null) {
+    return zonedPartsToInstant(
+      {
+        ...local.day,
+        hour: endOfDay ? 23 : 0,
+        minute: endOfDay ? 59 : 0,
+        second: endOfDay ? 59 : 0,
+      },
+      timeZone,
+    );
+  }
+
+  // Anything else is already an instant, or is not a date at all.
+  const date = new Date(text);
 
   if (Number.isNaN(date.getTime())) {
     throw new Error(`"${value}" is not a date I can read; use YYYY-MM-DD.`);
-  }
-
-  // A bare date means the whole day, not the instant of midnight.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-    date.setHours(endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
   }
 
   return date;
@@ -51,8 +76,8 @@ export const getSalesSummaryTool: RegisteredTool = {
     const { items, pagination } = await saleService.listSales(context.actor, {
       page: 1,
       pageSize: MAX_SALES_ROWS,
-      from: toDay(from, false),
-      to: toDay(to, true),
+      from: toDay(from, false, context.actor.timezone),
+      to: toDay(to, true, context.actor.timezone),
       status: 'completed' as SaleStatus,
       ...(branchId ? { branchId } : {}),
     });

@@ -1,3 +1,4 @@
+import { formatIsoDateInTimeZone } from '@hadiya/shared';
 import { pino } from 'pino';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -96,7 +97,9 @@ describe('the full loop through the real provider', () => {
       payments: [{ method: 'cash', amount: 3_600_000 }],
     });
 
-    const today = new Date().toISOString().slice(0, 10);
+    // The user's today, not the server's — which is what the model is told in
+    // its instructions and what the sales tool reads a bare date as.
+    const today = formatIsoDateInTimeZone(new Date(), actor.timezone);
     const double = useScriptedOpenAi([
       { body: openAiToolResponse('get_sales_summary', { from: today, to: today }) },
       { body: openAiTextResponse('Bugun 1 ta sotuv, jami 36 000 so‘m.') },
@@ -130,7 +133,9 @@ describe('the full loop through the real provider', () => {
 
   it('stops after the round limit instead of looping', async () => {
     const { actor } = await signIn();
-    const today = new Date().toISOString().slice(0, 10);
+    // The user's today, not the server's — which is what the model is told in
+    // its instructions and what the sales tool reads a bare date as.
+    const today = formatIsoDateInTimeZone(new Date(), actor.timezone);
     // The model asks for a tool every single time it is given the chance.
     const double = useScriptedOpenAi([
       { body: openAiToolResponse('get_sales_summary', { from: today, to: today }) },
@@ -203,7 +208,9 @@ describe('the full loop through the real provider', () => {
 
   it('keeps a replayed tool exchange valid for the provider', async () => {
     const { actor } = await signIn();
-    const today = new Date().toISOString().slice(0, 10);
+    // The user's today, not the server's — which is what the model is told in
+    // its instructions and what the sales tool reads a bare date as.
+    const today = formatIsoDateInTimeZone(new Date(), actor.timezone);
 
     // First turn: the model calls a tool, then answers.
     useScriptedOpenAi([

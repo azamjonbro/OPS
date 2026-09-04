@@ -64,9 +64,7 @@ export interface RegisteredTool<TSchema extends z.ZodType = z.ZodType> {
  * to the model like any other argument.
  */
 const isConfirmed = (args: unknown): boolean =>
-  typeof args === 'object' &&
-  args !== null &&
-  (args as { confirm?: unknown }).confirm === true;
+  typeof args === 'object' && args !== null && (args as { confirm?: unknown }).confirm === true;
 
 /**
  * The one place a model's tool requests are turned into code.
@@ -139,25 +137,31 @@ export class ToolRegistry {
       };
     }
 
-    // Destructive tools stop here until the person has agreed. Enforced by the
-    // registry rather than by each tool, so a new one cannot forget the guard —
-    // and enforced *after* validation, so what is described is what would run.
-    if (tool.requiresConfirmation && !isConfirmed(parsed.data)) {
-      const description = tool.describeConfirmation
-        ? await tool.describeConfirmation(parsed.data, context)
-        : `run "${name}"`;
-
-      return {
-        status: 'needs_confirmation',
-        durationMs: Date.now() - startedAt,
-        result: {
-          summary: `Confirmation needed: ${description}. Ask the user to confirm, then call "${name}" again with confirm: true. Do not assume they agreed.`,
-          data: { needsConfirmation: true, tool: name },
-        },
-      };
-    }
-
     try {
+      // Destructive tools stop here until the person has agreed. Enforced by
+      // the registry rather than by each tool, so a new one cannot forget the
+      // guard — and enforced *after* validation, so what is described is what
+      // would actually run.
+      //
+      // Describing the target reads it, and that read is scoped to the actor
+      // like every other, so it can fail. Inside the try, that failure becomes
+      // an ordinary failed call: a tool asked about somebody else's record
+      // answers "not found" rather than ending the turn with an exception.
+      if (tool.requiresConfirmation && !isConfirmed(parsed.data)) {
+        const description = tool.describeConfirmation
+          ? await tool.describeConfirmation(parsed.data, context)
+          : `run "${name}"`;
+
+        return {
+          status: 'needs_confirmation',
+          durationMs: Date.now() - startedAt,
+          result: {
+            summary: `Confirmation needed: ${description}. Ask the user to confirm, then call "${name}" again with confirm: true. Do not assume they agreed.`,
+            data: { needsConfirmation: true, tool: name },
+          },
+        };
+      }
+
       const result = await tool.execute(parsed.data, context);
 
       return { status: 'succeeded', durationMs: Date.now() - startedAt, result };

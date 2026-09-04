@@ -384,10 +384,9 @@ export const addItem = async (
   // A day added outside the stated range widens the plan rather than being
   // silently dropped from every date-bounded read of it.
   if (item.date.getTime() > plan.endDate.getTime()) {
-    await ContentPlanModel.updateOne(
-      ownedBy(actor, { _id: planId }),
-      { $set: { endDate: item.date } },
-    ).exec();
+    await ContentPlanModel.updateOne(ownedBy(actor, { _id: planId }), {
+      $set: { endDate: item.date },
+    }).exec();
   }
 
   return item;

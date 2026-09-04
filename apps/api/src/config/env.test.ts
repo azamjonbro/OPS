@@ -37,6 +37,13 @@ const baseEnv: Env = {
   AI_MAX_OUTPUT_TOKENS: 4_096,
   ANTHROPIC_API_KEY: undefined,
   TELEGRAM_BOT_TOKEN: undefined,
+  IMAGE_PROVIDER: undefined,
+  IMAGE_MODEL: undefined,
+  IMAGE_BASE_URL: undefined,
+  IMAGE_TIMEOUT_MS: 120_000,
+  IMAGE_MAX_RETRIES: 1,
+  STORAGE_DRIVER: 'local',
+  STORAGE_LOCAL_DIR: 'storage',
 };
 
 describe('buildConfig', () => {

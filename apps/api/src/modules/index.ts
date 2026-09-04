@@ -6,6 +6,7 @@ import { contentRouter } from './content/index.js';
 import { conversationRouter } from './conversations/index.js';
 import { customerRouter } from './customers/index.js';
 import { expenseRouter } from './expenses/index.js';
+import { imageRouter } from './images/index.js';
 import { inventoryRouter } from './inventory/index.js';
 import { memoryRouter } from './memory/index.js';
 import { notificationRouter } from './notifications/index.js';
@@ -36,6 +37,7 @@ export const apiModules: ApiModule[] = [
   { name: 'expenses', basePath: '/expenses', router: expenseRouter },
   { name: 'conversations', basePath: '/conversations', router: conversationRouter },
   { name: 'content', basePath: '/content', router: contentRouter },
+  { name: 'images', basePath: '/images', router: imageRouter },
   { name: 'memory', basePath: '/memory', router: memoryRouter },
   { name: 'reminders', basePath: '/reminders', router: reminderRouter },
   { name: 'notifications', basePath: '/notifications', router: notificationRouter },

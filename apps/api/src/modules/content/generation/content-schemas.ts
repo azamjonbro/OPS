@@ -24,7 +24,11 @@ import { z } from 'zod';
  * list. Nothing here invents a value that was not there.
  */
 
-/** `#Yangi Mahsulot` -> `yangimahsulot`. Punctuation and spacing are noise. */
+/**
+ * `#Yangi Mahsulot` -> `YangiMahsulot`. Punctuation and spacing are noise; the
+ * casing is not — `#YangiMahsulot` is readable and `#yangimahsulot` is a wall
+ * of letters, so what the model wrote is kept.
+ */
 const normaliseHashtag = (value: string): string =>
   value
     .trim()
@@ -47,17 +51,20 @@ export const hashtagsSchema = z
     z.array(z.string()).max(CONTENT_MAX_HASHTAGS * 2),
   )
   .transform((tags) => {
-    const seen = new Set<string>();
+    // Deduplicated case-insensitively even though the casing is kept: every
+    // platform treats #SALE and #sale as one tag, so posting both is just
+    // noise, and the first spelling the model chose is the one to keep.
+    const seen = new Map<string, string>();
 
     for (const tag of tags) {
       const normalised = normaliseHashtag(tag);
 
-      if (normalised.length > 0) {
-        seen.add(normalised);
+      if (normalised.length > 0 && !seen.has(normalised.toLowerCase())) {
+        seen.set(normalised.toLowerCase(), normalised);
       }
     }
 
-    return [...seen].slice(0, CONTENT_MAX_HASHTAGS);
+    return [...seen.values()].slice(0, CONTENT_MAX_HASHTAGS);
   });
 
 /**
