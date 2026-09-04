@@ -1,133 +1,190 @@
 <script setup lang="ts">
-import { APP_MODULES } from '@hadiya/shared';
-import { computed, onMounted } from 'vue';
+import { formatMoney } from '@hadiya/shared';
+import { onMounted, watch } from 'vue';
 
+import MetricCard from '@/components/dashboard/MetricCard.vue';
 import UpcomingReminders from '@/components/reminders/UpcomingReminders.vue';
+import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import StatusPill from '@/components/ui/StatusPill.vue';
-import { useAsyncTask } from '@/composables/useAsyncTask';
-import { healthService } from '@/services/health.service';
-import { formatDateTime, formatDuration } from '@/utils/format';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ErrorState from '@/components/ui/ErrorState.vue';
+import LoadingSkeleton from '@/components/ui/LoadingSkeleton.vue';
+import { useDashboard } from '@/composables/useDashboard';
+import { useBranchesStore } from '@/stores/branches';
+import { formatDateTime } from '@/utils/format';
 
-const health = useAsyncTask(healthService.fetch);
+/**
+ * Today, from real records.
+ *
+ * Every figure is computed from sales and expenses the API returned; nothing is
+ * estimated or filled in. Net profit is deliberately absent — it would need
+ * expenses attributed to the same period and branch, which the API does not do,
+ * so gross margin is shown and named as such.
+ */
+const branches = useBranchesStore();
+const dashboard = useDashboard(() => branches.scopeBranchId);
 
-onMounted(() => {
-  void health.run();
-});
-
-const status = computed(() => health.data.value?.status ?? 'unknown');
-const dependencies = computed(() => health.data.value?.dependencies ?? []);
-
-/** The delivered surface, so the roadmap below is never out of step with it. */
-const implementedModules = new Set<string>(['reports', 'reminders', 'notifications', 'content']);
-const roadmap = computed(() =>
-  APP_MODULES.map((module) => ({ name: module, implemented: implementedModules.has(module) })),
-);
+onMounted(() => void dashboard.load());
+watch(() => branches.scopeBranchId, () => void dashboard.load());
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-5xl flex-col gap-6">
-    <div>
-      <h2 class="text-xl font-semibold text-ink-900">Foundation is live</h2>
-      <p class="mt-1 text-sm text-ink-500">
-        The API, the database connection and the application shell are running. Business modules are
-        delivered in the phases that follow.
-      </p>
-    </div>
-
-    <BaseCard title="API health" description="Read live from GET /api/health">
-      <template #header>
-        <div class="flex items-center gap-2">
-          <StatusPill :status="status" />
-          <BaseButton
-            variant="secondary"
-            size="sm"
-            :loading="health.isLoading.value"
-            @click="health.run()"
-          >
-            Refresh
-          </BaseButton>
-        </div>
-      </template>
-
-      <p v-if="health.error.value" class="text-sm text-rose-600">
-        {{ health.error.value }}
-      </p>
-
-      <div v-else-if="health.data.value" class="flex flex-col gap-5">
-        <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-500">Service</dt>
-            <dd class="mt-1 text-sm font-medium text-ink-900">{{ health.data.value.service }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-500">Version</dt>
-            <dd class="mt-1 text-sm font-medium text-ink-900">{{ health.data.value.version }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-500">Environment</dt>
-            <dd class="mt-1 text-sm font-medium text-ink-900">
-              {{ health.data.value.environment }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-xs uppercase tracking-wide text-ink-500">Uptime</dt>
-            <dd class="mt-1 text-sm font-medium text-ink-900">
-              {{ formatDuration(health.data.value.uptimeSeconds) }}
-            </dd>
-          </div>
-        </dl>
-
-        <ul class="divide-y divide-border-subtle rounded-lg ring-1 ring-border-subtle">
-          <li
-            v-for="dependency in dependencies"
-            :key="dependency.name"
-            class="flex items-center justify-between gap-4 px-4 py-3"
-          >
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-ink-900">{{ dependency.name }}</p>
-              <p class="truncate text-xs text-ink-500">
-                {{ dependency.detail ?? (dependency.required ? 'Required' : 'Optional') }}
-              </p>
-            </div>
-            <div class="flex items-center gap-3">
-              <span v-if="dependency.latencyMs !== undefined" class="text-xs text-ink-500">
-                {{ dependency.latencyMs }} ms
-              </span>
-              <StatusPill :status="dependency.status" />
-            </div>
-          </li>
-        </ul>
-
-        <p class="text-xs text-ink-500">
-          Checked {{ formatDateTime(health.data.value.timestamp) }}
+  <div class="mx-auto flex max-w-6xl flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-semibold text-ink-900">Today</h2>
+        <p class="mt-1 text-sm text-ink-500">
+          Completed sales and approved expenses recorded today{{
+            branches.selectedBranch ? ` at ${branches.selectedBranch.name}` : ''
+          }}.
         </p>
       </div>
+      <BaseButton variant="secondary" size="sm" :loading="dashboard.isLoading.value" @click="dashboard.load()">
+        Refresh
+      </BaseButton>
+    </div>
 
-      <p v-else class="text-sm text-ink-500">Loading…</p>
-    </BaseCard>
+    <LoadingSkeleton v-if="dashboard.isLoading.value && !dashboard.hasData.value" variant="card" :rows="2" />
 
-    <UpcomingReminders />
+    <ErrorState
+      v-else-if="dashboard.error.value"
+      :message="dashboard.error.value"
+      @retry="dashboard.load()"
+    />
 
-    <BaseCard
-      title="Module roadmap"
-      description="Capabilities declared in the shared module registry"
-    >
-      <ul class="flex flex-wrap gap-2">
-        <li
-          v-for="entry in roadmap"
-          :key="entry.name"
-          class="rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset"
-          :class="
-            entry.implemented
-              ? 'bg-brand-50 text-brand-700 ring-brand-200'
-              : 'bg-surface-muted text-ink-500 ring-border-subtle'
+    <template v-else-if="dashboard.data.value">
+      <section aria-label="Today's figures" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="Sales"
+          :value="String(dashboard.data.value.metrics.saleCount)"
+          :caption="`${dashboard.data.value.metrics.itemsSold} item(s) sold`"
+        />
+        <MetricCard
+          label="Revenue"
+          :value="formatMoney(dashboard.data.value.metrics.revenue)"
+          caption="Billed on completed sales"
+        />
+        <MetricCard
+          label="Collected"
+          :value="formatMoney(dashboard.data.value.metrics.collected)"
+          :caption="
+            dashboard.data.value.metrics.outstanding > 0
+              ? `${formatMoney(dashboard.data.value.metrics.outstanding)} still owed`
+              : 'Everything paid'
           "
-        >
-          {{ entry.name }}
-        </li>
-      </ul>
-    </BaseCard>
+          :tone="dashboard.data.value.metrics.outstanding > 0 ? 'warning' : 'default'"
+        />
+        <MetricCard
+          label="Gross margin"
+          :value="formatMoney(dashboard.data.value.metrics.grossMargin)"
+          caption="Revenue less cost of goods sold"
+        />
+      </section>
+
+      <section class="grid gap-3 sm:grid-cols-2">
+        <MetricCard
+          label="Approved expenses"
+          :value="formatMoney(dashboard.data.value.metrics.expenses)"
+          caption="Recorded and approved today"
+        />
+        <MetricCard
+          label="Low stock"
+          :value="String(dashboard.data.value.lowStock.length)"
+          caption="Products at or below 5 units"
+          :tone="dashboard.data.value.lowStock.length > 0 ? 'warning' : 'default'"
+        />
+      </section>
+
+      <p v-if="dashboard.data.value.truncated" class="text-xs text-warning-700">
+        More than 100 sales today; the totals above cover the most recent 100.
+      </p>
+
+      <div class="grid gap-6 lg:grid-cols-2">
+        <BaseCard title="Recent sales" description="Most recent first">
+          <EmptyState
+            v-if="dashboard.data.value.recentSales.length === 0"
+            title="No sales yet today"
+            description="Completed sales appear here as they are rung up."
+          />
+          <ul v-else class="divide-y divide-border-subtle">
+            <li
+              v-for="sale in dashboard.data.value.recentSales"
+              :key="sale.id"
+              class="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+            >
+              <div class="min-w-0">
+                <RouterLink
+                  :to="{ name: 'sale-detail', params: { id: sale.id } }"
+                  class="truncate text-sm font-medium text-ink-900 hover:text-brand-700"
+                >
+                  {{ sale.number }}
+                </RouterLink>
+                <p class="text-xs text-ink-500">{{ formatDateTime(sale.soldAt) }}</p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p class="text-sm font-medium tabular-nums text-ink-900">
+                  {{ formatMoney(sale.totals.grandTotal) }}
+                </p>
+                <BaseBadge :tone="sale.totals.dueAmount > 0 ? 'warning' : 'positive'">
+                  {{ sale.paymentStatus }}
+                </BaseBadge>
+              </div>
+            </li>
+          </ul>
+        </BaseCard>
+
+        <BaseCard title="Top products today" description="By revenue">
+          <EmptyState
+            v-if="dashboard.data.value.topProducts.length === 0"
+            title="Nothing sold yet"
+            description="The best sellers of the day will show here."
+          />
+          <ul v-else class="divide-y divide-border-subtle">
+            <li
+              v-for="product in dashboard.data.value.topProducts"
+              :key="product.productId"
+              class="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-ink-900">{{ product.name }}</p>
+                <p class="text-xs text-ink-500">{{ product.sku }}</p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p class="text-sm font-medium tabular-nums text-ink-900">
+                  {{ formatMoney(product.revenue) }}
+                </p>
+                <p class="text-xs tabular-nums text-ink-500">×{{ product.quantity }}</p>
+              </div>
+            </li>
+          </ul>
+        </BaseCard>
+
+        <BaseCard title="Low stock" description="At or below 5 units">
+          <EmptyState
+            v-if="dashboard.data.value.lowStock.length === 0"
+            title="Stock looks healthy"
+            description="Nothing is running low right now."
+          />
+          <ul v-else class="divide-y divide-border-subtle">
+            <li
+              v-for="entry in dashboard.data.value.lowStock"
+              :key="entry.item.id"
+              class="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+            >
+              <p class="min-w-0 truncate text-sm text-ink-900">
+                {{ entry.product?.name ?? 'Unknown product' }}
+                <span v-if="entry.product" class="text-ink-500">· {{ entry.product.sku }}</span>
+              </p>
+              <BaseBadge :tone="entry.item.quantity <= 0 ? 'danger' : 'warning'">
+                {{ entry.item.quantity }} left
+              </BaseBadge>
+            </li>
+          </ul>
+        </BaseCard>
+
+        <UpcomingReminders />
+      </div>
+    </template>
   </div>
 </template>

@@ -436,7 +436,47 @@ read from the database _after_ validation, so the person is told what would actu
 what the model believed it had selected. That read is scoped like every other, so proposing to
 delete somebody else's plan fails as "not found" and never leaks the title.
 
-## 15. Known gaps entering the next phase
+## 15. Image generation (phase 8)
+
+Four layers, and the boundaries between them are the design. A tool takes a prompt; the service
+decides what happens to the result; a provider knows one vendor's API; storage knows where bytes
+live. The agent never touches an image API and the service never touches a filesystem.
+
+**Bytes are copied, never linked.** Some models answer with a signed URL that expires within the
+hour, so an asset pointing at one would quietly become a broken image in a plan written weeks
+earlier. The provider fetches and validates that URL itself — https only, a host it actually serves
+from, an image content type, within the size cap read from the buffer rather than from a header —
+and returns bytes. Nothing above the provider ever sees a link.
+
+**Rows are written before the provider is called.** A request that dies mid-flight leaves a
+`generating` row rather than nothing, and a failure marks it `failed` with a reason instead of
+deleting it: somebody who paid for a generation that did not work should be able to see that. Only
+`completed` has a file behind it, and a completed row always does, because the bytes are stored
+before the status changes.
+
+**A storage key is server-chosen.** Built from the user id and the asset id, validated against one
+strict pattern, and the resolved absolute path is checked to still sit inside the root — two
+independent defences, because a key is a path here and that is where this goes wrong. The generation
+schema has no field for a path, a filename or a URL, so there is nothing for a client to influence.
+Moving to object storage is a second implementation of four methods.
+
+**Images are served, not published.** `GET /v1/images/:id/file` is authenticated like every other
+endpoint and scoped to the owner. A static directory would make an unreleased product or a draft
+price readable by anyone who guessed a URL, so the browser fetches with its token and renders an
+object URL — which is why `ImageThumbnail` exists rather than a plain `<img src>`.
+
+**Ownership is checked before anything is paid for.** Attaching to a content item goes through the
+content service's own scoped read, so a request that could never be attached never reaches the
+provider — and a stranger's id fails as `404`, not `403`.
+
+**The model writes the prompt; the service does everything else.** The tool asks for a described
+scene rather than the user's sentence repeated back, and tells the model to read the real product
+with `get_products` first, so a picture of a watch is a picture of a watch Hadiya sells. Style is
+appended to the prompt in words rather than sent as a vendor parameter, because neither model's
+`style` field expresses what Hadiya means by "studio" — and the stored prompt then shows exactly
+what was asked for.
+
+## 16. Known gaps entering the next phase
 
 - Refresh tokens are stateless and cannot be revoked before they expire; signing out is a
   client-side discard. A denylist belongs in the auth module before multi-device use matters.
@@ -456,7 +496,12 @@ delete somebody else's plan fails as "not found" and never leaks the title.
   records.
 - Content is never published anywhere: the engine plans and writes, and `published` is a claim the
   user makes rather than something Hadiya observes. There are no platform integrations.
-- Image generation is not implemented, so an item describes what to shoot and carries no asset.
+- Storage is local disk only: a second API instance would not see the first one's images, so object
+  storage is required before running more than one replica.
+- Generation is synchronous — the request holds open for as long as the model takes, up to the
+  configured timeout. A job on the Phase 6 scheduler would suit it better once volume justifies it.
+- Nothing cleans up assets left `generating` by a process that died mid-request.
+- Images are never posted anywhere; there are still no platform integrations.
 - A generated plan costs one model call per request and there is no caching, so regenerating the
   same brief pays twice.
 - Telegram and e-mail are declared notification channels with no working provider: delivery needs a

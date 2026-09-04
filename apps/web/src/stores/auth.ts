@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 import { authService } from '@/services/auth.service';
+import { setSessionExpiredHandler } from '@/services/http';
 import { tokenStorage } from '@/services/token-storage';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -17,6 +18,14 @@ export const useAuthStore = defineStore('auth', () => {
     hasToken.value = false;
     user.value = null;
   };
+
+  /**
+   * The transport tells the store when a refresh has failed, rather than the
+   * other way round: the store already imports the HTTP layer, so importing it
+   * back would close a cycle. The router guard then does the redirecting, which
+   * keeps navigation decisions out of an interceptor.
+   */
+  setSessionExpiredHandler(clearSession);
 
   const login = async (credentials: LoginCredentials): Promise<void> => {
     const result = await authService.login(credentials);

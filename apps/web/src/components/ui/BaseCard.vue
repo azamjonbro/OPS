@@ -6,7 +6,7 @@ withDefaults(defineProps<{ title?: string; description?: string }>(), {
 </script>
 
 <template>
-  <section class="rounded-xl bg-white ring-1 ring-border-subtle">
+  <section class="rounded-xl bg-surface ring-1 ring-border-subtle">
     <header
       v-if="title || $slots.header"
       class="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4"

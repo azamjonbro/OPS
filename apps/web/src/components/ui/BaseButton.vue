@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md';
 
 const props = withDefaults(
@@ -19,8 +19,9 @@ const props = withDefaults(
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:hover:bg-brand-600',
   secondary:
-    'bg-white text-ink-900 ring-1 ring-inset ring-border-subtle hover:bg-surface-muted disabled:hover:bg-white',
+    'bg-surface text-ink-900 ring-1 ring-inset ring-border-subtle hover:bg-surface-muted disabled:hover:bg-surface',
   ghost: 'text-ink-700 hover:bg-surface-muted disabled:hover:bg-transparent',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700 disabled:hover:bg-danger-600',
 };
 
 const SIZE_CLASSES: Record<Size, string> = {

@@ -1,3 +1,4 @@
+import { hasAtLeastRole, type UserRole } from '@hadiya/shared';
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 
 import { appConfig } from '@/config/env';
@@ -11,6 +12,16 @@ declare module 'vue-router' {
     requiresAuth?: boolean;
     /** Redirects an already authenticated user away, e.g. from the login page. */
     guestOnly?: boolean;
+    /**
+     * Lowest role that may open the route.
+     *
+     * A second line of UX defence beside the hidden menu entry: somebody who
+     * types the URL, or follows a stale bookmark, lands on the dashboard rather
+     * than on a page of permission errors. The API is what actually refuses.
+     */
+    minimumRole?: UserRole;
+    /** Ancestors for the breadcrumb trail; the page's own title is appended. */
+    breadcrumb?: Array<{ label: string; to?: { name: string } }>;
   }
 }
 
@@ -36,6 +47,10 @@ export const createAppRouter = (): Router => {
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {
+      return { name: 'dashboard' };
+    }
+
+    if (to.meta.minimumRole && auth.user && !hasAtLeastRole(auth.user.role, to.meta.minimumRole)) {
       return { name: 'dashboard' };
     }
 
