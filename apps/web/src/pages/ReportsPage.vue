@@ -13,7 +13,6 @@ import { toErrorMessage } from '@/services/api-error';
 import { expenseService } from '@/services/expense.service';
 import { saleService } from '@/services/sales.service';
 import { useBranchesStore } from '@/stores/branches';
-import { formatDate } from '@/utils/format';
 
 /**
  * Reporting over a chosen range.
