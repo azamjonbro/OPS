@@ -20,6 +20,7 @@ export const APP_MODULES = [
   'expenses',
   'reports',
   'billz',
+  'integrations',
   'assistant',
   'conversations',
   'memory',

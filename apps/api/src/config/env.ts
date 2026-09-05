@@ -120,6 +120,36 @@ const envSchema = z
     STT_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
 
     TELEGRAM_BOT_TOKEN: optionalSecret,
+
+    /**
+     * The key integration credentials are encrypted with, 32 bytes as base64
+     * or hex. Generate one with `openssl rand -base64 32`.
+     *
+     * Left unset outside production, storing a credential is refused rather
+     * than done in the clear: a developer without a key gets a clear error on
+     * the day they add an integration, not a database full of plaintext tokens
+     * nobody noticed. In production it is required outright, below.
+     */
+    CREDENTIALS_ENCRYPTION_KEY: optionalSecret,
+
+    /** How long an MCP handshake may take before it is abandoned. */
+    MCP_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
+    /** How long one MCP tool call may take. Caps how long a server can stall a turn. */
+    MCP_TOOL_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
+    /**
+     * Whether an MCP server may live on a private or loopback address.
+     *
+     * Off by default. Hadiya makes the outbound request, so a server URL is an
+     * instruction to fetch a URL of the user's choosing from inside the
+     * deployment's network — the classic way to reach a metadata endpoint or an
+     * internal admin port. Local development needs it on; production must not.
+     */
+    MCP_ALLOW_PRIVATE_HOSTS: booleanFromEnv(false),
+
+    /** Per-user Notion access tokens are stored; the API version is fixed here. */
+    NOTION_API_VERSION: z.string().min(4).default('2022-06-28'),
+    NOTION_BASE_URL: z.preprocess(blankToUndefined, z.url().default('https://api.notion.com')),
+    NOTION_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {
@@ -139,6 +169,24 @@ const envSchema = z
           message: `${key} must be set to at least 32 characters in production`,
         });
       }
+    }
+
+    if (value.CREDENTIALS_ENCRYPTION_KEY === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CREDENTIALS_ENCRYPTION_KEY'],
+        message:
+          'CREDENTIALS_ENCRYPTION_KEY must be set in production; integration credentials cannot be stored without it',
+      });
+    }
+
+    if (value.MCP_ALLOW_PRIVATE_HOSTS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MCP_ALLOW_PRIVATE_HOSTS'],
+        message:
+          'MCP_ALLOW_PRIVATE_HOSTS must stay off in production: it lets a user-supplied server URL reach the deployment\'s own network',
+      });
     }
 
     if (value.CORS_ORIGINS.length === 0) {

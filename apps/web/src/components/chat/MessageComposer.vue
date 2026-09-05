@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue';
 
+import RecordingIndicator from './RecordingIndicator.vue';
+import TranscriptionStatus from './TranscriptionStatus.vue';
+import VoiceInputButton from './VoiceInputButton.vue';
+import { useVoiceInput } from '@/composables/useVoiceInput';
+
 const props = withDefaults(
   defineProps<{ busy?: boolean; placeholder?: string; autofocus?: boolean }>(),
   {
@@ -27,6 +32,11 @@ const emit = defineEmits<{ send: [text: string] }>();
  * the textarea and the fact that sending emits a value rather than reading the
  * field: adding a file means adding to that emitted payload, not rewriting the
  * control.
+ *
+ * Dictation writes into this same field and does not send. A transcript is a
+ * draft like any other: it can be read, corrected and abandoned, and it becomes
+ * a message only when the person presses Send — which runs the ordinary
+ * `send()` below, not a second path.
  */
 const MAX_LENGTH = 8_000;
 const MIN_HEIGHT_PX = 24;
@@ -58,6 +68,33 @@ watch(text, () => void nextTick(resize));
 const focus = (): void => {
   textarea.value?.focus();
 };
+
+/**
+ * Where a transcript lands.
+ *
+ * Appended rather than assigned, and to whatever is in the field *now* rather
+ * than to whatever was there when recording started. Somebody who typed a
+ * sentence while the model was listening keeps it, and the dictated words join
+ * the end — the one outcome that can never destroy work. A separating space is
+ * added only when there is something to separate from.
+ */
+const insertTranscript = (transcript: string): void => {
+  const existing = text.value.trimEnd();
+  const separator = existing.length > 0 ? ' ' : '';
+
+  text.value = `${existing}${separator}${transcript}`;
+
+  void nextTick(() => {
+    resize();
+    // Focus lands at the end so the person can carry straight on typing or
+    // correct the last word without hunting for the caret.
+    const element = textarea.value;
+    element?.focus();
+    element?.setSelectionRange(text.value.length, text.value.length);
+  });
+};
+
+const voice = useVoiceInput({ onTranscript: insertTranscript });
 
 const send = (): void => {
   if (!canSend.value || isOverLength.value) {
@@ -115,6 +152,12 @@ defineExpose({ focus, setText });
           @keydown="onKeydown"
         />
 
+        <VoiceInputButton
+          :phase="voice.phase.value"
+          :supported="voice.isSupported.value"
+          @activate="voice.toggle"
+        />
+
         <button
           type="button"
           class="mb-1.5 grid size-[34px] shrink-0 place-items-center rounded-[12px] bg-brand-500 text-white shadow-sm transition-all duration-200 hover:bg-brand-600 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 dark:bg-brand-600 dark:hover:bg-brand-500"
@@ -157,6 +200,33 @@ defineExpose({ focus, setText });
             <path d="M12 19V5M5 12l7-7 7 7" />
           </svg>
         </button>
+      </div>
+
+      <div
+        v-if="voice.isActive.value || voice.error.value"
+        class="mt-2 flex flex-wrap items-center gap-3 px-2"
+      >
+        <RecordingIndicator
+          v-if="voice.phase.value === 'recording'"
+          :elapsed-seconds="voice.elapsedSeconds.value"
+          :remaining-seconds="voice.remainingSeconds.value"
+          :near-limit="voice.isNearLimit.value"
+          @stop="voice.toggle"
+          @cancel="voice.cancel"
+        />
+
+        <TranscriptionStatus :phase="voice.phase.value" @cancel="voice.cancel" />
+
+        <p v-if="voice.error.value" class="flex items-center gap-2 text-[11px] text-danger-600" role="alert">
+          {{ voice.error.value }}
+          <button
+            type="button"
+            class="rounded px-1 py-0.5 font-medium underline hover:text-danger-700 focus:outline-none focus:ring-2 focus:ring-danger-600"
+            @click="voice.dismissError"
+          >
+            Dismiss
+          </button>
+        </p>
       </div>
 
       <div class="mt-2 flex items-center justify-between gap-3 px-2">

@@ -112,7 +112,13 @@ export const transcribe = async (
       language: input.language ?? null,
     });
 
-    if (outcome.text.length === 0) {
+    // Trimmed here as well as in the provider: whitespace-only is "heard
+    // nothing" whichever implementation is installed, and a contract that
+    // relies on every provider remembering to trim will eventually meet one
+    // that did not.
+    const text = outcome.text.trim();
+
+    if (text.length === 0) {
       // The provider heard nothing. Reported as a plain failure rather than an
       // empty success, which would silently clear the composer.
       throw ApiError.badRequest('I could not make out any speech in that recording.');
@@ -125,14 +131,14 @@ export const transcribe = async (
         bytes: input.audio.byteLength,
         // The transcript itself is never logged: it is the person's words, and
         // a log is the wrong place for them.
-        characters: outcome.text.length,
+        characters: text.length,
         durationMs: Date.now() - startedAt,
       },
       'audio transcribed',
     );
 
     return {
-      text: outcome.text,
+      text,
       durationSeconds: outcome.durationSeconds,
       language: outcome.language,
       model: outcome.model,

@@ -59,6 +59,28 @@ export interface SpeechConfig {
   maxRetries: number;
 }
 
+/** How Hadiya talks to a user's own MCP server, and how patiently. */
+export interface McpConfig {
+  connectTimeoutMs: number;
+  toolTimeoutMs: number;
+  /** Whether a server URL may resolve to a private or loopback address. */
+  allowPrivateHosts: boolean;
+}
+
+/** Where integration credentials are encrypted, and with what. */
+export interface CredentialsConfig {
+  /** Raw key material, 32 bytes; `null` when the deployment has not set one. */
+  encryptionKey: string | null;
+  /** True once a credential can actually be stored. */
+  configured: boolean;
+}
+
+export interface NotionConfig {
+  baseUrl: string;
+  apiVersion: string;
+  timeoutMs: number;
+}
+
 export interface AppConfig {
   app: {
     name: string;
@@ -102,8 +124,11 @@ export interface AppConfig {
   image: ImageConfig;
   speech: SpeechConfig;
   storage: StorageConfig;
+  mcp: McpConfig;
+  credentials: CredentialsConfig;
   integrations: {
     billz: BillzConfig;
+    notion: NotionConfig;
     openai: IntegrationConfig & { apiKey: string | undefined };
     anthropic: IntegrationConfig & { apiKey: string | undefined };
     telegram: IntegrationConfig & { botToken: string | undefined };
@@ -197,6 +222,15 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
       ? env.STORAGE_LOCAL_DIR
       : path.join(API_ROOT, env.STORAGE_LOCAL_DIR),
   },
+  mcp: {
+    connectTimeoutMs: env.MCP_CONNECT_TIMEOUT_MS,
+    toolTimeoutMs: env.MCP_TOOL_TIMEOUT_MS,
+    allowPrivateHosts: env.MCP_ALLOW_PRIVATE_HOSTS,
+  },
+  credentials: {
+    encryptionKey: env.CREDENTIALS_ENCRYPTION_KEY ?? null,
+    configured: Boolean(env.CREDENTIALS_ENCRYPTION_KEY),
+  },
   integrations: {
     billz: {
       baseUrl: env.BILLZ_BASE_URL,
@@ -206,6 +240,14 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
       shopIds: env.BILLZ_SHOP_IDS,
       // The base URL has a default, so the token is what decides this.
       configured: Boolean(env.BILLZ_API_TOKEN),
+    },
+    // Notion has no deployment-wide credential: each person connects their own
+    // workspace, so `configured` is a property of the integration row, not of
+    // the environment. Only the endpoint and its API version live here.
+    notion: {
+      baseUrl: env.NOTION_BASE_URL,
+      apiVersion: env.NOTION_API_VERSION,
+      timeoutMs: env.NOTION_TIMEOUT_MS,
     },
     openai: { apiKey: env.OPENAI_API_KEY, configured: Boolean(env.OPENAI_API_KEY) },
     anthropic: { apiKey: env.ANTHROPIC_API_KEY, configured: Boolean(env.ANTHROPIC_API_KEY) },
