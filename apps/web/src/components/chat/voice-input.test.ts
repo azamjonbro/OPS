@@ -407,6 +407,7 @@ describe('the transcript is a draft, never a message', () => {
 
     expect(wrapper.emitted('send')?.[0]).toEqual([
       'Bugungi savdoni tahlil qilib ber, kecha bilan ham solishtir.',
+      [],
     ]);
   });
 });
