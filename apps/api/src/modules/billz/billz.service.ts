@@ -14,7 +14,6 @@ import type {
   StartSyncInput,
   SyncLogQuery,
 } from './billz.query.types.js';
-import { BillzSyncService, listSyncLogs, listSyncState } from './sync/billz-sync.service.js';
 import { SYNC_ORDER } from './sync/sync.constants.js';
 
 const log = createLogger('billz');
@@ -142,45 +141,7 @@ export const listInventory = async (actor: AuthenticatedUser, query: BillzInvent
   );
 
 /**
- * Starts a sync and answers immediately.
- *
- * A full catalogue walk takes far longer than a request should, so the run
- * happens in the background and its progress is read back from the sync log.
- * Failures are recorded there rather than thrown at a caller who has already
- * been answered.
- */
-export const startSync = async (actor: AuthenticatedUser, input: StartSyncInput) => {
-  assertRole(actor, SYNC_ROLE);
-
-  const resources = input.resource ? [input.resource] : [...SYNC_ORDER];
-  const sync = new BillzSyncService();
-
-  void (async () => {
-    for (const resource of resources) {
-      await sync.syncResource(resource, input.mode, actor.id);
-    }
-  })().catch((error: unknown) => {
-    log.error({ err: error }, 'billz sync run failed outside the per-resource handler');
-  });
-
-  return {
-    accepted: true,
-    mode: input.mode,
-    resources,
-    startedAt: new Date().toISOString(),
-  };
-};
-
-export const getSyncState = async (actor: AuthenticatedUser) =>
-  guard(actor, READ_ROLE, async () => ({ items: await listSyncState() }));
-
-export const getSyncLogs = async (actor: AuthenticatedUser, query: SyncLogQuery) =>
-  guard(actor, READ_ROLE, async () => ({
-    items: await listSyncLogs(query.resource, query.limit),
-  }));
-
-/**
- * The read-only Billz functions the AI agent will be given in the next phase.
+ * The read-only Billz functions the assistant is given.
  * Exposed over HTTP so the capability list can be reviewed without reading code.
  */
 export const listCapabilities = (actor: AuthenticatedUser) => {

@@ -69,9 +69,3 @@ billzRouter.get(
   ...validated({ query: billzInventoryQuerySchema }, billzController.listInventory),
 );
 
-billzRouter.post('/sync', ...validated({ body: startSyncSchema }, billzController.startSync));
-billzRouter.get('/sync/state', asyncHandler(billzController.syncState));
-billzRouter.get(
-  '/sync/logs',
-  ...validated({ query: syncLogQuerySchema }, billzController.syncLogs),
-);

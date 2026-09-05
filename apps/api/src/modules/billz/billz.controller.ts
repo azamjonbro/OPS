@@ -106,23 +106,6 @@ export const listInventory: ValidatedHandler<{ query: typeof billzInventoryQuery
   sendSuccess(req, res, await billzService.listInventory(requireActor(req), req.validated.query));
 };
 
-export const startSync: ValidatedHandler<{ body: typeof startSyncSchema }> = async (req, res) => {
-  const accepted = await billzService.startSync(requireActor(req), req.validated.body);
-
-  sendAccepted(req, res, accepted);
-};
-
-export const syncState = async (req: Request, res: Response): Promise<void> => {
-  sendSuccess(req, res, await billzService.getSyncState(requireActor(req)));
-};
-
-export const syncLogs: ValidatedHandler<{ query: typeof syncLogQuerySchema }> = async (
-  req,
-  res,
-) => {
-  sendSuccess(req, res, await billzService.getSyncLogs(requireActor(req), req.validated.query));
-};
-
 export const capabilities = (req: Request, res: Response): void => {
   sendSuccess(req, res, billzService.listCapabilities(requireActor(req)));
 };
