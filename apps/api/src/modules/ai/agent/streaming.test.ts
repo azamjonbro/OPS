@@ -97,7 +97,9 @@ const eventTypes = (frames: SseFrame[]): string[] =>
 const eventsOf = (frames: SseFrame[]): AgentEvent[] =>
   frames
     .map((frame) => frame.data as AgentStreamFrame)
-    .filter((frame): frame is Extract<AgentStreamFrame, { frame: 'event' }> => frame.frame === 'event')
+    .filter(
+      (frame): frame is Extract<AgentStreamFrame, { frame: 'event' }> => frame.frame === 'event',
+    )
     .map((frame) => frame.event);
 
 /**
@@ -127,9 +129,7 @@ const frameOf = <TKind extends AgentStreamFrame['frame']>(
 
 describe('POST /api/v1/ai/chat as a stream', () => {
   it('is refused without a token', async () => {
-    const response = await request(app)
-      .post('/api/v1/ai/chat?stream=1')
-      .send({ message: 'Salom' });
+    const response = await request(app).post('/api/v1/ai/chat?stream=1').send({ message: 'Salom' });
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
     // Refused before a stream is opened, so the caller gets a status code it
@@ -801,9 +801,7 @@ describe('the run registry', () => {
 
 describe('GET /api/v1/ai/runs/:runId', () => {
   it('is refused without a token', async () => {
-    const response = await request(app).get(
-      '/api/v1/ai/runs/2f9b1c66-0f4c-4a2f-8f1e-0b5f8d3a6d21',
-    );
+    const response = await request(app).get('/api/v1/ai/runs/2f9b1c66-0f4c-4a2f-8f1e-0b5f8d3a6d21');
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
   });

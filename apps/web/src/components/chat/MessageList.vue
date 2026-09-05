@@ -18,6 +18,14 @@ const props = withDefaults(
     isLoading?: boolean;
     isLoadingOlder?: boolean;
     hasOlder?: boolean;
+    /**
+     * Whether the live slot is showing something.
+     *
+     * The three-dot indicator means "nothing to report yet". Once the run has
+     * a step or a sentence to show, that is the report, and keeping the dots
+     * beside it would be two answers to the same question.
+     */
+    hasLiveContent?: boolean;
   }>(),
   {
     pending: null,
@@ -26,6 +34,7 @@ const props = withDefaults(
     isLoading: false,
     isLoadingOlder: false,
     hasOlder: false,
+    hasLiveContent: false,
   },
 );
 
@@ -107,7 +116,7 @@ const loadOlder = async (): Promise<void> => {
 
 // New content follows the person's intent rather than overriding it.
 watch(
-  () => [props.messages.length, props.pending?.id, props.thinking] as const,
+  () => [props.messages.length, props.pending?.id, props.thinking, props.hasLiveContent] as const,
   async () => {
     if (!isAtBottom.value) {
       return;
@@ -187,7 +196,16 @@ defineExpose({ scrollToBottom });
             pending
           />
 
-          <div v-if="thinking" class="group/message flex w-full gap-4 pb-2 justify-start">
+          <!-- What is happening right now: the ledger, the answer as it is
+               written, and anything waiting on a person. Rendered here rather
+               than inside a message because none of it is a message yet — the
+               transcript takes over the moment the turn is stored. -->
+          <slot name="live" />
+
+          <div
+            v-if="thinking && !hasLiveContent"
+            class="group/message flex w-full gap-4 pb-2 justify-start"
+          >
             <span
               class="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-brand-500 text-[12px] font-bold text-white shadow-sm ring-1 ring-brand-100 dark:ring-surface-raised"
               aria-hidden="true"

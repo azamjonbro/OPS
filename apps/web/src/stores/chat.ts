@@ -53,7 +53,6 @@ export interface PendingMessage {
  */
 export type ChatPhase = 'idle' | 'thinking' | 'working';
 
-
 /**
  * The open conversation.
  *
@@ -333,7 +332,10 @@ export const useChatStore = defineStore('chat', () => {
     let established = false;
 
     await streamChat(
-      { message: content, ...(conversationId.value ? { conversationId: conversationId.value } : {}) },
+      {
+        message: content,
+        ...(conversationId.value ? { conversationId: conversationId.value } : {}),
+      },
       {
         onReady: (info) => {
           established = true;

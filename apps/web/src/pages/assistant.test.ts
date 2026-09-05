@@ -12,11 +12,14 @@ import { notificationService } from '@/services/notification.service';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import {
+  makeAgentEvent,
   makeChatResponse,
   makeConversation,
   makeMessage,
+  makeToolEvent,
   makeUser,
   paginated,
+  resetAgentEventSequence,
 } from '@/test/factories';
 import { routes } from '@/router/routes';
 import AssistantPage from './AssistantPage.vue';
@@ -60,6 +63,11 @@ beforeEach(async () => {
   // test should be reaching for. The stub delivers the run through whatever
   // `chatService.send` each test has set up, so these tests go on asserting on
   // the turn rather than on the transport underneath it.
+  // Opening a thread asks the server whether a run is still going there. There
+  // is not one by default, and a page test should not be reaching a port to
+  // find that out.
+  vi.spyOn(chatService, 'activeRun').mockResolvedValue({ run: null });
+
   vi.spyOn(agentStream, 'streamChat').mockImplementation(async (input, handlers) => {
     handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? '' });
 
@@ -308,5 +316,214 @@ describe('the signed-in employee', () => {
 
     expect(wrapper.text()).toContain('Test Manager');
     expect(router.currentRoute.value.meta.requiresAuth).toBe(true);
+  });
+});
+
+describe('watching a turn happen', () => {
+  /**
+   * Drives the page through a scripted run.
+   *
+   * The events are exactly the shape the server emits, so what is asserted
+   * below is what a person would actually see — including, in the last test,
+   * seeing a failure reported as a failure.
+   */
+  const runScript = (
+    events: ReturnType<typeof makeAgentEvent>[],
+    response = makeChatResponse(),
+  ) => {
+    vi.mocked(agentStream.streamChat).mockImplementation(async (input, handlers) => {
+      handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? 'c-1' });
+
+      for (const event of events) {
+        handlers.onEvent(event);
+        await Promise.resolve();
+      }
+
+      handlers.onResult(response);
+    });
+  };
+
+  const openThread = async () => {
+    const conversation = makeConversation();
+    vi.spyOn(conversationService, 'list').mockResolvedValue(paginated([conversation]));
+    vi.spyOn(conversationService, 'get').mockResolvedValue(conversation);
+    vi.spyOn(conversationService, 'messages').mockResolvedValue(paginated([]));
+
+    return { conversation, wrapper: await mountPage(`/assistant/${conversation.id}`) };
+  };
+
+  beforeEach(resetAgentEventSequence);
+
+  it('draws a truthful timeline for a workflow where one step failed', async () => {
+    const { wrapper } = await openThread();
+
+    // The four steps of the phase's own example, with the labels the server
+    // would have sent for each.
+    const step = (callId: string, name: string, running: string, done: string) => ({
+      callId,
+      displayName: name,
+      runningLabel: running,
+      doneLabel: done,
+    });
+
+    runScript([
+      makeAgentEvent('agent.started', { tools: 20 }),
+      makeToolEvent(
+        'tool.started',
+        step('billz', 'Sales figures', 'Reading the sales figures', 'Read the sales figures'),
+      ),
+      makeToolEvent(
+        'tool.completed',
+        step('billz', 'Sales figures', 'Reading the sales figures', 'Read the sales figures'),
+      ),
+      makeToolEvent(
+        'tool.started',
+        step('content', 'Content plan', 'Writing the content plan', 'Content plan saved'),
+      ),
+      makeToolEvent(
+        'tool.completed',
+        step('content', 'Content plan', 'Writing the content plan', 'Content plan saved'),
+      ),
+      makeToolEvent('tool.started', step('image', 'Image', 'Creating the image', 'Image created')),
+      makeToolEvent(
+        'tool.completed',
+        step('image', 'Image', 'Creating the image', 'Image created'),
+      ),
+      makeToolEvent(
+        'tool.started',
+        step('notion', 'Notion', 'Saving to Notion', 'Saved to Notion'),
+      ),
+      makeToolEvent('tool.failed', {
+        ...step('notion', 'Notion', 'Saving to Notion', 'Saved to Notion'),
+        message: 'Notion is unreachable',
+      }),
+      makeAgentEvent('agent.completed', { state: 'recovering' }),
+    ]);
+
+    await wrapper.find('textarea').setValue('Savdoni analiz qil va Notionga saqla');
+    await wrapper.find('[aria-label="Send message"]').trigger('click');
+    await flushPromises();
+
+    // The finished ledger collapses to a checkable summary, and opens on ask.
+    expect(wrapper.text()).toContain("4 steps · 1 didn't work");
+
+    await wrapper.find('[aria-label="What Hadiya is doing"] button').trigger('click');
+
+    const text = wrapper.text();
+
+    // Every step that ran, named as a person would name it.
+    expect(text).toContain('Read the sales figures');
+    expect(text).toContain('Content plan saved');
+    expect(text).toContain('Image created');
+    // And the one that did not, said plainly rather than glossed over. The
+    // past-tense "Saved to Notion" must not appear for a step that failed.
+    expect(text).toContain('Notion is unreachable');
+    expect(text).not.toContain('Saved to Notion');
+  });
+
+  it('shows the answer as it is written', async () => {
+    const { wrapper } = await openThread();
+
+    vi.mocked(agentStream.streamChat).mockImplementation(async (input, handlers) => {
+      handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? 'c-1' });
+      handlers.onEvent(makeAgentEvent('assistant.delta', { messageId: 'm-1', delta: 'Bugungi ' }));
+      handlers.onEvent(
+        makeAgentEvent('assistant.delta', { messageId: 'm-1', delta: 'savdo yaxshi' }),
+      );
+      // Left unsettled so the partial answer is what is on screen.
+      await Promise.resolve();
+    });
+
+    await wrapper.find('textarea').setValue('Savdo?');
+    await wrapper.find('[aria-label="Send message"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Bugungi savdo yaxshi');
+  });
+
+  it('offers Stop while a run is going, and stops offering it once asked', async () => {
+    const { conversation, wrapper } = await openThread();
+    const cancel = vi.spyOn(chatService, 'cancel').mockResolvedValue({
+      conversationId: conversation.id,
+      cancelledRuns: 1,
+      cancelledActions: 0,
+    });
+
+    vi.mocked(agentStream.streamChat).mockImplementation(async (input, handlers) => {
+      handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? 'c-1' });
+      handlers.onEvent(makeAgentEvent('agent.started', {}));
+      await Promise.resolve();
+    });
+
+    await wrapper.find('textarea').setValue('Uzoq ish');
+    await wrapper.find('[aria-label="Send message"]').trigger('click');
+    await flushPromises();
+
+    const stop = wrapper.find('[aria-label="Stop Hadiya"]');
+    expect(stop.exists()).toBe(true);
+
+    await stop.trigger('click');
+    await flushPromises();
+
+    expect(cancel).toHaveBeenCalledWith(conversation.id);
+    expect(wrapper.find('[aria-label="Stop Hadiya"]').exists()).toBe(false);
+  });
+
+  it('asks before a write, and the card cannot run it', async () => {
+    const { wrapper } = await openThread();
+
+    vi.mocked(agentStream.streamChat).mockImplementation(async (input, handlers) => {
+      handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? 'c-1' });
+      handlers.onEvent(
+        makeAgentEvent('confirmation.required', {
+          callId: 'call-1',
+          pendingActionId: 'pa-1',
+          tool: 'crm_invoice',
+          displayName: 'Invoice',
+          title: 'Invoice',
+          description: 'create an invoice for 1 200 000 UZS',
+          integration: 'My CRM',
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+      );
+      handlers.onResult(makeChatResponse());
+    });
+
+    await wrapper.find('textarea').setValue('Invoice yarat');
+    await wrapper.find('[aria-label="Send message"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('create an invoice for 1 200 000 UZS');
+    expect(wrapper.text()).toContain('It has not done it yet');
+  });
+
+  it('picks up a run that was already going when the page opened', async () => {
+    const conversation = makeConversation();
+    vi.spyOn(conversationService, 'list').mockResolvedValue(paginated([conversation]));
+    vi.spyOn(conversationService, 'get').mockResolvedValue(conversation);
+    vi.spyOn(conversationService, 'messages').mockResolvedValue(paginated([]));
+
+    vi.spyOn(chatService, 'activeRun').mockResolvedValue({
+      run: {
+        runId: 'run-7',
+        conversationId: conversation.id,
+        state: 'executing',
+        active: true,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        events: [makeToolEvent('tool.started', { displayName: 'Sales figures' })],
+        summary: null,
+      },
+    });
+
+    const watch = vi.spyOn(agentStream, 'watchRun').mockResolvedValue(undefined);
+
+    const wrapper = await mountPage(`/assistant/${conversation.id}`);
+    await flushPromises();
+
+    // The run is recovered from the server rather than from anything this tab
+    // remembered, because after a reload it remembers nothing.
+    expect(watch).toHaveBeenCalledWith('run-7', expect.anything(), expect.anything());
+    expect(wrapper.text()).toContain('Reading the sales figures');
   });
 });

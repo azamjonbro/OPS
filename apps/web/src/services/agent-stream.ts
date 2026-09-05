@@ -220,7 +220,10 @@ const openStream = async (
       response.status === 401
         ? 'Your session has expired. Sign in again.'
         : 'The assistant could not be reached.',
-      { code: response.status === 401 ? 'UNAUTHENTICATED' : 'NETWORK_ERROR', status: response.status },
+      {
+        code: response.status === 401 ? 'UNAUTHENTICATED' : 'NETWORK_ERROR',
+        status: response.status,
+      },
     );
   }
 

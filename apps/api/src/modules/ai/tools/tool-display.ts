@@ -235,7 +235,10 @@ const LABELS: Record<string, ToolDisplayLabels> = {
 
 /** `search_customers` becomes `Search customers`. */
 const humanise = (value: string): string => {
-  const words = value.replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = value
+    .replace(/[_.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return words.length === 0 ? 'Step' : words.charAt(0).toUpperCase() + words.slice(1);
 };

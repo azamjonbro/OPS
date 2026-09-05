@@ -435,16 +435,18 @@ describe('OpenAI streaming', () => {
             choices: [
               {
                 delta: {
-                  tool_calls: [
-                    { index: 0, id: 'call_1', function: { name: 'get_sales_summary' } },
-                  ],
+                  tool_calls: [{ index: 0, id: 'call_1', function: { name: 'get_sales_summary' } }],
                 },
               },
             ],
           },
           // Every later frame carries the index and no id, which is why the
           // pieces are keyed by index rather than by id.
-          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"from"' } }] } }] },
+          {
+            choices: [
+              { delta: { tool_calls: [{ index: 0, function: { arguments: '{"from"' } }] } },
+            ],
+          },
           {
             choices: [
               { delta: { tool_calls: [{ index: 0, function: { arguments: ':"2026-09-05"}' } }] } },
@@ -464,7 +466,9 @@ describe('OpenAI streaming', () => {
   });
 
   it('classifies a refused key on a stream exactly as on an ordinary call', async () => {
-    const { provider } = buildOpenAi([{ status: 401, body: { error: { code: 'invalid_api_key' } } }]);
+    const { provider } = buildOpenAi([
+      { status: 401, body: { error: { code: 'invalid_api_key' } } },
+    ]);
 
     const error = (await provider
       .stream?.({ messages: [], tools: [] }, () => undefined)

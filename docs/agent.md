@@ -305,6 +305,153 @@ that can bypass it.
 | `AGENT_CONFIRMATION_TTL_MS`          | `600000` | How long an agreement stands            |
 | `AGENT_REQUIRE_PENDING_CONFIRMATION` | `false`  | Strict server-side confirmation         |
 
+## Watching a run happen
+
+Everything above describes what the agent does. This describes how a browser
+sees it while it is doing it.
+
+### One endpoint, two shapes
+
+```
+POST /api/v1/ai/chat                    → JSON, exactly as before
+POST /api/v1/ai/chat?stream=1           → the same turn, as it happens
+POST /api/v1/ai/chat  (Accept: text/event-stream)   → the same
+```
+
+Same handler, same `sendMessage`, same run. A second endpoint would have meant a
+second execution path, and two paths through an agent is how the streamed one
+quietly stops matching the one that is tested. A client that asks for nothing
+gets the JSON reply it has always got, and the `result` frame at the end of a
+stream is that same `ChatResponse` object — a streaming client and a waiting one
+end up holding the same turn.
+
+Two more endpoints exist for the cases a single connection cannot cover:
+
+```
+GET /api/v1/ai/runs/:runId/stream       rejoin, honouring Last-Event-ID
+GET /api/v1/ai/runs/:runId              a snapshot, for a browser that reloaded
+GET /api/v1/ai/chat/:conversationId/run the newest run in a conversation
+```
+
+### Why not `EventSource`
+
+The obvious choice, and the wrong one twice over: it cannot send a body, so it
+could not start a turn, and it cannot set an `Authorization` header, so the
+access token would have to travel in the query string — into browser history,
+into proxy logs, into referrers. The client is `fetch` with a readable body,
+which does both properly and gives up only the automatic reconnection, which
+`agent-stream.ts` writes out by hand.
+
+### The wire
+
+SSE frames, with the agent event's own type as the event name and its sequence
+as the id:
+
+```
+id: 4
+event: tool.completed
+data: {"frame":"event","event":{"type":"tool.completed","sequence":4,…}}
+```
+
+Four frame kinds: `ready` (the run has an id), `event`, `result` (the finished
+`ChatResponse`), `error`. One `data:` line per frame — `JSON.stringify` escapes
+newlines, so a payload can never split itself across two events.
+
+Three headers earn their place. `Cache-Control: no-transform` is what stops this
+application's own `compression()` middleware buffering a trickle of small events
+until it has enough to gzip — without it the stream arrives in one lump at the
+end, which is the exact opposite of the feature. `X-Accel-Buffering: no` is
+nginx's opt-out. A comment line every twenty seconds keeps an idle socket from
+being reaped.
+
+### The race, and the buffer
+
+A browser cannot subscribe to a run before the run exists. Handled by choosing
+the run id in the controller and registering the listener _before_ the agent is
+started — so `agent.started` cannot be emitted into a run nothing is watching.
+
+`agent-run-registry.ts` buffers every run's events besides that, which is what a
+reconnection reads from. The catch-up and the subscription happen in one
+synchronous step; anything else leaves a window where an event is emitted after
+the buffer was read and before the subscriber was attached, and that event is
+lost silently, exactly when the run is busiest.
+
+State is per process and in memory, which is the honest scope: these are this
+process's in-flight runs. Losing them on a restart costs a live view, never a
+record — the transcript holds every tool call and its result.
+
+### Reconnecting without repeating
+
+Every event carries a sequence, which is the SSE id. A client that drops rejoins
+with `Last-Event-ID` and the server replays only what came after; the reducer
+drops anything at or below the highest sequence it has already applied. Between
+them, rejoining twice cannot draw a completed step a second time — and two tabs
+watching one run agree, because both are folding the same numbered stream.
+
+### Safe display text
+
+An event carries names, statuses, counts and durations. It does not carry
+arguments, results, prompts, model messages, upstream bodies or stack traces —
+`agent-events.ts` sanitises the payload rather than trusting call sites, because
+these are designed to be pushed to a browser.
+
+What makes that usable is that the _label_ is decided server-side, in
+`tools/tool-display.ts`, and travels with the event:
+
+```
+tool.started   displayName "Sales figures"   runningLabel "Reading the sales figures"
+tool.completed                               doneLabel    "Read the sales figures"
+```
+
+That is not a nicety. The events name tools the frontend has never heard of —
+every tool on somebody's own MCP server — and a bundle shipped last week cannot
+have a phrase ready for a server connected this morning. An MCP tool is named by
+its own external name and its integration ("My CRM: Search customers"), never by
+Hadiya's namespaced registry id.
+
+### Assistant text
+
+`assistant.delta` carries the answer as the model writes it, and only when the
+provider can actually send it that way. The OpenAI provider implements `stream`;
+Anthropic's does not yet and reports `supportsStreaming: false`, so its turns
+arrive whole. Nothing is chopped up to look as though it were streamed.
+
+Deltas are asked for only when somebody is watching (`streamDeltas`), because
+token deltas exist to be rendered: asking for them when nothing is subscribed
+buys a second transport path in exchange for text that is assembled and thrown
+away.
+
+In the browser the deltas accumulate on every event and are _painted_ once per
+animation frame. Tokens arrive faster than a screen refreshes, and binding
+directly to the accumulation schedules a render per token.
+
+### What the interface promises
+
+- **Nothing is invented.** Every row of the timeline came from an event the
+  server emitted. No optimistic step, no predicted next step, no percentage.
+- **Parallel work looks parallel.** A step that starts while another is still
+  running shares its wave, and the two are bracketed together. Sequential work
+  is not drawn as concurrent, and concurrent work is not drawn as a queue.
+- **A failed step is never given the past tense of the thing it did not do.**
+  "Saved to Notion" under a cross would be the interface contradicting itself.
+  A failed row is named by what it was, with the reason beneath it.
+- **Confirmation is not authorisation.** The card sends an ordinary message; the
+  server's confirmation gate still decides. When the offer lapses the buttons
+  go, because pressing them would send a "yes" the server is required to refuse.
+- **Stop means stop.** The composer's send button becomes Stop while there is a
+  run to stop, and asks once. The server aborts the run and withdraws its
+  proposals; the run's own `agent.cancelled` event is what turns the interface
+  off.
+
+### Falling back, narrowly
+
+If the stream never opens — a proxy that will not pass `text/event-stream`, a
+browser without a readable body — the store sends the turn again as an ordinary
+`POST`. That is safe in exactly that case and no other: nothing reached the
+agent, so nothing can be duplicated. A stream that dropped _after_ frames
+arrived is never re-sent; that turn is running, and asking for it twice would be
+two content plans and two invoices.
+
 ## Tests
 
 No test spends money or opens a socket. The model is scripted and the tools are

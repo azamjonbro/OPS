@@ -7,14 +7,31 @@ import VoiceInputButton from './VoiceInputButton.vue';
 import { useVoiceInput } from '@/composables/useVoiceInput';
 
 const props = withDefaults(
-  defineProps<{ busy?: boolean; placeholder?: string; autofocus?: boolean }>(),
+  defineProps<{
+    busy?: boolean;
+    /**
+     * Whether the run can be stopped.
+     *
+     * Separate from `busy`, because they are not the same moment: a turn is
+     * busy from the instant Enter is pressed, and is stoppable only once the
+     * server has a run to stop. Offering Stop before there is anything to stop
+     * would be a button that does nothing.
+     */
+    stoppable?: boolean;
+    /** True once a stop has been asked for, so it cannot be asked for twice. */
+    stopping?: boolean;
+    placeholder?: string;
+    autofocus?: boolean;
+  }>(),
   {
     busy: false,
+    stoppable: false,
+    stopping: false,
     placeholder: 'Ask Hadiya anything about your business…',
     autofocus: true,
   },
 );
-const emit = defineEmits<{ send: [text: string] }>();
+const emit = defineEmits<{ send: [text: string]; stop: [] }>();
 /**
  * Where a turn is written.
  *
@@ -48,6 +65,14 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 
 const trimmed = computed(() => text.value.trim());
 const canSend = computed(() => trimmed.value.length > 0 && !props.busy);
+/**
+ * The primary button becomes Stop while there is a run to stop.
+ *
+ * One control rather than two, in the place the thumb is already resting: on a
+ * phone, a Stop button somewhere else on the screen is a Stop button nobody
+ * finds in time.
+ */
+const isStop = computed(() => props.stoppable && !props.stopping);
 const isOverLength = computed(() => text.value.length > MAX_LENGTH);
 /** Only worth showing near the limit; a counter on every message is nagging. */
 const showCounter = computed(() => text.value.length > MAX_LENGTH * 0.9);
@@ -159,6 +184,19 @@ defineExpose({ focus, setText });
         />
 
         <button
+          v-if="isStop"
+          type="button"
+          class="mb-1.5 grid size-[34px] shrink-0 place-items-center rounded-[12px] bg-ink-900 text-surface shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ink-900 focus:ring-offset-2"
+          aria-label="Stop Hadiya"
+          @click="emit('stop')"
+        >
+          <svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
+          </svg>
+        </button>
+
+        <button
+          v-else
           type="button"
           class="mb-1.5 grid size-[34px] shrink-0 place-items-center rounded-[12px] bg-brand-500 text-white shadow-sm transition-all duration-200 hover:bg-brand-600 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 dark:bg-brand-600 dark:hover:bg-brand-500"
           :disabled="!canSend || isOverLength"
