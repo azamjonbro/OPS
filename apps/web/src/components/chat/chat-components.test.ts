@@ -222,12 +222,17 @@ describe('the block renderer', () => {
     const wrapper = render([
       {
         kind: 'error',
-        call: makeToolCall({ status: 'failed' }),
-        message: 'Billz did not answer.',
+        call: makeToolCall({ name: 'billz_get_sales_summary', status: 'failed' }),
+        message: 'Reading the sales figures — that step did not work.',
+        detail: 'Billz answered 405 for /v1/auth/login',
       },
     ]);
 
-    expect(wrapper.text()).toContain('Billz did not answer.');
+    expect(wrapper.text()).toContain('that step did not work');
+    // The upstream wording names a host and a path; it belongs behind the
+    // toggle, not in the sentence the shopkeeper reads.
+    expect(wrapper.find('p').text()).not.toContain('/v1/auth/login');
+    expect(wrapper.find('details').text()).toContain('/v1/auth/login');
   });
 
   it('turns a confirmation into an ordinary chat reply', async () => {

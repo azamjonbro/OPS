@@ -213,13 +213,27 @@ describe('a tool the interface has never heard of', () => {
 });
 
 describe('failures and confirmations', () => {
-  it('shows a failed call as an error rather than as a result', () => {
+  it('shows a failed call as an error, in words rather than in the upstream’s', () => {
     const block = toolToBlock(
-      makeToolCall({ status: 'failed', result: 'Billz did not answer.', data: null }),
+      makeToolCall({
+        name: 'billz_get_sales_summary',
+        status: 'failed',
+        result: 'Billz answered 405 for /v1/auth/login',
+        data: null,
+      }),
     );
 
     expect(block.kind).toBe('error');
-    expect(block.kind === 'error' && block.message).toBe('Billz did not answer.');
+
+    if (block.kind !== 'error') {
+      throw new Error('expected an error block');
+    }
+
+    // The message names the step the way a successful one would be named; the
+    // upstream text keeps its host and path out of it.
+    expect(block.message).toBe('Reading the sales figures — that step did not work.');
+    expect(block.message).not.toContain('/v1/auth/login');
+    expect(block.detail).toBe('Billz answered 405 for /v1/auth/login');
   });
 
   it('shows a destructive call waiting for agreement as a confirmation', () => {
