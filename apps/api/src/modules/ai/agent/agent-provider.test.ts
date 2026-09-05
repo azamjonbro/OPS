@@ -2,6 +2,7 @@ import { formatIsoDateInTimeZone } from '@hadiya/shared';
 import { pino } from 'pino';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { config } from '../../../config/index.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../../test/database.js';
 import { createTestBranch, signInAs } from '../../../test/factories.js';
 import { createApp } from '../../../app.js';
@@ -148,8 +149,10 @@ describe('the full loop through the real provider', () => {
 
     const result = await sendMessage(actor, { message: 'loop' });
 
-    // Four calls: three tool rounds, then one final call with no tools.
-    expect(double.calls).toHaveLength(4);
+    // Every configured tool round, then one final call with no tools. The
+    // limit is configuration now rather than a constant, so the assertion
+    // reads it from the same place the loop does.
+    expect(double.calls).toHaveLength(config.agent.maxToolRounds + 1);
     expect(double.calls.at(-1)?.body.tools).toBeUndefined();
     expect(result.message.role).toBe('assistant');
   });
