@@ -51,7 +51,9 @@ const cancel = async (): Promise<void> => {
 </script>
 
 <template>
-  <article class="flex flex-col gap-4 rounded-[14px] bg-surface p-5 shadow-sm ring-1 ring-border-subtle my-2">
+  <article
+    class="flex flex-col gap-4 rounded-[14px] bg-surface p-5 shadow-sm ring-1 ring-border-subtle my-2"
+  >
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <h3 class="truncate text-[15px] font-semibold text-ink-900">{{ reminder.title }}</h3>
@@ -77,7 +79,11 @@ const cancel = async (): Promise<void> => {
       </div>
       <div v-if="reminder.recurrenceRule" class="col-span-2">
         <dt class="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Repeats</dt>
-        <dd class="mt-1 font-mono text-[13px] text-ink-900 bg-surface px-2 py-1 rounded-md inline-block ring-1 ring-border-subtle shadow-sm">{{ reminder.recurrenceRule }}</dd>
+        <dd
+          class="mt-1 font-mono text-[13px] text-ink-900 bg-surface px-2 py-1 rounded-md inline-block ring-1 ring-border-subtle shadow-sm"
+        >
+          {{ reminder.recurrenceRule }}
+        </dd>
       </div>
     </dl>
 
@@ -93,7 +99,9 @@ const cancel = async (): Promise<void> => {
         Cancel reminder
       </BaseButton>
       <RouterLink :to="{ name: 'reminders' }">
-        <BaseButton variant="ghost" size="sm" class="!rounded-lg text-ink-600 hover:text-ink-900">All reminders</BaseButton>
+        <BaseButton variant="ghost" size="sm" class="!rounded-lg text-ink-600 hover:text-ink-900"
+          >All reminders</BaseButton
+        >
       </RouterLink>
     </div>
   </article>

@@ -17,8 +17,6 @@ import type {
  * decisions on, so reading it is a supervisor's job rather than a till's.
  */
 const READ_ROLE = 'manager' as const;
-/** Running a sync writes to Hadiya's own catalogue, so it needs an administrator. */
-const SYNC_ROLE = 'admin' as const;
 
 /**
  * The module's own service: authorization, and turning integration failures
@@ -30,7 +28,7 @@ const SYNC_ROLE = 'admin' as const;
  */
 const guard = async <TResult>(
   actor: AuthenticatedUser,
-  role: typeof READ_ROLE | typeof SYNC_ROLE,
+  role: typeof READ_ROLE,
   run: () => Promise<TResult> | TResult,
 ): Promise<TResult> => {
   assertRole(actor, role);

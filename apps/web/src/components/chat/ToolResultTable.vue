@@ -41,7 +41,11 @@ const cell = (value: string | number | null, money: boolean): string => {
           </tr>
         </thead>
         <tbody class="divide-y divide-border-subtle">
-          <tr v-for="(row, index) in rows" :key="index" class="transition-colors hover:bg-surface-muted/30">
+          <tr
+            v-for="(row, index) in rows"
+            :key="index"
+            class="transition-colors hover:bg-surface-muted/30"
+          >
             <td
               v-for="column in table.columns"
               :key="column.key"
@@ -55,7 +59,10 @@ const cell = (value: string | number | null, money: boolean): string => {
       </table>
     </div>
 
-    <p v-if="hidden > 0" class="border-t border-border-subtle px-4 py-2 text-[12px] font-medium text-ink-500 bg-surface-muted/30">
+    <p
+      v-if="hidden > 0"
+      class="border-t border-border-subtle px-4 py-2 text-[12px] font-medium text-ink-500 bg-surface-muted/30"
+    >
       {{ hidden }} more not shown.
     </p>
   </div>

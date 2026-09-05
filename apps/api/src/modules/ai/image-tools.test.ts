@@ -3,10 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createApp } from '../../app.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
-import {
-  createTestBranch,
-  signInAs,
-} from '../../test/factories.js';
+import { createTestBranch, signInAs } from '../../test/factories.js';
 import * as contentService from '../content/content.service.js';
 import { ImageAssetModel } from '../images/image-asset.model.js';
 import * as imageService from '../images/image.service.js';
@@ -102,7 +99,10 @@ describe('the tool registry', () => {
 
     const schema = JSON.stringify(definition?.parameters);
     expect(schema).toMatch(/Stories, Reels and TikTok/);
-    expect(definition?.description).toMatch(/call get_products first/i);
+    // Look the product up only when the shop actually sells the thing; a
+    // generic picture must not send the model hunting through the catalogue.
+    expect(definition?.description).toMatch(/call billz_search_products first/i);
+    expect(definition?.description).toMatch(/For a generic picture, draw it directly/i);
   });
 });
 

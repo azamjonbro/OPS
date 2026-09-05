@@ -11,10 +11,10 @@ import { RouterLink } from 'vue-router';
         The address may be mistyped, or the module is not part of this release yet.
       </p>
       <RouterLink
-        :to="{ name: 'dashboard' }"
+        :to="{ name: 'assistant' }"
         class="mt-6 inline-flex h-10 items-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
       >
-        Back to dashboard
+        Back to the assistant
       </RouterLink>
     </div>
   </div>

@@ -6,6 +6,7 @@ import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import type { chatSchema } from '../conversations/conversation.validators.js';
 import * as agentService from './agent/agent.service.js';
 import { describeAiProvider } from './provider/index.js';
+import * as usageService from './usage.service.js';
 import { getToolRegistry } from './tools/index.js';
 
 /**
@@ -43,4 +44,15 @@ export const status = (req: Request, res: Response): void => {
         requiresConfirmation: tool.requiresConfirmation ?? false,
       })),
   });
+};
+
+/**
+ * What the assistant has cost so far, from Hadiya's own records.
+ *
+ * Not the provider's balance — that is not readable with an ordinary API key,
+ * by the provider's own design — so this reports what was actually spent
+ * through this application rather than guessing at what is left.
+ */
+export const usage = async (req: Request, res: Response): Promise<void> => {
+  sendSuccess(req, res, await usageService.getUsage(requireActor(req)));
 };

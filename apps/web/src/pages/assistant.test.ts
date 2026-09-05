@@ -77,7 +77,7 @@ describe('a new conversation', () => {
 
     const wrapper = await mountPage();
 
-    expect(wrapper.text()).toContain('Hadiya bilan suhbat');
+    expect(wrapper.text()).toContain('How can I help your business today?');
     expect(create).not.toHaveBeenCalled();
   });
 

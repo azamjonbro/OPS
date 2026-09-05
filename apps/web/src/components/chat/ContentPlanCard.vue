@@ -27,7 +27,9 @@ const toggle = (day: number): void => {
 </script>
 
 <template>
-  <article class="overflow-hidden rounded-[14px] bg-surface shadow-sm ring-1 ring-border-subtle my-2">
+  <article
+    class="overflow-hidden rounded-[14px] bg-surface shadow-sm ring-1 ring-border-subtle my-2"
+  >
     <header
       class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4"
     >
@@ -58,7 +60,9 @@ const toggle = (day: number): void => {
             {{ item.day }}
           </span>
           <span class="min-w-0 flex-1">
-            <span class="block truncate text-[14px] font-semibold text-ink-900">{{ item.title }}</span>
+            <span class="block truncate text-[14px] font-semibold text-ink-900">{{
+              item.title
+            }}</span>
             <span class="block text-[12px] font-medium text-ink-500 mt-0.5">
               {{ item.date }}<span v-if="item.date"> · </span>{{ item.contentType }}
             </span>
@@ -79,7 +83,10 @@ const toggle = (day: number): void => {
 
         <div v-if="expanded === item.day" class="flex flex-col gap-2.5 px-5 pb-4 pl-[4.25rem]">
           <p v-if="item.idea" class="text-[13px] text-ink-500 leading-relaxed">{{ item.idea }}</p>
-          <p v-if="item.caption" class="whitespace-pre-line text-[14px] text-ink-800 leading-relaxed bg-surface-muted p-3 rounded-lg ring-1 ring-border-subtle">
+          <p
+            v-if="item.caption"
+            class="whitespace-pre-line text-[14px] text-ink-800 leading-relaxed bg-surface-muted p-3 rounded-lg ring-1 ring-border-subtle"
+          >
             {{ item.caption }}
           </p>
           <p v-if="item.callToAction" class="text-[13px] font-semibold text-ink-800">
@@ -94,7 +101,9 @@ const toggle = (day: number): void => {
       </li>
     </ol>
 
-    <p class="border-t border-border-subtle px-5 py-3 text-[12px] font-medium text-ink-500 bg-surface-muted/30">
+    <p
+      class="border-t border-border-subtle px-5 py-3 text-[12px] font-medium text-ink-500 bg-surface-muted/30"
+    >
       Ask for a change in the chat — for example “3-kunni o‘zgartir”.
     </p>
   </article>

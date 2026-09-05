@@ -40,15 +40,14 @@ const ICONS: Record<string, string> = {
   >
     <span
       class="grid size-6 shrink-0 place-items-center rounded-md text-ink-500"
-      :class="running ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'bg-surface-muted text-ink-400'"
+      :class="
+        running
+          ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400'
+          : 'bg-surface-muted text-ink-400'
+      "
       aria-hidden="true"
     >
-      <svg
-        v-if="running"
-        class="size-3.5 animate-spin"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
+      <svg v-if="running" class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z" />
       </svg>
@@ -66,14 +65,27 @@ const ICONS: Record<string, string> = {
       </svg>
     </span>
 
-    <span class="min-w-0 flex-1" :class="running ? 'text-brand-700 dark:text-brand-300' : 'text-ink-600'">
+    <span
+      class="min-w-0 flex-1"
+      :class="running ? 'text-brand-700 dark:text-brand-300' : 'text-ink-600'"
+    >
       {{ running ? `${label.running}…` : label.done }}
     </span>
 
     <details v-if="!running && call.result" class="shrink-0 group">
-      <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-900 transition-colors">Details</summary>
-      <div class="absolute left-0 mt-2 z-10 w-full max-w-sm rounded-lg bg-surface p-3 shadow-lg ring-1 ring-border-subtle">
-        <p class="max-w-md whitespace-pre-line text-left text-[12px] font-mono leading-relaxed text-ink-600 break-words">{{ call.result }}</p>
+      <summary
+        class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-900 transition-colors"
+      >
+        Details
+      </summary>
+      <div
+        class="absolute left-0 mt-2 z-10 w-full max-w-sm rounded-lg bg-surface p-3 shadow-lg ring-1 ring-border-subtle"
+      >
+        <p
+          class="max-w-md whitespace-pre-line text-left text-[12px] font-mono leading-relaxed text-ink-600 break-words"
+        >
+          {{ call.result }}
+        </p>
       </div>
     </details>
   </div>

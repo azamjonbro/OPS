@@ -22,7 +22,7 @@ const onSubmit = async (): Promise<void> => {
     await auth.login({ username: credentials.username, password: credentials.password });
 
     const redirect = route.query.redirect;
-    await router.push(typeof redirect === 'string' ? redirect : { name: 'dashboard' });
+    await router.push(typeof redirect === 'string' ? redirect : { name: 'assistant' });
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'Unable to sign in');
   } finally {
@@ -67,10 +67,5 @@ const onSubmit = async (): Promise<void> => {
 
       <BaseButton type="submit" block :loading="isSubmitting">Sign in</BaseButton>
     </div>
-
-    <p class="mt-6 border-t border-border-subtle pt-4 text-xs text-ink-500">
-      The authentication API is delivered in the next phase; submitting now returns a
-      <code>404</code> from the server.
-    </p>
   </form>
 </template>

@@ -18,8 +18,40 @@ export interface ToolLabel {
 }
 
 const LABELS: Record<string, ToolLabel> = {
-  get_sales_summary: { running: 'Reading the sales figures', done: 'Read the sales figures' },
-  get_products: { running: 'Looking up products', done: 'Looked up products' },
+  // Billz is the shop's system of record. The person does not care which of
+  // the two it is — they asked about "savdo" — so these say what was looked at,
+  // not where it came from.
+  billz_get_sales_summary: {
+    running: 'Reading the sales figures',
+    done: 'Read the sales figures',
+  },
+  billz_get_sales: { running: 'Reading the receipts', done: 'Read the receipts' },
+  billz_get_sale: { running: 'Opening the receipt', done: 'Opened the receipt' },
+  billz_get_products: { running: 'Looking up products', done: 'Looked up products' },
+  billz_search_products: { running: 'Searching the catalogue', done: 'Searched the catalogue' },
+  billz_get_product: { running: 'Looking up the product', done: 'Found the product' },
+  billz_get_categories: { running: 'Reading the categories', done: 'Read the categories' },
+  billz_get_inventory: { running: 'Checking what is in stock', done: 'Checked the stock' },
+  billz_get_inventory_valuation: {
+    running: 'Valuing the shelves',
+    done: 'Valued the shelves',
+  },
+  billz_get_customers: { running: 'Reading the customer list', done: 'Read the customer list' },
+  billz_search_customers: { running: 'Searching for the customer', done: 'Searched the customers' },
+  billz_get_customer_by_phone: {
+    running: 'Looking the customer up',
+    done: 'Found the customer',
+  },
+  billz_get_debts: { running: 'Checking who owes what', done: 'Checked the debts' },
+  billz_get_payment_breakdown: {
+    running: 'Checking how it was paid',
+    done: 'Checked the payment methods',
+  },
+  billz_get_shops: { running: 'Reading the shop list', done: 'Read the shop list' },
+  billz_get_payment_types: {
+    running: 'Reading the payment methods',
+    done: 'Read the payment methods',
+  },
 
   remember_information: { running: 'Saving what you told me', done: 'Remembered' },
   get_memory: { running: 'Recalling what I know', done: 'Checked what I remember' },
@@ -62,6 +94,11 @@ export type ToolFamily = 'data' | 'content' | 'image' | 'reminder' | 'memory' | 
 export const toolFamily = (name: string): ToolFamily => {
   if (name.startsWith('generate_image')) {
     return 'image';
+  }
+
+  // Everything Billz answers is a read of the shop's own figures.
+  if (name.startsWith('billz_')) {
+    return 'data';
   }
 
   if (name.includes('reminder')) {
