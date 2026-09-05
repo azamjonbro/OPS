@@ -2,9 +2,10 @@ import type { Logger } from 'pino';
 
 import { createLogger } from '../../../core/logger/logger.js';
 import { AiProviderError } from './ai-error.js';
-import { postJson, type FetchLike } from './ai-http.js';
+import { postJson, postSse, type FetchLike } from './ai-http.js';
 import type {
   AiCompletion,
+  AiCompletionChunk,
   AiCompletionRequest,
   AiPromptMessage,
   AiProvider,
@@ -29,6 +30,23 @@ interface OpenAiResponse {
   model?: string;
   choices?: Array<{ message?: OpenAiMessage; finish_reason?: string }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+/** One frame of a streamed reply. Every field is optional by design. */
+interface OpenAiStreamChunk {
+  model?: string;
+  choices?: Array<{
+    delta?: {
+      content?: string | null;
+      tool_calls?: Array<{
+        index?: number;
+        id?: string;
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
+    finish_reason?: string | null;
+  }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
 }
 
 export interface OpenAiProviderOptions {
@@ -117,8 +135,7 @@ const readToolCalls = (message: OpenAiMessage | undefined, log: Logger): AiToolC
 export class OpenAiProvider implements AiProvider {
   readonly name = 'openai';
   readonly isConfigured = true;
-  /** The transport is one JSON POST, so streaming slots in beside `complete`. */
-  readonly supportsStreaming = false;
+  readonly supportsStreaming = true;
 
   private readonly log: Logger;
 
@@ -130,7 +147,15 @@ export class OpenAiProvider implements AiProvider {
     return this.options.model;
   }
 
-  async complete(request: AiCompletionRequest): Promise<AiCompletion> {
+  /**
+   * The request body, built once for both paths.
+   *
+   * Streaming and not streaming must ask the model for exactly the same thing —
+   * the same messages, the same tools, the same ceiling — or the streamed
+   * answer is quietly a different answer, and only one of the two is ever
+   * covered by a test.
+   */
+  private buildBody(request: AiCompletionRequest): Record<string, unknown> {
     const body: Record<string, unknown> = {
       model: this.options.model,
       messages: request.messages.map(toOpenAiMessage),
@@ -150,20 +175,34 @@ export class OpenAiProvider implements AiProvider {
       body.tool_choice = 'auto';
     }
 
+    return body;
+  }
+
+  private get endpointUrl(): string {
+    return `${this.options.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  }
+
+  private get httpOptions() {
+    return {
+      timeoutMs: this.options.timeoutMs,
+      maxRetries: this.options.maxRetries,
+      ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
+      ...(this.options.sleep ? { sleep: this.options.sleep } : {}),
+      logger: this.log,
+    };
+  }
+
+  async complete(request: AiCompletionRequest): Promise<AiCompletion> {
+    const body = this.buildBody(request);
+
     const response = await postJson<OpenAiResponse>(
       {
-        url: `${this.options.baseUrl.replace(/\/$/, '')}/chat/completions`,
+        url: this.endpointUrl,
         headers: { authorization: `Bearer ${this.options.apiKey}` },
         body,
         endpoint: '/chat/completions',
       },
-      {
-        timeoutMs: this.options.timeoutMs,
-        maxRetries: this.options.maxRetries,
-        ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
-        ...(this.options.sleep ? { sleep: this.options.sleep } : {}),
-        logger: this.log,
-      },
+      this.httpOptions,
     );
 
     const choice = response.choices?.[0];
@@ -183,6 +222,118 @@ export class OpenAiProvider implements AiProvider {
       usage: {
         promptTokens: response.usage?.prompt_tokens ?? null,
         completionTokens: response.usage?.completion_tokens ?? null,
+      },
+    };
+  }
+
+  /**
+   * The same completion, delivered as it is written.
+   *
+   * It resolves with exactly what `complete` would have returned — the whole
+   * text, the tool calls, the usage — so nothing above this line has to know
+   * which path produced it. The callback is a *view* of the answer arriving,
+   * not the answer itself: a caller that ignores it loses nothing.
+   *
+   * Tool calls arrive in pieces too, and are reassembled by their index rather
+   * than their id, because only the first frame of a call carries an id while
+   * every frame carries the index. Getting that wrong produces a plausible
+   * looking tool call with half its arguments, which the registry would then
+   * reject for reasons nobody could trace back to here.
+   */
+  async stream(
+    request: AiCompletionRequest,
+    onChunk: (chunk: AiCompletionChunk) => void,
+  ): Promise<AiCompletion> {
+    const body = this.buildBody(request);
+    // Usage is not sent on a streamed reply unless it is asked for, and without
+    // it every streamed turn would be recorded as costing nothing.
+    body.stream_options = { include_usage: true };
+
+    let content = '';
+    let model: string | undefined;
+    let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+    const partials = new Map<number, { id?: string; name?: string; arguments: string }>();
+
+    await postSse(
+      {
+        url: this.endpointUrl,
+        headers: { authorization: `Bearer ${this.options.apiKey}` },
+        body,
+        endpoint: '/chat/completions (stream)',
+      },
+      {
+        ...this.httpOptions,
+        onLine: (payload) => {
+          let frame: OpenAiStreamChunk;
+
+          try {
+            frame = JSON.parse(payload) as OpenAiStreamChunk;
+          } catch {
+            // A frame that is not JSON is a frame this provider does not
+            // understand; dropping it loses a token rather than the answer.
+            this.log.warn('the provider sent a stream frame that is not JSON');
+
+            return;
+          }
+
+          model ??= frame.model;
+
+          if (frame.usage) {
+            usage = frame.usage;
+          }
+
+          const choice = frame.choices?.[0];
+
+          if (!choice) {
+            return;
+          }
+
+          const delta = choice.delta?.content;
+
+          if (typeof delta === 'string' && delta.length > 0) {
+            content += delta;
+            onChunk({ delta, done: false });
+          }
+
+          for (const call of choice.delta?.tool_calls ?? []) {
+            const index = call.index ?? 0;
+            const partial = partials.get(index) ?? { arguments: '' };
+
+            partials.set(index, {
+              id: call.id ?? partial.id,
+              name: call.function?.name ?? partial.name,
+              arguments: partial.arguments + (call.function?.arguments ?? ''),
+            });
+          }
+
+          if (choice.finish_reason === 'content_filter') {
+            throw new AiProviderError('content_filtered', 'the provider filtered this response');
+          }
+        },
+      },
+    );
+
+    onChunk({ delta: '', done: true });
+
+    const assembled: OpenAiMessage = {
+      role: 'assistant',
+      content,
+      tool_calls: [...partials.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([, call]) => ({
+          id: call.id,
+          type: 'function',
+          function: { name: call.name, arguments: call.arguments },
+        })),
+    };
+
+    return {
+      content,
+      toolCalls: readToolCalls(assembled, this.log),
+      model: model ?? this.options.model,
+      usage: {
+        promptTokens: usage?.prompt_tokens ?? null,
+        completionTokens: usage?.completion_tokens ?? null,
       },
     };
   }

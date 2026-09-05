@@ -2,6 +2,18 @@ export { aiRouter } from './ai.routes.js';
 export { MAX_TOOL_ROUNDS, sendMessage } from './agent/agent.service.js';
 export type { AgentDependencies, AgentLimitOverrides } from './agent/agent.service.js';
 export {
+  closeRun,
+  failRun,
+  latestRunForConversation,
+  openRun,
+  resetRunRegistry,
+  runSnapshot,
+  subscribeToRun,
+  subscriberCount,
+} from './agent/agent-run-registry.js';
+export { toolDisplayFor } from './tools/tool-display.js';
+export type { ToolDisplayLabels } from './tools/tool-display.js';
+export {
   cancelConversationRuns,
   cancelRun,
   listRuns,

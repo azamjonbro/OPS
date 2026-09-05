@@ -1,4 +1,5 @@
 import type {
+  AgentEvent,
   ChatResponse,
   Conversation,
   Memory,
@@ -94,7 +95,10 @@ export const makeConversation = (overrides: Partial<Conversation> = {}): Convers
   user: objectId(),
   title: 'Bugungi savdo',
   status: 'active',
-  lastMessageAt: '2026-09-05T10:00:00.000Z',
+  // Relative to now, not a fixed date: the sidebar groups threads as "Today"
+  // and "Yesterday", so a hard-coded timestamp changes group the day after it
+  // is written and takes a passing test with it.
+  lastMessageAt: new Date().toISOString(),
   messageCount: 2,
   ...timestamps(),
   ...overrides,
@@ -155,3 +159,57 @@ export const makeChatResponse = (overrides: Partial<ChatResponse> = {}): ChatRes
   pendingMemories: [],
   ...overrides,
 });
+
+/* -------------------------------------------------------------------------- */
+/* Agent events                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** Numbers the events of one run. Reset between tests. */
+let eventSequence = 0;
+
+/**
+ * One event as the stream delivers it.
+ *
+ * The sequence auto-increments so a test can write a run as a list of events
+ * without numbering them by hand, and `resetAgentEventSequence` puts it back
+ * for the next test. Passing an explicit `sequence` is how a test writes a
+ * replay or a duplicate on purpose.
+ */
+export const makeAgentEvent = (
+  type: AgentEvent['type'],
+  data: Record<string, string | number | boolean | null> = {},
+  overrides: Partial<AgentEvent> = {},
+): AgentEvent => {
+  eventSequence += 1;
+
+  return {
+    type,
+    sequence: eventSequence,
+    at: '2026-09-06T09:00:00.000Z',
+    workflowId: 'run-1',
+    conversationId: 'conversation-1',
+    data,
+    ...overrides,
+  };
+};
+
+export const resetAgentEventSequence = (): void => {
+  eventSequence = 0;
+};
+
+/** A tool event with every display field the reducer reads. */
+export const makeToolEvent = (
+  type: 'tool.started' | 'tool.completed' | 'tool.failed' | 'tool.skipped' | 'tool.retrying',
+  data: Record<string, string | number | boolean | null> = {},
+): AgentEvent =>
+  makeAgentEvent(type, {
+    callId: 'call-1',
+    tool: 'billz_get_sales_summary',
+    displayName: 'Sales figures',
+    runningLabel: 'Reading the sales figures',
+    doneLabel: 'Read the sales figures',
+    category: 'business',
+    risk: 'read',
+    integration: 'Billz',
+    ...data,
+  });

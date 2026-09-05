@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { BillzCapabilityRunner, BillzProduct } from '../billz/index.js';
-import type { AiCompletion, AiProvider } from './provider/ai-provider.js';
+import type { AiCompletion, AiCompletionRequest, AiProvider } from './provider/ai-provider.js';
 import { createBillzTools } from './tools/billz.tools.js';
 import { CONTENT_TOOLS } from './tools/content.tools.js';
 import { IMAGE_TOOLS } from './tools/image.tools.js';
@@ -21,34 +21,120 @@ export interface ScriptedProvider extends AiProvider {
   readonly requests: Array<{ messages: unknown[]; toolNames: string[] }>;
 }
 
+export interface ScriptedProviderOptions {
+  /**
+   * Whether this double answers through `stream` as well as `complete`.
+   *
+   * Off by default, which is what keeps every existing test on the path it was
+   * written for. On, the scripted text is handed back a few characters at a
+   * time — the point being to prove that a caller reassembles it into exactly
+   * the completion the non-streaming path would have produced.
+   */
+  streaming?: boolean;
+  /** Characters per delta. Small, so a short answer still arrives in pieces. */
+  chunkSize?: number;
+}
+
 export const createScriptedProvider = (
   completions: Array<Partial<AiCompletion>>,
+  options: ScriptedProviderOptions = {},
 ): ScriptedProvider => {
   const requests: Array<{ messages: unknown[]; toolNames: string[] }> = [];
   let index = 0;
 
-  return {
+  const answer = (request: AiCompletionRequest): AiCompletion => {
+    requests.push({
+      messages: request.messages,
+      toolNames: request.tools.map((tool) => tool.name),
+    });
+
+    const scripted = completions[index] ?? completions.at(-1) ?? {};
+    index += 1;
+
+    return {
+      content: scripted.content ?? 'Understood.',
+      toolCalls: scripted.toolCalls ?? [],
+      model: scripted.model ?? 'scripted-model',
+      usage: scripted.usage ?? { promptTokens: 10, completionTokens: 5 },
+    };
+  };
+
+  const provider: ScriptedProvider = {
     name: 'scripted',
     isConfigured: true,
     requests,
-    complete: async (request) => {
-      requests.push({
-        messages: request.messages,
-        toolNames: request.tools.map((tool) => tool.name),
-      });
-
-      const scripted = completions[index] ?? completions.at(-1) ?? {};
-      index += 1;
-
-      return {
-        content: scripted.content ?? 'Understood.',
-        toolCalls: scripted.toolCalls ?? [],
-        model: scripted.model ?? 'scripted-model',
-        usage: scripted.usage ?? { promptTokens: 10, completionTokens: 5 },
-      };
-    },
+    complete: (request) => Promise.resolve(answer(request)),
   };
+
+  if (options.streaming) {
+    const size = options.chunkSize ?? 4;
+
+    return {
+      ...provider,
+      supportsStreaming: true,
+      stream: async (request, onChunk) => {
+        const completion = answer(request);
+
+        for (let at = 0; at < completion.content.length; at += size) {
+          onChunk({ delta: completion.content.slice(at, at + size), done: false });
+          // Yields to the event loop, so a subscriber sees deltas arrive over
+          // time rather than all at once after the call has already returned.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+
+        onChunk({ delta: '', done: true });
+
+        return completion;
+      },
+    };
+  }
+
+  return provider;
 };
+
+/* -------------------------------------------------------------------------- */
+/* Server-sent events                                                         */
+/* -------------------------------------------------------------------------- */
+
+export interface SseFrame {
+  id: string | null;
+  event: string;
+  data: unknown;
+}
+
+/**
+ * Reads an SSE body back into frames.
+ *
+ * Written against the wire format rather than against the writer, so a test
+ * asserts what a browser would actually receive: `id`, `event` and one `data`
+ * line per frame, separated by a blank line. Comments (heartbeats) are dropped.
+ */
+export const parseSse = (body: string): SseFrame[] =>
+  body
+    .split('\n\n')
+    .map((block) => block.trim())
+    .filter((block) => block.length > 0 && !block.startsWith(':'))
+    .flatMap((block) => {
+      let id: string | null = null;
+      let event = 'message';
+      let data = '';
+
+      for (const line of block.split('\n')) {
+        if (line.startsWith('id:')) {
+          id = line.slice(3).trim();
+        } else if (line.startsWith('event:')) {
+          event = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          data += line.slice(5).trim();
+        }
+      }
+
+      if (data.length === 0) {
+        return [];
+      }
+
+      return [{ id, event, data: JSON.parse(data) as unknown }];
+    });
 
 /**
  * A registry whose Billz tools answer from a script rather than from Billz.

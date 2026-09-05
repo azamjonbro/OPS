@@ -1,3 +1,4 @@
+export * from './types/agent-stream.js';
 export * from './types/agent.js';
 export * from './types/ai.js';
 export * from './types/api.js';

@@ -117,6 +117,25 @@ const callFingerprint = (name: string, args: Record<string, unknown>): string =>
     )
     .digest('hex');
 
+/**
+ * The fields every tool event carries.
+ *
+ * Gathered once so a browser can correlate `started` with `completed` by
+ * `callId`, and can render a phrase without knowing the tool exists. Names,
+ * labels and a category — never an argument and never a result.
+ */
+const eventFieldsFor = (call: ScheduledCall, plan: ToolPlan): Record<string, unknown> => ({
+  callId: call.callId,
+  tool: call.name,
+  displayName: plan.display.displayName,
+  runningLabel: plan.display.runningLabel,
+  doneLabel: plan.display.doneLabel,
+  category: plan.category,
+  risk: plan.risk,
+  source: plan.provenance.source,
+  integration: plan.provenance.integrationName,
+});
+
 const failureOutcome = (
   call: ScheduledCall,
   plan: ToolPlan | null,
@@ -231,10 +250,18 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
   const plan = options.registry.plan(call.name) ?? null;
 
   if (!plan) {
-    options.events.emit('tool.failed', { tool: call.name, reason: 'unknown_tool' });
+    options.events.emit('tool.failed', {
+      callId: call.callId,
+      tool: call.name,
+      displayName: call.name,
+      reason: 'unknown_tool',
+      message: 'That step is not available.',
+    });
 
     return failureOutcome(call, null, `There is no tool named "${call.name}".`);
   }
+
+  const eventFields = eventFieldsFor(call, plan);
 
   if (options.signal.aborted) {
     return failureOutcome(call, plan, 'The run was cancelled before this step started.', {
@@ -257,7 +284,7 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
     const already = options.ledger.get(idempotencyKey);
 
     if (already && already.status === 'succeeded') {
-      options.events.emit('tool.skipped', { tool: call.name, reason: 'already_done' });
+      options.events.emit('tool.skipped', { ...eventFields, reason: 'already_done' });
 
       return {
         ...already,
@@ -290,21 +317,18 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
     preflight.kind === 'refused'
   ) {
     options.events.emit('tool.failed', {
-      tool: call.name,
+      ...eventFields,
       round: options.round,
       reason: preflight.kind,
+      // The tool's own words, which are written for a person; the alternative
+      // would be a validation dump nobody outside this process can read.
+      message: preflight.message,
     });
 
     return failureOutcome(call, plan, preflight.message, { durationMs: Date.now() - startedAt });
   }
 
   if (preflight.kind === 'needs_confirmation') {
-    options.events.emit('confirmation.required', {
-      tool: call.name,
-      round: options.round,
-      integration: plan.provenance.integrationName,
-    });
-
     return {
       callId: call.callId,
       name: call.name,
@@ -338,15 +362,7 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
       break;
     }
 
-    options.events.emit('tool.started', {
-      tool: call.name,
-      round: options.round,
-      attempt,
-      risk: plan.risk,
-      category: plan.category,
-      source: plan.provenance.source,
-      integration: plan.provenance.integrationName,
-    });
+    options.events.emit('tool.started', { ...eventFields, round: options.round, attempt });
 
     try {
       const result = await runWithTimeout(
@@ -375,11 +391,10 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
       }
 
       options.events.emit('tool.completed', {
-        tool: call.name,
+        ...eventFields,
         round: options.round,
         attempts: attempt,
         durationMs: outcome.durationMs,
-        source: plan.provenance.source,
       });
 
       return outcome;
@@ -410,7 +425,7 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
       }
 
       options.events.emit('tool.retrying', {
-        tool: call.name,
+        ...eventFields,
         round: options.round,
         attempt,
         kind: decision.kind,
@@ -426,11 +441,13 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
     lastError instanceof Error ? lastError.message : `The "${call.name}" tool failed.`;
 
   options.events.emit('tool.failed', {
-    tool: call.name,
+    ...eventFields,
     round: options.round,
     attempts: attempt,
     kind,
-    source: plan.provenance.source,
+    // Already normalised for a person by the tool or by `McpError`; a stack
+    // and an upstream body never reach here.
+    message,
   });
 
   return {
@@ -495,7 +512,7 @@ export const runToolBatch = async (
 
       if (unmet.length > 0) {
         options.events.emit('tool.skipped', {
-          tool: call.name,
+          ...(plan ? eventFieldsFor(call, plan) : { callId: call.callId, tool: call.name }),
           round: options.round,
           reason: 'dependency_failed',
           dependency: unmet[0] ?? null,

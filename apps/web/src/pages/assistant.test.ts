@@ -3,6 +3,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 
+import * as agentStream from '@/services/agent-stream';
 import { ApiClientError } from '@/services/api-error';
 import { branchService } from '@/services/branch.service';
 import { chatService } from '@/services/chat.service';
@@ -54,6 +55,20 @@ beforeEach(async () => {
   // a socket — a test that reaches a real port passes or fails on the weather.
   vi.spyOn(branchService, 'list').mockResolvedValue(paginated([]));
   vi.spyOn(notificationService, 'unreadCount').mockResolvedValue({ unread: 0 });
+
+  // The turn is streamed in the browser, and `fetch` is not something a page
+  // test should be reaching for. The stub delivers the run through whatever
+  // `chatService.send` each test has set up, so these tests go on asserting on
+  // the turn rather than on the transport underneath it.
+  vi.spyOn(agentStream, 'streamChat').mockImplementation(async (input, handlers) => {
+    handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? '' });
+
+    try {
+      handlers.onResult(await chatService.send(input.message, input.conversationId));
+    } catch (caught) {
+      handlers.onFailure(caught as ApiClientError);
+    }
+  });
 });
 
 const mountPage = async (path = '/assistant') => {

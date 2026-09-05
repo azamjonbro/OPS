@@ -1,4 +1,10 @@
-import type { ChatRequest, ChatResponse, ToolCategory, ToolRisk } from '@hadiya/shared';
+import type {
+  AgentRunSnapshot,
+  ChatRequest,
+  ChatResponse,
+  ToolCategory,
+  ToolRisk,
+} from '@hadiya/shared';
 
 import { api, type RequestOptions } from './http';
 
@@ -79,6 +85,32 @@ export const chatService = {
       { message, ...(conversationId ? { conversationId } : {}) } satisfies ChatRequest,
       { timeout: CHAT_TIMEOUT_MS, ...options },
     ),
+
+  /**
+   * Stops a run that is going.
+   *
+   * The conversation is the handle because that is what the client has. It is
+   * not a second cancellation mechanism: the server aborts the run and
+   * withdraws anything it had prepared, and this only asks it to.
+   */
+  cancel: (
+    conversationId: string,
+    options: RequestOptions = {},
+  ): Promise<{ conversationId: string; cancelledRuns: number; cancelledActions: number }> =>
+    api.post('/v1/ai/chat/cancel', { conversationId }, options),
+
+  /**
+   * The newest run in a conversation, if the server still has one.
+   *
+   * How a reloaded page finds a turn that is still going: it has the
+   * conversation from the URL and nothing else. `null` means there is nothing
+   * live to watch, which is the ordinary answer.
+   */
+  activeRun: (
+    conversationId: string,
+    options: RequestOptions = {},
+  ): Promise<{ run: AgentRunSnapshot | null }> =>
+    api.get(`/v1/ai/chat/${conversationId}/run`, options),
 
   status: (options: RequestOptions = {}): Promise<AssistantStatus> =>
     api.get<AssistantStatus>('/v1/ai/status', options),

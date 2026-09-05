@@ -1,16 +1,30 @@
+import { randomUUID } from 'node:crypto';
+
+import type { AgentStreamFrame } from '@hadiya/shared';
 import type { Request, Response } from 'express';
 
 import { config } from '../../config/index.js';
 import { ApiError } from '../../core/http/api-error.js';
 import { sendSuccess } from '../../core/http/api-response.js';
+import { lastEventId, openSse } from '../../core/http/sse.js';
 import { requireActor } from '../../core/security/actor.js';
+import { createLogger } from '../../core/logger/logger.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import type { chatSchema } from '../conversations/conversation.validators.js';
 import * as conversationService from '../conversations/conversation.service.js';
 import * as agentService from './agent/agent.service.js';
 import { cancelConversationRuns } from './agent/agent-cancellation.js';
+import { onAgentEvent } from './agent/agent-events.js';
+import * as runRegistry from './agent/agent-run-registry.js';
 import * as pendingActionService from './agent/pending-action.service.js';
-import type { cancelRunSchema, conversationParamSchema } from './ai.validators.js';
+import type {
+  cancelRunSchema,
+  conversationParamSchema,
+  chatStreamQuerySchema,
+  runParamSchema,
+} from './ai.validators.js';
+
+const log = createLogger('ai-stream');
 import { describeAiProvider } from './provider/index.js';
 import { describeSpeechProvider } from './stt/index.js';
 import * as transcriptionService from './stt/transcription.service.js';
@@ -25,20 +39,198 @@ import { getToolRegistry } from './tools/index.js';
  * memories worth recalling — is assembled server-side from the authenticated
  * request, so a client can neither widen the context nor answer as someone else.
  */
-export const chat: ValidatedHandler<{ body: typeof chatSchema }> = async (req, res) => {
-  const result = await agentService.sendMessage(
-    requireActor(req),
-    {
-      conversationId: req.validated.body.conversationId,
-      message: req.validated.body.message,
-    },
-    {
-      // Ties every tool call and log line in the run back to this request.
+/**
+ * Whether this caller wants to watch the turn happen.
+ *
+ * Two ways to ask, and both are opt-in: a client that says nothing gets exactly
+ * the JSON reply it has always got. That is what keeps the endpoint one
+ * endpoint — there is no second chat API for streaming clients, only a second
+ * shape for the same turn.
+ */
+const wantsStream = (req: Request, stream: string | undefined): boolean =>
+  stream !== undefined || (req.get('accept') ?? '').includes('text/event-stream');
+
+/**
+ * Streams one turn as it happens.
+ *
+ * The listener is registered *before* the agent is started, on a run id chosen
+ * here rather than inside. That ordering is the whole design: an agent that
+ * generated its own id would have emitted `agent.started` before anything could
+ * subscribe, and the first events of every run — the ones that say what the
+ * assistant set off to do — would be lost to a race nobody would notice until
+ * production.
+ *
+ * The run is not cancelled when the socket closes. A person who shuts a tab
+ * mid-answer should come back to a finished conversation, not a half-written
+ * one; cancelling is a thing they ask for, through the cancel endpoint, and
+ * this is not that.
+ */
+const streamChat = async (
+  req: Request,
+  res: Response,
+  input: { conversationId: string | undefined; message: string },
+): Promise<void> => {
+  const actor = requireActor(req);
+  const runId = randomUUID();
+  const connection = openSse(req, res);
+
+  const write = (frame: AgentStreamFrame): void => {
+    connection.send(
+      frame.frame === 'event' ? frame.event.type : `stream.${frame.frame}`,
+      frame,
+      frame.frame === 'event' ? frame.event.sequence : undefined,
+    );
+  };
+
+  const unsubscribe = onAgentEvent((event) => {
+    if (event.workflowId === runId) {
+      write({ frame: 'event', event });
+    }
+  });
+
+  connection.onClose(() => {
+    unsubscribe();
+    log.debug({ user: actor.id, run: runId }, 'stream client disconnected');
+  });
+
+  write({ frame: 'ready', runId, conversationId: input.conversationId ?? '' });
+
+  try {
+    const result = await agentService.sendMessage(actor, input, {
+      runId,
       requestId: req.id,
-    },
-  );
+      // Somebody is watching, so the answer is worth sending as it is written.
+      streamDeltas: true,
+    });
+
+    write({ frame: 'result', response: result });
+  } catch (error) {
+    // The same translation the JSON path performs, written into the stream
+    // instead of thrown: the response has already begun, so there is no status
+    // code left to set and the error handler cannot help.
+    const failure =
+      error instanceof ApiError
+        ? { code: error.code, message: error.message }
+        : { code: 'INTERNAL_ERROR', message: 'The assistant could not finish that.' };
+
+    log.warn({ user: actor.id, run: runId, err: error }, 'streamed turn failed');
+    write({ frame: 'error', ...failure });
+  } finally {
+    unsubscribe();
+    connection.end();
+  }
+};
+
+export const chat: ValidatedHandler<{
+  body: typeof chatSchema;
+  query: typeof chatStreamQuerySchema;
+}> = async (req, res) => {
+  const input = {
+    conversationId: req.validated.body.conversationId,
+    message: req.validated.body.message,
+  };
+
+  if (wantsStream(req, req.validated.query.stream)) {
+    await streamChat(req, res, input);
+
+    return;
+  }
+
+  const result = await agentService.sendMessage(requireActor(req), input, {
+    // Ties every tool call and log line in the run back to this request.
+    requestId: req.id,
+  });
 
   sendSuccess(req, res, result);
+};
+
+/**
+ * Rejoins a run that is already going.
+ *
+ * For the reconnection case rather than the ordinary one: a stream that dropped
+ * mid-answer, or a browser that reloaded and found its way back through the
+ * conversation. `Last-Event-ID` says what the client already saw, and the run's
+ * buffer replays only what came after — so rejoining twice does not draw the
+ * same tool twice.
+ *
+ * Ownership is the registry's, not this handler's: a run belongs to the account
+ * that started it, and asking for somebody else's is answered as though it did
+ * not exist.
+ */
+export const streamRun: ValidatedHandler<{ params: typeof runParamSchema }> = async (req, res) => {
+  const actor = requireActor(req);
+  const { runId } = req.validated.params;
+  const connection = openSse(req, res);
+
+  const write = (frame: AgentStreamFrame): void => {
+    connection.send(
+      frame.frame === 'event' ? frame.event.type : `stream.${frame.frame}`,
+      frame,
+      frame.frame === 'event' ? frame.event.sequence : undefined,
+    );
+  };
+
+  let subscription: runRegistry.Subscription;
+
+  try {
+    subscription = runRegistry.subscribeToRun({
+      runId,
+      userId: actor.id,
+      afterSequence: lastEventId(req),
+      onFrame: write,
+    });
+  } catch (error) {
+    // The stream is already open, so the refusal is written into it rather
+    // than thrown. It says the run is unavailable and nothing about whether it
+    // exists, which is all a stranger is owed.
+    write({
+      frame: 'error',
+      code: error instanceof ApiError ? error.code : 'NOT_FOUND',
+      message: 'That run is not available.',
+    });
+    connection.end();
+
+    return;
+  }
+
+  connection.onClose(subscription.unsubscribe);
+
+  write({ frame: 'ready', runId, conversationId: '' });
+
+  for (const frame of subscription.replay) {
+    write(frame);
+  }
+
+  if (subscription.finished) {
+    connection.end();
+  }
+};
+
+/** Everything known about one run, for a browser that has just reloaded. */
+export const runState: ValidatedHandler<{ params: typeof runParamSchema }> = (req, res) => {
+  sendSuccess(req, res, runRegistry.runSnapshot(req.validated.params.runId, requireActor(req).id));
+};
+
+/**
+ * The newest run in a conversation, or `null`.
+ *
+ * How a reloaded browser finds a turn that is still going: it has the
+ * conversation from the URL and nothing else. `null` is an ordinary answer —
+ * the run finished and was swept, or is on another instance — and means there
+ * is nothing live to watch rather than that something went wrong.
+ */
+export const conversationRun: ValidatedHandler<{ params: typeof conversationParamSchema }> = async (
+  req,
+  res,
+) => {
+  const actor = requireActor(req);
+  const { conversationId } = req.validated.params;
+
+  await conversationService.getConversation(actor, conversationId);
+
+  sendSuccess(req, res, {
+    run: runRegistry.latestRunForConversation(actor.id, conversationId),
+  });
 };
 
 /**

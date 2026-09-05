@@ -85,6 +85,25 @@ export const clearAgentEventListeners = (): void => {
   listeners.clear();
 };
 
+/**
+ * Hands one event to every listener.
+ *
+ * Extracted from the sink so there is a single fan-out, and so a test can push
+ * a synthetic event through the real path rather than reaching into whatever is
+ * listening. A listener that throws is contained here: one broken subscriber —
+ * a socket that has gone, a logger that is misconfigured — must not take down
+ * the run that was only trying to say what it was doing.
+ */
+export const publishAgentEvent = (event: AgentEvent): void => {
+  for (const listener of listeners) {
+    try {
+      listener(event);
+    } catch (error) {
+      log.warn({ err: error }, 'agent event listener failed');
+    }
+  }
+};
+
 export interface EventSinkOptions {
   workflowId: string;
   conversationId: string;
@@ -128,14 +147,7 @@ export const createEventSink = (options: EventSinkOptions): AgentEventSink => {
       // not — the browser already knows who it is.
       log.debug({ user: options.userId, workflow: options.workflowId, ...event }, type);
 
-      for (const listener of listeners) {
-        try {
-          listener(event);
-        } catch (error) {
-          // A broken listener must not take a run down with it.
-          log.warn({ err: error }, 'agent event listener failed');
-        }
-      }
+      publishAgentEvent(event);
     },
   };
 };

@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "create-owner": "tsx src/scripts/create-owner.ts",
-    "probe-transactions": "tsx src/scripts/probe-transactions.ts"
+    "probe-transactions": "tsx src/scripts/probe-transactions.ts",
+    "probe-agent": "tsx src/scripts/probe-agent.ts"
   },
   "dependencies": {
     "@hadiya/shared": "2.0.0",

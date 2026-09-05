@@ -385,3 +385,107 @@ describe('Anthropic provider', () => {
     expect(error.toApiError().statusCode).toBe(503);
   });
 });
+
+describe('OpenAI streaming', () => {
+  /** An OpenAI stream, written the way the API actually frames it. */
+  const sseBody = (frames: unknown[]): string =>
+    `${frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('')}data: [DONE]\n\n`;
+
+  const textFrame = (content: string) => ({
+    model: 'gpt-5',
+    choices: [{ delta: { content }, finish_reason: null }],
+  });
+
+  it('reassembles a streamed answer into the completion `complete` would have returned', async () => {
+    const { provider, double } = buildOpenAi([
+      {
+        rawBody: sseBody([
+          textFrame('Bugungi '),
+          textFrame('savdo '),
+          textFrame('yaxshi.'),
+          { choices: [{ delta: {}, finish_reason: 'stop' }] },
+          { usage: { prompt_tokens: 120, completion_tokens: 8 } },
+        ]),
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    ]);
+
+    const deltas: string[] = [];
+    const completion = await provider.stream?.({ messages: [], tools: [] }, (chunk) => {
+      if (!chunk.done) {
+        deltas.push(chunk.delta);
+      }
+    });
+
+    expect(deltas).toEqual(['Bugungi ', 'savdo ', 'yaxshi.']);
+    expect(completion?.content).toBe('Bugungi savdo yaxshi.');
+    // Usage arrives in its own final frame and only when asked for; without
+    // this every streamed turn would be recorded as free.
+    expect(completion?.usage).toEqual({ promptTokens: 120, completionTokens: 8 });
+    expect(double.calls[0]?.body.stream).toBe(true);
+    expect(double.calls[0]?.body.stream_options).toEqual({ include_usage: true });
+  });
+
+  it('reassembles a tool call that arrived in pieces', async () => {
+    const { provider } = buildOpenAi([
+      {
+        rawBody: sseBody([
+          {
+            model: 'gpt-5',
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: 'call_1', function: { name: 'get_sales_summary' } },
+                  ],
+                },
+              },
+            ],
+          },
+          // Every later frame carries the index and no id, which is why the
+          // pieces are keyed by index rather than by id.
+          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"from"' } }] } }] },
+          {
+            choices: [
+              { delta: { tool_calls: [{ index: 0, function: { arguments: ':"2026-09-05"}' } }] } },
+            ],
+          },
+          { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+        ]),
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    ]);
+
+    const completion = await provider.stream?.({ messages: [], tools: TOOLS }, () => undefined);
+
+    expect(completion?.toolCalls).toEqual([
+      { callId: 'call_1', name: 'get_sales_summary', arguments: { from: '2026-09-05' } },
+    ]);
+  });
+
+  it('classifies a refused key on a stream exactly as on an ordinary call', async () => {
+    const { provider } = buildOpenAi([{ status: 401, body: { error: { code: 'invalid_api_key' } } }]);
+
+    const error = (await provider
+      .stream?.({ messages: [], tools: [] }, () => undefined)
+      .catch((caught: unknown) => caught)) as AiProviderError;
+
+    expect(error.kind).toBe('invalid_credentials');
+  });
+
+  it('does not replay text it has already handed over', async () => {
+    // A stream that opens, delivers, then breaks. Retrying would repeat the
+    // half-sentence the caller already has, so it fails instead.
+    const { provider, double } = buildOpenAi([
+      {
+        rawBody: sseBody([textFrame('Bugungi ')]),
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    ]);
+
+    const completion = await provider.stream?.({ messages: [], tools: [] }, () => undefined);
+
+    expect(completion?.content).toBe('Bugungi ');
+    expect(double.calls).toHaveLength(1);
+  });
+});

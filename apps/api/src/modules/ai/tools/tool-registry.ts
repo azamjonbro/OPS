@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { createLogger } from '../../../core/logger/logger.js';
 import type { AiToolDefinition } from '../provider/ai-provider.js';
+import { toolDisplayFor, type ToolDisplayLabels } from './tool-display.js';
 
 const log = createLogger('ai-tools');
 
@@ -125,6 +126,14 @@ export interface RegisteredTool<TSchema extends z.ZodType = z.ZodType> {
   dependsOn?: readonly string[];
   /** Where it came from. Defaults to a native Hadiya tool. */
   provenance?: ToolProvenance;
+  /**
+   * What to call this on a screen while it runs.
+   *
+   * Optional because most tools get a sensible phrase from `tool-display.ts`
+   * without saying anything. Declaring one here is for a tool whose derived
+   * label would read badly, and it is the only thing that overrides the table.
+   */
+  display?: Partial<ToolDisplayLabels>;
   /** Overrides the run's tool timeout, for something known to be slow. */
   timeoutMs?: number;
   /**
@@ -167,16 +176,20 @@ export interface ToolPlan {
   dependsOn: readonly string[];
   provenance: ToolProvenance;
   timeoutMs: number | null;
+  /** Already resolved, so an event can carry it without a second lookup. */
+  display: ToolDisplayLabels;
 }
 
 export const resolveToolPlan = (tool: RegisteredTool): ToolPlan => {
   const requiresConfirmation = tool.requiresConfirmation ?? false;
   const risk =
     tool.risk ?? (requiresConfirmation ? 'destructive' : tool.mutates ? 'write' : 'read');
+  const category = tool.category ?? 'other';
+  const provenance = tool.provenance ?? NATIVE_PROVENANCE;
 
   return {
     name: tool.name,
-    category: tool.category ?? 'other',
+    category,
     risk,
     mutates: tool.mutates,
     requiresConfirmation,
@@ -185,10 +198,16 @@ export const resolveToolPlan = (tool: RegisteredTool): ToolPlan => {
     // be racing something else while they read the question.
     parallelSafe: tool.parallelSafe ?? (risk === 'read' && !requiresConfirmation),
     idempotent: tool.idempotent ?? !tool.mutates,
-    resource: tool.resource ?? (tool.mutates ? (tool.category ?? 'other') : null),
+    resource: tool.resource ?? (tool.mutates ? category : null),
     dependsOn: tool.dependsOn ?? [],
-    provenance: tool.provenance ?? NATIVE_PROVENANCE,
+    provenance,
     timeoutMs: tool.timeoutMs ?? null,
+    display: toolDisplayFor({
+      name: tool.name,
+      category,
+      provenance,
+      declared: tool.display,
+    }),
   };
 };
 
@@ -268,6 +287,7 @@ export class ToolRegistry {
         requiresConfirmation: plan.requiresConfirmation,
         parallelSafe: plan.parallelSafe,
         provenance: plan.provenance,
+        display: plan.display,
       };
     });
   }
