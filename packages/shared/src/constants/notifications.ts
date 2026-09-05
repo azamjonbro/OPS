@@ -17,7 +17,7 @@ export const NOTIFICATION_STATUSES = ['unread', 'read'] as const;
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 
 /** What produced the notification, which decides how a client renders it. */
-export const NOTIFICATION_CATEGORIES = ['reminder', 'system'] as const;
+export const NOTIFICATION_CATEGORIES = ['reminder', 'system', 'alert'] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 

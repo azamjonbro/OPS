@@ -3,6 +3,8 @@ import type { AuthenticatedUser } from '@hadiya/shared';
 import { createLogger } from '../../../core/logger/logger.js';
 import { createBillzTools } from './billz.tools.js';
 import { createAnalyticsTools } from '../../analytics/analytics.tools.js';
+import { ALERT_TOOLS } from '../../alerts/alert.tools.js';
+import { FILE_TOOLS } from '../../files/file.tools.js';
 import { CONTENT_TOOLS } from './content.tools.js';
 import { IMAGE_TOOLS } from './image.tools.js';
 import { buildIntegrationTools } from './integration.tools.js';
@@ -44,6 +46,8 @@ export const createToolRegistry = (): ToolRegistry => {
     ...IMAGE_TOOLS,
     ...createBillzTools(),
     ...createAnalyticsTools(),
+    ...ALERT_TOOLS,
+    ...FILE_TOOLS,
   ]) {
     registry.register(tool);
   }

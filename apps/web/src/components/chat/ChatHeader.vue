@@ -4,7 +4,7 @@ import { computed } from 'vue';
 
 import AccountMenu from '@/components/layout/AccountMenu.vue';
 import BranchSelector from '@/components/layout/BranchSelector.vue';
-import NotificationBell from '@/components/notifications/NotificationBell.vue';
+import NotificationCenter from '@/components/notifications/NotificationCenter.vue';
 import { useUiStore } from '@/stores/ui';
 
 const props = defineProps<{ conversation: Conversation | null; connected: boolean }>();
@@ -53,7 +53,7 @@ const title = computed(() => props.conversation?.title ?? 'New conversation');
       </span>
 
       <BranchSelector />
-      <NotificationBell />
+      <NotificationCenter />
       <AccountMenu />
     </div>
   </header>

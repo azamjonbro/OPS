@@ -28,6 +28,8 @@ export const APP_MODULES = [
   'content',
   'images',
   'notifications',
+  'alerts',
+  'files',
   'audit',
 ] as const;
 

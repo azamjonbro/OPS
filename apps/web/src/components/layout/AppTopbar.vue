@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router';
 import AccountMenu from '@/components/layout/AccountMenu.vue';
 import AppBreadcrumbs from '@/components/layout/AppBreadcrumbs.vue';
 import BranchSelector from '@/components/layout/BranchSelector.vue';
-import NotificationBell from '@/components/notifications/NotificationBell.vue';
+import NotificationCenter from '@/components/notifications/NotificationCenter.vue';
 import { useUiStore } from '@/stores/ui';
 
 const route = useRoute();
@@ -46,7 +46,7 @@ const title = computed(() => route.meta.title ?? 'Hadiya');
 
     <div class="flex shrink-0 items-center gap-2 sm:gap-3">
       <BranchSelector />
-      <NotificationBell />
+      <NotificationCenter />
       <AccountMenu />
     </div>
   </header>

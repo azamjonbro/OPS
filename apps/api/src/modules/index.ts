@@ -1,7 +1,9 @@
 import { aiRouter } from './ai/index.js';
+import { alertRouter } from './alerts/index.js';
 import { billzRouter } from './billz/index.js';
 import { branchRouter } from './branches/index.js';
 import { contentRouter } from './content/index.js';
+import { fileRouter } from './files/index.js';
 import { conversationRouter } from './conversations/index.js';
 import { imageRouter } from './images/index.js';
 import { integrationRouter } from './integrations/index.js';
@@ -39,9 +41,11 @@ export const apiModules: ApiModule[] = [
   { name: 'conversations', basePath: '/conversations', router: conversationRouter },
   { name: 'content', basePath: '/content', router: contentRouter },
   { name: 'images', basePath: '/images', router: imageRouter },
+  { name: 'files', basePath: '/files', router: fileRouter },
   { name: 'memory', basePath: '/memory', router: memoryRouter },
   { name: 'reminders', basePath: '/reminders', router: reminderRouter },
   { name: 'notifications', basePath: '/notifications', router: notificationRouter },
+  { name: 'alerts', basePath: '/alerts', router: alertRouter },
   { name: 'assistant', basePath: '/ai', router: aiRouter },
   // Integrations are namespaced so a second one does not collide with a domain.
   // Billz keeps the specific path it has always had; the hub takes the parent,
