@@ -10,7 +10,10 @@ defineProps<{ metrics: MetricsBlock }>();
 <template>
   <div class="flex flex-col gap-3 my-2">
     <div class="rounded-[14px] bg-surface p-5 shadow-sm ring-1 ring-border-subtle">
-      <p v-if="metrics.period" class="mb-4 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-400">
+      <p
+        v-if="metrics.period"
+        class="mb-4 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-400"
+      >
         {{ metrics.period }}
       </p>
 

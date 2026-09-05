@@ -3,10 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createApp } from '../../app.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
-import {
-  createTestBranch,
-  signInAs,
-} from '../../test/factories.js';
+import { createTestBranch, signInAs } from '../../test/factories.js';
 import { ContentItemModel } from '../content/content-item.model.js';
 import { ContentPlanModel } from '../content/content-plan.model.js';
 import * as contentService from '../content/content.service.js';

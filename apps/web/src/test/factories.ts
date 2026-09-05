@@ -1,17 +1,11 @@
 import type {
-  Category,
   ChatResponse,
   Conversation,
-  Customer,
-  Expense,
-  InventoryItem,
   Memory,
   Message,
   MessageToolCall,
   PaginatedResult,
-  Product,
   Reminder,
-  Sale,
   User,
 } from '@hadiya/shared';
 
@@ -67,105 +61,6 @@ export const makeUser = (overrides: Partial<User> = {}): User => ({
   branch: null,
   timezone: 'Asia/Tashkent',
   lastLoginAt: null,
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeProduct = (overrides: Partial<Product> = {}): Product => ({
-  id: objectId(),
-  name: 'Cola 1L',
-  sku: 'COLA1L',
-  barcode: '4780000000001',
-  description: null,
-  category: objectId(),
-  price: 1_200_000,
-  costPrice: 900_000,
-  currency: 'UZS',
-  unit: 'piece',
-  trackInventory: true,
-  reorderLevel: 5,
-  isActive: true,
-  images: [],
-  externalRefs: [],
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeCategory = (overrides: Partial<Category> = {}): Category => ({
-  id: objectId(),
-  name: 'Drinks',
-  description: null,
-  parent: null,
-  isActive: true,
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeCustomer = (overrides: Partial<Customer> = {}): Customer => ({
-  id: objectId(),
-  fullName: 'Aziz Karimov',
-  phone: '+998901234567',
-  notes: null,
-  status: 'active',
-  branch: null,
-  debtBalance: 0,
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeSale = (overrides: Partial<Sale> = {}): Sale => ({
-  id: objectId(),
-  number: 'S-0001',
-  branch: objectId(),
-  employee: objectId(),
-  customer: null,
-  items: [
-    {
-      product: objectId(),
-      name: 'Cola 1L',
-      sku: 'COLA1L',
-      unitPrice: 1_200_000,
-      costPrice: 900_000,
-      quantity: 2,
-      discount: 0,
-      lineTotal: 2_400_000,
-    },
-  ],
-  totals: {
-    subtotal: 2_400_000,
-    discountTotal: 0,
-    grandTotal: 2_400_000,
-    paidAmount: 2_400_000,
-    dueAmount: 0,
-  },
-  status: 'completed',
-  paymentStatus: 'paid',
-  note: null,
-  soldAt: '2026-09-05T09:00:00.000Z',
-  cancelledAt: null,
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeExpense = (overrides: Partial<Expense> = {}): Expense => ({
-  id: objectId(),
-  branch: objectId(),
-  category: 'rent',
-  amount: 5_000_000,
-  description: 'September rent',
-  date: '2026-09-01T00:00:00.000Z',
-  status: 'pending',
-  createdBy: objectId(),
-  reviewedBy: null,
-  ...timestamps(),
-  ...overrides,
-});
-
-export const makeStockItem = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
-  id: objectId(),
-  product: objectId(),
-  branch: objectId(),
-  quantity: 12,
   ...timestamps(),
   ...overrides,
 });

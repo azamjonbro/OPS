@@ -66,4 +66,3 @@ billzRouter.get(
   '/inventory',
   ...validated({ query: billzInventoryQuerySchema }, billzController.listInventory),
 );
-

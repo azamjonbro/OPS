@@ -48,6 +48,5 @@ export const billzInventoryQuerySchema = z.object({
 
 export const billzExternalIdParamSchema = z.object({ externalId: externalIdSchema });
 
-
 export type BillzProductQuery = z.output<typeof billzProductQuerySchema>;
 export type BillzSalesQuery = z.output<typeof billzSalesQuerySchema>;

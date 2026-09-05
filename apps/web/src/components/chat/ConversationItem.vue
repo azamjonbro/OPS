@@ -72,7 +72,11 @@ const closeMenu = (): void => {
         :aria-current="active ? 'page' : undefined"
         @click="emit('open', conversation.id)"
       >
-        <div v-if="active" class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-500" aria-hidden="true" />
+        <div
+          v-if="active"
+          class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-500"
+          aria-hidden="true"
+        />
         <span class="truncate pl-0.5">{{ title }}</span>
       </button>
 

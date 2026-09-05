@@ -36,7 +36,10 @@ const timestamp = computed(() => (props.createdAt ? formatDateTime(props.created
       H
     </span>
 
-    <div class="flex min-w-0 flex-col gap-1.5" :class="isUser ? 'max-w-[75%] md:max-w-[65%] items-end' : 'flex-1 max-w-[85%] md:max-w-[75%]' ">
+    <div
+      class="flex min-w-0 flex-col gap-1.5"
+      :class="isUser ? 'max-w-[75%] md:max-w-[65%] items-end' : 'flex-1 max-w-[85%] md:max-w-[75%]'"
+    >
       <p class="sr-only">{{ isUser ? 'You said' : 'Hadiya said' }}</p>
 
       <slot />

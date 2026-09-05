@@ -26,21 +26,21 @@ describe('protected routes', () => {
   it('sends an anonymous visitor to the login page, remembering where they were going', async () => {
     const router = createAppRouter();
 
-    await router.push('/products');
+    await router.push('/reminders');
     await router.isReady();
 
     expect(router.currentRoute.value.name).toBe('login');
-    expect(router.currentRoute.value.query.redirect).toBe('/products');
+    expect(router.currentRoute.value.query.redirect).toBe('/reminders');
   });
 
   it('lets a signed-in employee through', async () => {
     signedIn();
     const router = createAppRouter();
 
-    await router.push('/products');
+    await router.push('/reminders');
     await router.isReady();
 
-    expect(router.currentRoute.value.name).toBe('products');
+    expect(router.currentRoute.value.name).toBe('reminders');
   });
 
   it('keeps a signed-in employee off the login page', async () => {
@@ -50,7 +50,7 @@ describe('protected routes', () => {
     await router.push('/');
     await router.push('/auth/login');
 
-    expect(router.currentRoute.value.name).toBe('dashboard');
+    expect(router.currentRoute.value.name).toBe('assistant');
   });
 
   it('clears the session when the stored token is no longer accepted', async () => {
@@ -58,7 +58,7 @@ describe('protected routes', () => {
     vi.spyOn(authService, 'currentUser').mockRejectedValue(new Error('401'));
 
     const router = createAppRouter();
-    await router.push('/products');
+    await router.push('/reminders');
 
     const auth = useAuthStore();
     expect(auth.isAuthenticated).toBe(false);
@@ -67,23 +67,37 @@ describe('protected routes', () => {
   });
 });
 
-describe('role-based routes', () => {
-  it('turns a cashier away from reports', async () => {
-    signedIn('cashier');
+describe('where signing in lands', () => {
+  it('opens the assistant rather than a menu of screens', async () => {
+    signedIn();
     const router = createAppRouter();
 
-    await router.push('/reports');
+    await router.push('/');
+    await router.isReady();
 
-    // The API would refuse anyway; this is so they never see the refusal.
-    expect(router.currentRoute.value.name).toBe('dashboard');
+    // Hadiya is the product; the first thing it should offer is a question box.
+    expect(router.currentRoute.value.name).toBe('assistant');
   });
 
-  it('lets a manager in', async () => {
-    signedIn('manager');
+  it('carries a bookmarked conversation id through the guard', async () => {
+    signedIn();
     const router = createAppRouter();
 
-    await router.push('/reports');
+    await router.push('/assistant/aaaaaaaaaaaaaaaaaaaaaaaa');
+    await router.isReady();
 
-    expect(router.currentRoute.value.name).toBe('reports');
+    expect(router.currentRoute.value.name).toBe('assistant-conversation');
+    expect(router.currentRoute.value.params.id).toBe('aaaaaaaaaaaaaaaaaaaaaaaa');
+  });
+
+  it('has no route left for a screen Billz owns', async () => {
+    signedIn();
+    const router = createAppRouter();
+
+    for (const gone of ['/products', '/sales', '/inventory', '/customers', '/expenses', '/pos']) {
+      await router.push(gone);
+
+      expect(router.currentRoute.value.name).toBe('not-found');
+    }
   });
 });

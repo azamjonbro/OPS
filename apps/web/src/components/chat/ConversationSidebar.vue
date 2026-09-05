@@ -64,7 +64,10 @@ const archive = (id: string): void => {
 </script>
 
 <template>
-  <aside class="flex h-full w-[260px] flex-col bg-surface-muted border-r border-border-subtle text-ink-900 font-sans" aria-label="Conversations">
+  <aside
+    class="flex h-full w-[260px] flex-col bg-surface-muted border-r border-border-subtle text-ink-900 font-sans"
+    aria-label="Conversations"
+  >
     <!-- Header -->
     <div class="flex h-[72px] shrink-0 items-center justify-between px-4">
       <RouterLink
@@ -84,8 +87,8 @@ const archive = (id: string): void => {
       <button
         type="button"
         class="flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-surface hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-        @click="emit('newChat')"
         title="New Chat"
+        @click="emit('newChat')"
       >
         <svg
           class="size-[18px]"
@@ -127,7 +130,10 @@ const archive = (id: string): void => {
     </div>
 
     <!-- Conversation List -->
-    <nav class="min-h-0 flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar" aria-label="Conversation history">
+    <nav
+      class="min-h-0 flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar"
+      aria-label="Conversation history"
+    >
       <p v-if="conversations.isLoading" class="px-3 py-3 text-[13px] text-ink-500" role="status">
         Loading...
       </p>
@@ -182,7 +188,9 @@ const archive = (id: string): void => {
     </div>
 
     <!-- User Profile -->
-    <div class="flex shrink-0 items-center gap-3 p-4 border-t border-border-subtle hover:bg-surface transition-colors cursor-pointer rounded-b-lg">
+    <div
+      class="flex shrink-0 items-center gap-3 p-4 border-t border-border-subtle hover:bg-surface transition-colors cursor-pointer rounded-b-lg"
+    >
       <span
         class="grid size-8 shrink-0 place-items-center rounded-full bg-brand-500 text-[11px] font-bold text-white shadow-sm"
         aria-hidden="true"
@@ -193,7 +201,9 @@ const archive = (id: string): void => {
         <span class="block truncate text-[13px] font-semibold text-ink-900 leading-tight">
           {{ auth.user?.fullName ?? 'Not signed in' }}
         </span>
-        <span class="block truncate text-[11px] font-medium text-ink-500 capitalize leading-tight mt-0.5">
+        <span
+          class="block truncate text-[11px] font-medium text-ink-500 capitalize leading-tight mt-0.5"
+        >
           {{ auth.user?.role ?? 'User' }}
         </span>
       </span>

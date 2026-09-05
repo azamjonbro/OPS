@@ -99,7 +99,9 @@ describe('authentication guard', () => {
     const { UserModel } = await import('../users/user.model.js');
     await UserModel.updateOne({ _id: user._id }, { $set: { status: 'suspended' } }).exec();
 
-    const response = await request(app).get('/api/v1/conversations').set('Authorization', authorization);
+    const response = await request(app)
+      .get('/api/v1/conversations')
+      .set('Authorization', authorization);
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
   });

@@ -16,8 +16,12 @@ declare module 'vue-router' {
      * Lowest role that may open the route.
      *
      * A second line of UX defence beside the hidden menu entry: somebody who
-     * types the URL, or follows a stale bookmark, lands on the dashboard rather
+     * types the URL, or follows a stale bookmark, lands on the assistant rather
      * than on a page of permission errors. The API is what actually refuses.
+     *
+     * No route declares one today — the screens that needed a role were the
+     * ones mirroring Billz, and they are gone. The rule stays because the next
+     * one that needs it (staff administration) is already in the menu.
      */
     minimumRole?: UserRole;
     /** Ancestors for the breadcrumb trail; the page's own title is appended. */
@@ -47,11 +51,11 @@ export const createAppRouter = (): Router => {
     }
 
     if (to.meta.guestOnly && auth.isAuthenticated) {
-      return { name: 'dashboard' };
+      return { name: 'assistant' };
     }
 
     if (to.meta.minimumRole && auth.user && !hasAtLeastRole(auth.user.role, to.meta.minimumRole)) {
-      return { name: 'dashboard' };
+      return { name: 'assistant' };
     }
 
     return true;

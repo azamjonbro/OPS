@@ -45,7 +45,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  */
 const describeProduct = (product: Record<string, unknown>): string => {
   const price = typeof product.retailPrice === 'number' ? money(product.retailPrice) : 'no price';
-  const stock = typeof product.totalStock === 'number' ? `${product.totalStock} in stock` : 'stock unknown';
+  const stock =
+    typeof product.totalStock === 'number' ? `${product.totalStock} in stock` : 'stock unknown';
 
   return `${String(product.name)} — ${price}, ${stock} [sku ${String(product.sku)}, id ${String(product.externalId)}]`;
 };

@@ -78,9 +78,7 @@ export const createRegistryWithBillz = (stub: Partial<BillzCapabilityRunner>): T
 };
 
 /** One Billz product, with only the fields a tool or a test actually reads. */
-export const billzProduct = (
-  overrides: Partial<BillzProduct> = {},
-): BillzProduct =>
+export const billzProduct = (overrides: Partial<BillzProduct> = {}): BillzProduct =>
   ({
     externalId: 'billz-product-1',
     name: 'Cola 1L',

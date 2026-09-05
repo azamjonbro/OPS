@@ -54,6 +54,13 @@ const emit = defineEmits<{ retry: []; dismiss: [] }>();
     >
       Try again
     </BaseButton>
-    <BaseButton v-else variant="ghost" size="sm" class="!rounded-lg text-danger-700 hover:text-danger-900" @click="emit('dismiss')">Dismiss</BaseButton>
+    <BaseButton
+      v-else
+      variant="ghost"
+      size="sm"
+      class="!rounded-lg text-danger-700 hover:text-danger-900"
+      @click="emit('dismiss')"
+      >Dismiss</BaseButton
+    >
   </div>
 </template>
