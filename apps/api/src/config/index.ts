@@ -30,6 +30,27 @@ export interface AiConfig {
   maxOutputTokens: number;
 }
 
+/**
+ * What one agent run may spend, and how strictly it asks before it acts.
+ *
+ * Every field is a ceiling rather than a target: a run that needs fewer rounds
+ * uses fewer. They live in configuration because the right numbers depend on
+ * the model, the plan and how patient the shop is, and none of that is knowable
+ * from here.
+ */
+export interface AgentConfig {
+  maxToolRounds: number;
+  maxModelCalls: number;
+  maxParallelTools: number;
+  toolTimeoutMs: number;
+  maxToolRetries: number;
+  retryBackoffMs: number;
+  tokenBudget: number;
+  confirmationTtlMs: number;
+  /** Whether a confirmed call must match an action this server prepared. */
+  requirePendingConfirmation: boolean;
+}
+
 /** Which model draws, and how patiently. */
 export interface ImageConfig {
   /** Explicit choice, or `null` to let the configured key decide. */
@@ -121,6 +142,7 @@ export interface AppConfig {
    * none of these integrations are implemented yet.
    */
   ai: AiConfig;
+  agent: AgentConfig;
   image: ImageConfig;
   speech: SpeechConfig;
   storage: StorageConfig;
@@ -194,6 +216,17 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     timeoutMs: env.AI_TIMEOUT_MS,
     maxRetries: env.AI_MAX_RETRIES,
     maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+  },
+  agent: {
+    maxToolRounds: env.AGENT_MAX_TOOL_ROUNDS,
+    maxModelCalls: env.AGENT_MAX_MODEL_CALLS,
+    maxParallelTools: env.AGENT_MAX_PARALLEL_TOOLS,
+    toolTimeoutMs: env.AGENT_TOOL_TIMEOUT_MS,
+    maxToolRetries: env.AGENT_MAX_TOOL_RETRIES,
+    retryBackoffMs: env.AGENT_RETRY_BACKOFF_MS,
+    tokenBudget: env.AGENT_TOKEN_BUDGET,
+    confirmationTtlMs: env.AGENT_CONFIRMATION_TTL_MS,
+    requirePendingConfirmation: env.AGENT_REQUIRE_PENDING_CONFIRMATION,
   },
   image: {
     provider: env.IMAGE_PROVIDER ?? null,
