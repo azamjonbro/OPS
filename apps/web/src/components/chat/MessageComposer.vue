@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { DOCUMENT_ACCEPT_ATTRIBUTE } from '@hadiya/shared';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 
+import AttachmentChip from './AttachmentChip.vue';
 import RecordingIndicator from './RecordingIndicator.vue';
 import TranscriptionStatus from './TranscriptionStatus.vue';
 import VoiceInputButton from './VoiceInputButton.vue';
+import { useFileUpload } from '@/composables/useFileUpload';
 import { useVoiceInput } from '@/composables/useVoiceInput';
 
 const props = withDefaults(
@@ -31,7 +34,7 @@ const props = withDefaults(
     autofocus: true,
   },
 );
-const emit = defineEmits<{ send: [text: string]; stop: [] }>();
+const emit = defineEmits<{ send: [text: string, fileIds: string[]]; stop: [] }>();
 /**
  * Where a turn is written.
  *
@@ -45,10 +48,10 @@ const emit = defineEmits<{ send: [text: string]; stop: [] }>();
  * waits. Disabling the field would also move focus away and, on a phone, close
  * the keyboard mid-sentence.
  *
- * Attachments are not part of this phase. The seam for them is the row below
- * the textarea and the fact that sending emits a value rather than reading the
- * field: adding a file means adding to that emitted payload, not rewriting the
- * control.
+ * Attachments sit in a row above the textarea and travel with the emitted
+ * payload rather than being read out of the field. Picking one uploads it at
+ * once — so a problem with it surfaces while the person is still here — but it
+ * becomes part of a message only when Send is pressed.
  *
  * Dictation writes into this same field and does not send. A transcript is a
  * draft like any other: it can be read, corrected and abandoned, and it becomes
@@ -64,7 +67,21 @@ const text = ref('');
 const textarea = ref<HTMLTextAreaElement | null>(null);
 
 const trimmed = computed(() => text.value.trim());
-const canSend = computed(() => trimmed.value.length > 0 && !props.busy);
+/**
+ * A turn needs something in it and nothing still arriving.
+ *
+ * An attached document counts as content on its own — "bu faylni analiz qil"
+ * with the file attached and no typing is a perfectly ordinary request — but a
+ * file that is still uploading holds Send back, because sending a reference to
+ * a document the server has not finished reading produces an answer about
+ * nothing.
+ */
+const canSend = computed(
+  () =>
+    (trimmed.value.length > 0 || files.readyFiles().length > 0) &&
+    !props.busy &&
+    !files.isUploading.value,
+);
 /**
  * The primary button becomes Stop while there is a run to stop.
  *
@@ -133,6 +150,30 @@ const insertTranscript = (transcript: string): void => {
   });
 };
 
+/**
+ * Documents attached to this turn.
+ *
+ * Picking a file uploads it immediately — so it can be read, and so a problem
+ * with it surfaces while the person is still looking at the composer — but it
+ * never sends anything. The attachment becomes part of a message only when Send
+ * is pressed, which is the same rule dictation follows.
+ */
+const files = useFileUpload();
+const filePicker = ref<HTMLInputElement | null>(null);
+
+const onFilesPicked = async (event: Event): Promise<void> => {
+  const input = event.target as HTMLInputElement;
+  const picked = [...(input.files ?? [])];
+
+  // Cleared straight away so picking the same file twice in a row still fires
+  // a change event.
+  input.value = '';
+
+  if (picked.length > 0) {
+    await files.add(picked);
+  }
+};
+
 const voice = useVoiceInput({ onTranscript: insertTranscript });
 
 /** Starting again clears the last announcement, so it cannot be read as new. */
@@ -146,10 +187,15 @@ const send = (): void => {
     return;
   }
 
-  emit('send', trimmed.value);
+  emit(
+    'send',
+    trimmed.value,
+    files.readyFiles().map((file) => file.id),
+  );
   // Cleared straight away: the message is optimistic upstream, so a failure
   // puts the words back rather than this holding on to them.
   text.value = '';
+  files.clear();
   void nextTick(resize);
 };
 
@@ -182,6 +228,19 @@ defineExpose({ focus, setText });
       <label :for="id" class="sr-only">Message Hadiya</label>
 
       <div
+        v-if="files.attachments.value.length > 0"
+        class="mb-2 flex flex-col gap-2"
+        aria-label="Attached documents"
+      >
+        <AttachmentChip
+          v-for="attachment in files.attachments.value"
+          :key="attachment.localId"
+          :attachment="attachment"
+          @remove="files.remove"
+        />
+      </div>
+
+      <div
         class="flex items-end gap-3 rounded-[24px] bg-surface-muted px-4 py-2 ring-1 ring-border-subtle shadow-sm transition-all duration-300 focus-within:bg-surface focus-within:ring-2 focus-within:ring-brand-500 focus-within:shadow-md"
       >
         <textarea
@@ -196,6 +255,38 @@ defineExpose({ focus, setText });
           class="max-h-[200px] min-h-6 w-full resize-none border-0 bg-transparent py-2.5 text-[15px] leading-relaxed text-ink-900 placeholder:text-ink-400 focus:outline-none"
           @keydown="onKeydown"
         />
+
+        <input
+          ref="filePicker"
+          type="file"
+          class="sr-only"
+          :accept="DOCUMENT_ACCEPT_ATTRIBUTE"
+          multiple
+          tabindex="-1"
+          aria-hidden="true"
+          @change="onFilesPicked"
+        />
+
+        <button
+          type="button"
+          class="relative mb-1.5 grid size-[34px] shrink-0 touch-manipulation place-items-center rounded-[12px] text-ink-500 transition-all duration-200 after:absolute after:-inset-[5px] after:content-[''] hover:bg-border-subtle/60 hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+          aria-label="Attach a document"
+          title="Attach a document"
+          @click="filePicker?.click()"
+        >
+          <svg
+            class="size-[18px]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
 
         <VoiceInputButton
           :phase="voice.phase.value"

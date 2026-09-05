@@ -100,10 +100,24 @@ onMounted(async () => {
  * `push`, so the back button does not walk into the empty screen the person
  * just left.
  */
-const send = async (text: string): Promise<void> => {
+/**
+ * Sends a turn, naming any attached documents.
+ *
+ * The reference is a short line, never the document itself: the assistant has
+ * tools that can inspect and query a file by id, and putting a spreadsheet into
+ * a message would be slower, dearer and — past a few hundred rows — impossible.
+ *
+ * The person's own words are left exactly as they wrote them and the reference
+ * is appended after them, so nothing they typed is rewritten.
+ */
+const send = async (text: string, fileIds: string[] = []): Promise<void> => {
   const wasNew = chat.conversationId === null;
+  const message =
+    fileIds.length > 0
+      ? [text, `[Biriktirilgan fayl(lar): ${fileIds.join(', ')}]`].filter(Boolean).join('\n\n')
+      : text;
 
-  await chat.send(text);
+  await chat.send(message);
 
   if (wasNew && chat.conversationId) {
     await router.replace({ name: 'assistant-conversation', params: { id: chat.conversationId } });
