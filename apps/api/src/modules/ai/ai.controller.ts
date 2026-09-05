@@ -1,11 +1,14 @@
 import type { Request, Response } from 'express';
 
+import { ApiError } from '../../core/http/api-error.js';
 import { sendSuccess } from '../../core/http/api-response.js';
 import { requireActor } from '../../core/security/actor.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import type { chatSchema } from '../conversations/conversation.validators.js';
 import * as agentService from './agent/agent.service.js';
 import { describeAiProvider } from './provider/index.js';
+import { describeSpeechProvider } from './stt/index.js';
+import * as transcriptionService from './stt/transcription.service.js';
 import * as usageService from './usage.service.js';
 import { getToolRegistry } from './tools/index.js';
 
@@ -44,6 +47,40 @@ export const status = (req: Request, res: Response): void => {
         requiresConfirmation: tool.requiresConfirmation ?? false,
       })),
   });
+};
+
+/**
+ * Turns a recording into text, and nothing else.
+ *
+ * It deliberately does *not* answer the question the person asked: the
+ * transcript goes back to the composer so they can read it, fix a misheard word
+ * and decide whether to send it. Wiring this straight into the agent would mean
+ * a mis-transcription became a message nobody chose to send, and on a shop floor
+ * that is how the wrong thing gets ordered.
+ *
+ * The audio is read from memory and released with the request; nothing is
+ * written to disk and nothing is kept.
+ */
+export const transcribe = async (req: Request, res: Response): Promise<void> => {
+  const file = req.file;
+
+  if (!file) {
+    throw ApiError.badRequest('No recording was attached.');
+  }
+
+  const result = await transcriptionService.transcribe(requireActor(req), {
+    audio: file.buffer,
+    // The declared content type, not the filename: a name from the browser is
+    // untrusted text and has no bearing on what the bytes are.
+    mimeType: file.mimetype,
+  });
+
+  sendSuccess(req, res, result);
+};
+
+/** Whether voice input can be offered at all. Holds no credential. */
+export const speechStatus = (req: Request, res: Response): void => {
+  sendSuccess(req, res, describeSpeechProvider());
 };
 
 /**
