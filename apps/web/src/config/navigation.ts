@@ -4,87 +4,23 @@ import type { NavigationSection } from '@/types/navigation';
  * Where everything lives, now that the assistant is the product.
  *
  * Hadiya is an AI business assistant. Talking to it is the whole interface, so
- * the chat is not one item in a menu of twenty — it *is* the application, and
- * it has a sidebar of its own full of conversations rather than modules.
+ * the chat is not one item in a menu — it *is* the application, and it has a
+ * sidebar of its own full of conversations rather than modules.
  *
- * Everything below is what remains: the screens that read and edit records
- * directly. They are kept because somebody occasionally needs to look a thing
- * up or correct it by hand, and because most of them mirror data Billz owns —
- * but they are a back office, not the front door, so they sit under Settings
- * instead of competing with the conversation for attention.
+ * What is *not* here is as deliberate as what is. There are no screens for
+ * products, sales, stock, customers or expenses. Billz owns all of that and the
+ * assistant reads it live, so a screen here would be a second, staler view of
+ * somebody else's data — and a menu of twenty such screens would say the chat
+ * is one feature among many.
+ *
+ * So this is the back office and nothing more: what the assistant produced,
+ * what it knows, what it is connected to, and the account it acts as.
  *
  * `minimumRole` mirrors the role each module's service actually requires, so
  * the menu offers only what the person can carry out. It is UX, not security:
  * the backend enforces the same rule and does not care what was rendered.
  */
 export const settingsSections: NavigationSection[] = [
-  {
-    title: 'Operations',
-    items: [
-      {
-        label: 'Dashboard',
-        module: 'reports',
-        to: { name: 'dashboard' },
-        icon: 'M3 12h6v9H3zM10 3h4v18h-4zM15 8h6v13h-6z',
-      },
-      {
-        label: 'Point of sale',
-        module: 'sales',
-        to: { name: 'pos' },
-        icon: 'M3 3h2l3 12h10l3-8H7M9 21h.01M18 21h.01',
-      },
-      {
-        label: 'Sales',
-        module: 'sales',
-        to: { name: 'sales' },
-        icon: 'M4 4h16v4H4zM4 12h16M4 18h10',
-      },
-      {
-        label: 'Products',
-        module: 'products',
-        to: { name: 'products' },
-        icon: 'M21 8 12 3 3 8v8l9 5 9-5V8ZM3 8l9 5 9-5M12 13v8',
-      },
-      {
-        label: 'Categories',
-        module: 'categories',
-        to: { name: 'categories' },
-        icon: 'M4 6h6v6H4zM14 6h6v6h-6zM4 16h6v4H4zM14 16h6v4h-6z',
-      },
-      {
-        label: 'Inventory',
-        module: 'inventory',
-        to: { name: 'inventory' },
-        icon: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
-      },
-      {
-        label: 'Customers',
-        module: 'customers',
-        to: { name: 'customers' },
-        icon: 'M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 9.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM21 20v-2a4 4 0 0 0-3-3.9',
-      },
-    ],
-  },
-  {
-    title: 'Finance',
-    items: [
-      {
-        label: 'Expenses',
-        module: 'expenses',
-        to: { name: 'expenses' },
-        icon: 'M12 3v18M17 8H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H6',
-      },
-      {
-        label: 'Reports',
-        module: 'reports',
-        to: { name: 'reports' },
-        icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
-        // Reporting reads across the whole business, so it follows the same
-        // threshold the sales and expense services use for cross-branch reads.
-        minimumRole: 'manager',
-      },
-    ],
-  },
   {
     title: 'What the assistant made',
     items: [
