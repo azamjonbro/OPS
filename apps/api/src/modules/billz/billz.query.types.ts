@@ -6,8 +6,6 @@ import type {
   billzPeriodQuerySchema,
   billzProductQuerySchema,
   billzSalesQuerySchema,
-  startSyncSchema,
-  syncLogQuerySchema,
 } from './billz.validators.js';
 
 /**
@@ -19,5 +17,3 @@ export type BillzCustomerQuery = z.output<typeof billzCustomerQuerySchema>;
 export type BillzSalesQuery = z.output<typeof billzSalesQuerySchema>;
 export type BillzPeriodQuery = z.output<typeof billzPeriodQuerySchema>;
 export type BillzInventoryQuery = z.output<typeof billzInventoryQuerySchema>;
-export type StartSyncInput = z.output<typeof startSyncSchema>;
-export type SyncLogQuery = z.output<typeof syncLogQuerySchema>;

@@ -10,8 +10,6 @@ import {
   billzPeriodQuerySchema,
   billzProductQuerySchema,
   billzSalesQuerySchema,
-  startSyncSchema,
-  syncLogQuerySchema,
 } from './billz.validators.js';
 
 /**

@@ -8,18 +8,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useConversationsStore } from '@/stores/conversations';
 import ConversationList from './ConversationList.vue';
 
-/**
- * The chat's own navigation.
- *
- * It is not the application menu with a chat bolted on: the thing being
- * navigated here is the conversation history, and the handful of links at the
- * foot are the places a conversation sends somebody — the reminders it set, the
- * content it wrote, the notifications it raised.
- *
- * Search is debounced and goes to the API's own `search` parameter rather than
- * filtering what happens to be loaded, so it finds a thread from March that was
- * never fetched.
- */
 defineProps<{ activeId: string | null }>();
 
 const emit = defineEmits<{
@@ -31,9 +19,6 @@ const emit = defineEmits<{
 
 const conversations = useConversationsStore();
 const auth = useAuthStore();
-
-// The field updates as they type; the watcher fires only once they stop, so a
-// four-letter search is one request rather than four.
 const search = useDebouncedRef('', 350);
 
 watch(search, (value) => {
@@ -79,31 +64,31 @@ const archive = (id: string): void => {
 </script>
 
 <template>
-  <aside class="flex h-full w-72 flex-col bg-slate-900 text-slate-300" aria-label="Conversations">
-    <div class="flex h-16 shrink-0 items-center gap-3 px-4">
+  <aside class="flex h-full w-[260px] flex-col bg-surface-muted border-r border-border-subtle text-ink-900 font-sans" aria-label="Conversations">
+    <!-- Header -->
+    <div class="flex h-[72px] shrink-0 items-center justify-between px-4">
       <RouterLink
         :to="{ name: 'dashboard' }"
-        class="flex items-center gap-3"
+        class="flex items-center gap-3 transition-opacity hover:opacity-80"
         @click="emit('navigate')"
       >
         <span
-          class="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white"
+          class="grid size-8 shrink-0 place-items-center rounded-[10px] bg-brand-600 text-sm font-bold text-white shadow-sm"
           aria-hidden="true"
         >
           H
         </span>
-        <span class="text-base font-semibold text-white">Hadiya</span>
+        <span class="text-[15px] font-semibold tracking-tight text-ink-900">Hadiya</span>
       </RouterLink>
-    </div>
-
-    <div class="shrink-0 space-y-2 px-3 pb-3">
+      <!-- New Chat Button inside Header for minimal look -->
       <button
         type="button"
-        class="flex w-full items-center gap-2 rounded-lg bg-brand-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
+        class="flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-surface hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
         @click="emit('newChat')"
+        title="New Chat"
       >
         <svg
-          class="size-4 shrink-0"
+          class="size-[18px]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -113,17 +98,19 @@ const archive = (id: string): void => {
         >
           <path d="M12 5v14M5 12h14" />
         </svg>
-        New chat
       </button>
+    </div>
 
-      <div class="relative">
+    <!-- Search -->
+    <div class="shrink-0 px-3 pb-4 pt-1">
+      <div class="relative group">
         <label for="conversation-search" class="sr-only">Search conversations</label>
         <svg
-          class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+          class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400 transition-colors group-focus-within:text-brand-500"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="1.8"
+          stroke-width="2"
           stroke-linecap="round"
           aria-hidden="true"
         >
@@ -133,23 +120,24 @@ const archive = (id: string): void => {
           id="conversation-search"
           v-model="search"
           type="search"
-          placeholder="Search conversations"
-          class="w-full rounded-lg bg-slate-800 py-2 pl-8 pr-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-600"
+          placeholder="Search..."
+          class="w-full rounded-xl border border-transparent bg-surface px-3 py-2 pl-9 text-[13px] text-ink-900 placeholder:text-ink-400 shadow-sm transition-all focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-1 focus:ring-brand-500 hover:border-border-subtle"
         />
       </div>
     </div>
 
-    <nav class="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Conversation history">
-      <p v-if="conversations.isLoading" class="px-2.5 py-3 text-xs text-slate-500" role="status">
-        Loading conversations…
+    <!-- Conversation List -->
+    <nav class="min-h-0 flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar" aria-label="Conversation history">
+      <p v-if="conversations.isLoading" class="px-3 py-3 text-[13px] text-ink-500" role="status">
+        Loading...
       </p>
 
-      <p v-else-if="conversations.error" class="px-2.5 py-3 text-xs text-red-400" role="alert">
+      <p v-else-if="conversations.error" class="px-3 py-3 text-[13px] text-danger-600" role="alert">
         {{ conversations.error }}
       </p>
 
-      <p v-else-if="conversations.isEmpty" class="px-2.5 py-3 text-xs text-slate-500">
-        {{ search ? 'No conversation matches that.' : 'No conversations yet.' }}
+      <p v-else-if="conversations.isEmpty" class="px-3 py-3 text-[13px] text-ink-500">
+        {{ search ? 'No results found.' : 'No conversations yet.' }}
       </p>
 
       <ConversationList
@@ -166,20 +154,21 @@ const archive = (id: string): void => {
       />
     </nav>
 
-    <div class="shrink-0 border-t border-slate-800 px-3 py-2">
+    <!-- App Links -->
+    <div class="shrink-0 border-t border-border-subtle px-2 py-2">
       <ul class="space-y-0.5">
         <li v-for="link in LINKS" :key="link.label">
           <RouterLink
             :to="link.to"
-            class="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            class="group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-ink-500 transition-all hover:bg-surface hover:text-ink-900"
             @click="emit('navigate')"
           >
             <svg
-              class="size-4 shrink-0"
+              class="size-[15px] shrink-0 text-ink-400 transition-colors group-hover:text-ink-700"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              stroke-width="1.7"
+              stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
               aria-hidden="true"
@@ -192,21 +181,42 @@ const archive = (id: string): void => {
       </ul>
     </div>
 
-    <div class="flex shrink-0 items-center gap-3 border-t border-slate-800 px-4 py-3">
+    <!-- User Profile -->
+    <div class="flex shrink-0 items-center gap-3 p-4 border-t border-border-subtle hover:bg-surface transition-colors cursor-pointer rounded-b-lg">
       <span
-        class="grid size-8 shrink-0 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-slate-200"
+        class="grid size-8 shrink-0 place-items-center rounded-full bg-brand-500 text-[11px] font-bold text-white shadow-sm"
         aria-hidden="true"
       >
         {{ auth.user?.fullName?.charAt(0).toUpperCase() ?? '?' }}
       </span>
       <span class="min-w-0">
-        <span class="block truncate text-sm font-medium text-white">
+        <span class="block truncate text-[13px] font-semibold text-ink-900 leading-tight">
           {{ auth.user?.fullName ?? 'Not signed in' }}
         </span>
-        <span class="block truncate text-xs capitalize text-slate-500">
-          {{ auth.user?.role ?? 'no session' }}
+        <span class="block truncate text-[11px] font-medium text-ink-500 capitalize leading-tight mt-0.5">
+          {{ auth.user?.role ?? 'User' }}
         </span>
       </span>
     </div>
   </aside>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: 10px;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-ink-400);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+</style>

@@ -1,7 +1,6 @@
 import type { AuthenticatedUser } from '@hadiya/shared';
 
 import { assertRole } from '../../core/security/actor.js';
-import { createLogger } from '../../core/logger/logger.js';
 import { isBillzError } from './client/billz-error.js';
 import { BILLZ_CAPABILITIES } from './billz.capabilities.js';
 import { checkBillzConnection, getBillzServices } from './services/index.js';
@@ -11,12 +10,7 @@ import type {
   BillzPeriodQuery,
   BillzProductQuery,
   BillzSalesQuery,
-  StartSyncInput,
-  SyncLogQuery,
 } from './billz.query.types.js';
-import { SYNC_ORDER } from './sync/sync.constants.js';
-
-const log = createLogger('billz');
 
 /**
  * Billz data is company-wide, and its figures are the ones an owner makes
