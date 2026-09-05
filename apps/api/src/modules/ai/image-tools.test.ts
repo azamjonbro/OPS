@@ -320,7 +320,11 @@ describe('through /ai/chat', () => {
 
     setAiProvider(provider);
 
-    await sendMessage(actor, { message: 'Hadiya yangi soat uchun Instagram reklama rasmi yarat.' });
+    await sendMessage(
+      actor,
+      { message: 'Hadiya yangi soat uchun Instagram reklama rasmi yarat.' },
+      { registry },
+    );
 
     // The prompt names the catalogue's own product rather than an invented one.
     const stored = await ImageAssetModel.findOne().lean().exec();
