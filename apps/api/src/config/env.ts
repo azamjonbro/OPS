@@ -1,3 +1,4 @@
+import { AGENT_LIMITS, PENDING_ACTION_TTL_MS } from '@hadiya/shared';
 import { z } from 'zod';
 
 import { loadEnvFiles } from './load-env.js';
@@ -90,6 +91,64 @@ const envSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(32_000).default(4_096),
+
+    /**
+     * What one agent run may spend.
+     *
+     * These are the cost ceilings, and every one of them is a decision about
+     * somebody's money rather than a tuning knob: a model that keeps asking for
+     * tools spends a completion per round, and a workflow that fans out spends
+     * an external call per tool. The defaults come from `AGENT_LIMITS` in the
+     * shared package, which is also what a test pins; the variables exist so a
+     * deployment can tighten them without a release.
+     */
+    AGENT_MAX_TOOL_ROUNDS: z.coerce.number().int().min(1).max(20).default(AGENT_LIMITS.maxToolRounds),
+    AGENT_MAX_MODEL_CALLS: z.coerce.number().int().min(2).max(30).default(AGENT_LIMITS.maxModelCalls),
+    AGENT_MAX_PARALLEL_TOOLS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(16)
+      .default(AGENT_LIMITS.maxParallelTools),
+    /** One tool call, retries included. A slow server cannot outlast this. */
+    AGENT_TOOL_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(300_000)
+      .default(AGENT_LIMITS.toolTimeoutMs),
+    AGENT_MAX_TOOL_RETRIES: z.coerce.number().int().min(0).max(5).default(AGENT_LIMITS.maxToolRetries),
+    AGENT_RETRY_BACKOFF_MS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(10_000)
+      .default(AGENT_LIMITS.retryBackoffMs),
+    AGENT_TOKEN_BUDGET: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(2_000_000)
+      .default(AGENT_LIMITS.tokenBudget),
+    /** How long a prepared action stands before the person has to be asked again. */
+    AGENT_CONFIRMATION_TTL_MS: z.coerce
+      .number()
+      .int()
+      .min(30_000)
+      .max(24 * 60 * 60 * 1_000)
+      .default(PENDING_ACTION_TTL_MS),
+    /**
+     * Whether a confirmed call must match an action Hadiya itself prepared.
+     *
+     * On, nothing that changes data runs unless this server asked for agreement
+     * first and the arguments still match — the model saying "they agreed" is
+     * not enough on its own. Off (the default), a confirmed call is still
+     * checked against any prepared action that exists, and only the absence of
+     * one is tolerated. It is a policy rather than a constant because tightening
+     * it costs a turn whenever a model confirms in the same breath it proposes,
+     * and that trade belongs to the deployment.
+     */
+    AGENT_REQUIRE_PENDING_CONFIRMATION: booleanFromEnv(false),
 
     /** Image generation. The vendor key is shared with the text model. */
     IMAGE_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
