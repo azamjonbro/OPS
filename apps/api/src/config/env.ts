@@ -103,6 +103,22 @@ const envSchema = z
     STORAGE_DRIVER: z.preprocess(blankToUndefined, z.enum(['local']).default('local')),
     /** Relative paths resolve against the API package root. */
     STORAGE_LOCAL_DIR: z.string().min(1).default('storage'),
+    /**
+     * Speech to text. The transcription models share `OPENAI_API_KEY` with the
+     * chat models, so configuring the assistant configures dictation too.
+     */
+    STT_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
+    STT_MODEL: z.preprocess(blankToUndefined, z.string().min(1).max(80).optional()),
+    STT_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
+    /**
+     * Left unset the provider detects the language, which is what a bilingual
+     * shop floor needs. Set it to an ISO-639-1 code to pin one.
+     */
+    STT_LANGUAGE: z.preprocess(blankToUndefined, z.string().trim().min(2).max(5).optional()),
+    /** Transcription is slower than a sentence and faster than an image. */
+    STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
+    STT_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
+
     TELEGRAM_BOT_TOKEN: optionalSecret,
   })
   .superRefine((value, ctx) => {

@@ -47,6 +47,18 @@ export interface StorageConfig {
   localDir: string;
 }
 
+/** Which model listens, and how patiently. */
+export interface SpeechConfig {
+  /** Explicit choice, or `null` to let the configured key decide. */
+  provider: 'openai' | null;
+  model: string;
+  baseUrl: string | null;
+  /** `null` means let the provider detect it. */
+  language: string | null;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
 export interface AppConfig {
   app: {
     name: string;
@@ -88,6 +100,7 @@ export interface AppConfig {
    */
   ai: AiConfig;
   image: ImageConfig;
+  speech: SpeechConfig;
   storage: StorageConfig;
   integrations: {
     billz: BillzConfig;
@@ -165,6 +178,16 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     baseUrl: env.IMAGE_BASE_URL ?? null,
     timeoutMs: env.IMAGE_TIMEOUT_MS,
     maxRetries: env.IMAGE_MAX_RETRIES,
+  },
+  speech: {
+    provider: env.STT_PROVIDER ?? null,
+    // Whisper is the model with documented Uzbek coverage, so it is the default
+    // for a shop floor that speaks it; overridable for anywhere that does not.
+    model: env.STT_MODEL ?? 'whisper-1',
+    baseUrl: env.STT_BASE_URL ?? null,
+    language: env.STT_LANGUAGE ?? null,
+    timeoutMs: env.STT_TIMEOUT_MS,
+    maxRetries: env.STT_MAX_RETRIES,
   },
   storage: {
     driver: env.STORAGE_DRIVER,
