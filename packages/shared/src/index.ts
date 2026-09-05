@@ -12,6 +12,7 @@ export * from './types/notification.js';
 export * from './types/pagination.js';
 export * from './types/reminder.js';
 export * from './types/scheduler.js';
+export * from './types/speech.js';
 export * from './types/user.js';
 
 export * from './constants/content.js';
@@ -24,6 +25,7 @@ export * from './constants/pagination.js';
 export * from './constants/reminders.js';
 export * from './constants/roles.js';
 export * from './constants/scheduler.js';
+export * from './constants/speech.js';
 export * from './constants/users.js';
 
 export * from './utils/identifiers.js';
