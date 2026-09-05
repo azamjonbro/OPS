@@ -1,3 +1,4 @@
+import type { AgentRunSummary } from './agent.js';
 import type { Message } from './conversation.js';
 import type { Memory } from './memory.js';
 
@@ -20,6 +21,17 @@ export interface ChatResponse {
   usedMemories: Array<Pick<Memory, 'id' | 'type' | 'key' | 'value'>>;
   /** Memories the assistant wants to keep but that need confirmation first. */
   pendingMemories: Array<Pick<Memory, 'id' | 'type' | 'key' | 'value'>>;
+  /**
+   * How the run got to that reply: which tools ran, which failed, what is still
+   * waiting on the person.
+   *
+   * Optional so that every client written against the earlier contract keeps
+   * working untouched, and so the field can be omitted from a response that had
+   * no run behind it. When it is present it is the authoritative account of
+   * what happened — the prose above it is the model's account, and only this
+   * one is generated from what the tools actually returned.
+   */
+  agent?: AgentRunSummary;
 }
 
 /** How a prompt was assembled, useful for debugging and for the UI. */
