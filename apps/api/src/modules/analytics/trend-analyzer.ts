@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_MAX_ANOMALIES,
   ANALYTICS_THRESHOLDS,
   type AnalyticsAnomaly,
   type AnalyticsDailyPoint,
@@ -97,7 +98,11 @@ export const detectTrend = (
   }
 
   // Two independent supports for the claim: how many days it rests on, and how
-  // far past the threshold it went. Neither alone can reach certainty.
+  // far past the threshold it went. The floor is what clearing the threshold at
+  // all is worth; the two weights carry the rest, and together they reach but
+  // never exceed 1 — a confidence above certainty would be nonsense, and one
+  // that silently clipped would make a strong finding indistinguishable from an
+  // overwhelming one.
   const evidenceWeight = Math.min(series.length / 14, 1) * 0.4;
   const magnitudeWeight = Math.min(Math.abs(change) / (threshold * 4), 1) * 0.4;
 
@@ -106,7 +111,7 @@ export const detectTrend = (
     direction: change > 0 ? 'up' : 'down',
     changePercent: roundPercent(change),
     observations: series.length,
-    confidence: Math.round((0.4 + evidenceWeight + magnitudeWeight) * 100) / 100,
+    confidence: Math.round((0.2 + evidenceWeight + magnitudeWeight) * 100) / 100,
     series,
   };
 };
@@ -126,6 +131,8 @@ export interface AnomalyOptions {
   deviationPercent?: number;
   /** Days of baseline needed before anything is called anomalous. */
   minObservations?: number;
+  /** How many days to name. The rest are the trend's business, not this one's. */
+  limit?: number;
 }
 
 /**
@@ -153,7 +160,7 @@ export const detectAnomalies = (
     return [];
   }
 
-  return series.flatMap<AnalyticsAnomaly>((point, index) => {
+  const found = series.flatMap<AnalyticsAnomaly>((point, index) => {
     const others = series.filter((_unused, otherIndex) => otherIndex !== index);
     const baseline = median(others.map((entry) => entry.revenue));
 
@@ -181,4 +188,13 @@ export const detectAnomalies = (
       },
     ];
   });
+
+  // A period that steps between two levels makes every day anomalous against
+  // the others. That is arithmetically true and tells a shopkeeper nothing, so
+  // only the most extreme are named — the shape of such a period is a *trend*,
+  // and that is where it gets reported.
+  return [...found]
+    .sort((left, right) => Math.abs(right.deviationPercent) - Math.abs(left.deviationPercent))
+    .slice(0, options.limit ?? ANALYTICS_MAX_ANOMALIES)
+    .sort((left, right) => left.date.localeCompare(right.date));
 };

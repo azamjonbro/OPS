@@ -81,5 +81,16 @@ export const ANALYTICS_MAX_RECEIPTS = 5_000;
 /** How many rows a ranking returns before it stops being a ranking. */
 export const ANALYTICS_MAX_RANKING = 20;
 
+/**
+ * How many unusual days one report will name.
+ *
+ * A period that steps from one level to another makes *every* day look unusual
+ * against the median of the others — mathematically true and completely
+ * useless, because a report that lists ten anomalies out of ten days has not
+ * found anything. Only the most extreme are named, and the rest are left to
+ * the trend, which is the finding that period actually contains.
+ */
+export const ANALYTICS_MAX_ANOMALIES = 5;
+
 /** How long a computed answer may be reused. Short: shops ask about today. */
 export const ANALYTICS_CACHE_TTL_MS = 120_000;

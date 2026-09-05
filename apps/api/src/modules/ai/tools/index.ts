@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from '@hadiya/shared';
 
 import { createLogger } from '../../../core/logger/logger.js';
 import { createBillzTools } from './billz.tools.js';
+import { createAnalyticsTools } from '../../analytics/analytics.tools.js';
 import { CONTENT_TOOLS } from './content.tools.js';
 import { IMAGE_TOOLS } from './image.tools.js';
 import { buildIntegrationTools } from './integration.tools.js';
@@ -26,6 +27,10 @@ import {
  * None of them changes the agent, which only ever asks the registry, so a
  * capability is added here in one line.
  *
+ * The analytics tools sit on top of the Billz ones rather than beside them:
+ * they read the same capability layer and turn it into figures, trends and
+ * findings, so the assistant can say what changed rather than only what is.
+ *
  * Order matters only for how the list reads to a person; the model picks by
  * name and description, never by position.
  */
@@ -38,6 +43,7 @@ export const createToolRegistry = (): ToolRegistry => {
     ...CONTENT_TOOLS,
     ...IMAGE_TOOLS,
     ...createBillzTools(),
+    ...createAnalyticsTools(),
   ]) {
     registry.register(tool);
   }

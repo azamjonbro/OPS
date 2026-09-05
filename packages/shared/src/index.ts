@@ -1,4 +1,5 @@
 export * from './types/agent-stream.js';
+export * from './types/analytics.js';
 export * from './types/agent.js';
 export * from './types/ai.js';
 export * from './types/api.js';
@@ -19,6 +20,7 @@ export * from './types/speech.js';
 export * from './types/user.js';
 
 export * from './constants/agent.js';
+export * from './constants/analytics.js';
 export * from './constants/content.js';
 export * from './constants/conversations.js';
 export * from './constants/images.js';

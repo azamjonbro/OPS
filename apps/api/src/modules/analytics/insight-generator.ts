@@ -59,7 +59,10 @@ export const insightFromComparison = (
     comparison.percentageChange === null
       ? // Said plainly rather than dressed up as a percentage. The previous
         // period had nothing to grow from, and any figure here would be made up.
-        'There is no percentage change, because the previous period was zero.'
+        // Worded without a causal conjunction on purpose: the word "because"
+        // appears nowhere in generated analytics text, which lets a test assert
+        // the causation rule mechanically rather than by review.
+        'There is no percentage change: the previous period was zero.'
       : `Change: ${comparison.percentageChange > 0 ? '+' : ''}${comparison.percentageChange}%.`,
   ];
 
@@ -204,6 +207,19 @@ export const buildRecommendations = (
   insights: AnalyticsInsight[],
 ): AnalyticsRecommendation[] => {
   const recommendations: AnalyticsRecommendation[] = [];
+  // A period where several days each look unusual would otherwise produce the
+  // same sentence once per day. Ten identical suggestions are not ten times the
+  // advice; they are noise that buries the one thing worth reading.
+  const seen = new Set<string>();
+
+  const add = (recommendation: AnalyticsRecommendation): void => {
+    if (seen.has(recommendation.recommendation)) {
+      return;
+    }
+
+    seen.add(recommendation.recommendation);
+    recommendations.push(recommendation);
+  };
 
   for (const insight of insights) {
     if (insight.confidence < ANALYTICS_CONFIDENT_THRESHOLD) {
@@ -211,7 +227,7 @@ export const buildRecommendations = (
     }
 
     if (insight.type === 'data_quality') {
-      recommendations.push({
+      add({
         basedOn: insight.headline,
         recommendation:
           'Treat these figures as provisional and narrow the period before acting on them.',
@@ -223,7 +239,7 @@ export const buildRecommendations = (
     }
 
     if (insight.direction === 'down' && insight.severity !== 'info') {
-      recommendations.push({
+      add({
         basedOn: insight.headline,
         recommendation:
           insight.type === 'contributor'
@@ -237,7 +253,7 @@ export const buildRecommendations = (
     }
 
     if (insight.direction === 'up' && (insight.severity === 'high' || insight.severity === 'medium')) {
-      recommendations.push({
+      add({
         basedOn: insight.headline,
         recommendation:
           'Check that stock can sustain the increase, so the growth is not lost to an empty shelf.',
