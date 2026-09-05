@@ -313,9 +313,9 @@ describe('the OpenAI provider, driven by scripted HTTP', () => {
     script: Array<{ status?: number; body?: unknown; raw?: string }>,
   ): {
     fetchImpl: FetchLike;
-    calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }>;
+    calls: Array<{ url: string; headers: unknown; body: FormData }>;
   } => {
-    const calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }> = [];
+    const calls: Array<{ url: string; headers: unknown; body: FormData }> = [];
     let index = 0;
 
     const fetchImpl: FetchLike = async (url, init) => {
