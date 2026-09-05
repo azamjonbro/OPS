@@ -2,17 +2,6 @@
 import type { Conversation } from '@hadiya/shared';
 import { computed, nextTick, ref } from 'vue';
 
-/**
- * One thread in the sidebar.
- *
- * Renaming happens in place rather than in a dialog: it is a two-word edit, and
- * a modal for it would be three clicks where one should do. Escape abandons the
- * edit and Enter commits it, so the keyboard can do the whole thing.
- *
- * Deleting only *asks* here. The confirmation lives above, because a row that
- * can destroy a conversation on its own is a row that will eventually destroy
- * the wrong one.
- */
 const props = defineProps<{ conversation: Conversation; active: boolean }>();
 
 const emit = defineEmits<{
@@ -65,7 +54,7 @@ const closeMenu = (): void => {
       type="text"
       maxlength="120"
       aria-label="Conversation title"
-      class="w-full rounded-lg bg-slate-800 px-2.5 py-2 text-sm text-white ring-1 ring-brand-600 focus:outline-none"
+      class="w-full rounded-lg bg-surface px-3 py-2 text-[13px] text-ink-900 shadow-sm ring-1 ring-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
       @keydown.enter.prevent="commitRename"
       @keydown.esc.prevent="cancelRename"
       @blur="commitRename"
@@ -74,28 +63,29 @@ const closeMenu = (): void => {
     <div v-else class="flex items-center">
       <button
         type="button"
-        class="flex min-w-0 flex-1 items-center rounded-lg px-2.5 py-2 text-left text-sm transition-colors"
+        class="flex min-w-0 flex-1 items-center rounded-lg px-3 py-2 text-left text-[13px] transition-all duration-200 relative overflow-hidden"
         :class="
           active
-            ? 'bg-slate-800 font-medium text-white'
-            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            ? 'bg-surface font-semibold text-ink-900 shadow-sm ring-1 ring-border-subtle'
+            : 'font-medium text-ink-500 hover:bg-surface hover:text-ink-900'
         "
         :aria-current="active ? 'page' : undefined"
         @click="emit('open', conversation.id)"
       >
-        <span class="truncate">{{ title }}</span>
+        <div v-if="active" class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-brand-500" aria-hidden="true" />
+        <span class="truncate pl-0.5">{{ title }}</span>
       </button>
 
       <button
         type="button"
-        class="absolute right-1 rounded-md p-1.5 text-slate-400 opacity-0 transition-opacity hover:bg-slate-700 hover:text-white focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-600 group-hover/row:opacity-100"
+        class="absolute right-1.5 rounded-md p-1.5 text-ink-400 opacity-0 transition-opacity hover:bg-surface-raised hover:text-ink-900 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-brand-500 group-hover/row:opacity-100"
         :class="isMenuOpen ? 'opacity-100' : ''"
         :aria-expanded="isMenuOpen"
         aria-haspopup="menu"
         :aria-label="`Actions for ${title}`"
-        @click="isMenuOpen = !isMenuOpen"
+        @click.stop="isMenuOpen = !isMenuOpen"
       >
-        <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg class="size-[15px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <circle cx="5" cy="12" r="1.6" />
           <circle cx="12" cy="12" r="1.6" />
           <circle cx="19" cy="12" r="1.6" />
@@ -103,17 +93,17 @@ const closeMenu = (): void => {
       </button>
     </div>
 
-    <!-- A click anywhere else closes the menu; the backdrop is what catches it. -->
+    <!-- Dropdown Menu -->
     <template v-if="isMenuOpen">
-      <div class="fixed inset-0 z-20" aria-hidden="true" @click="closeMenu" />
+      <div class="fixed inset-0 z-20" aria-hidden="true" @click.stop="closeMenu" />
       <div
         role="menu"
-        class="absolute right-1 top-9 z-30 w-40 overflow-hidden rounded-lg bg-slate-800 py-1 text-sm shadow-xl ring-1 ring-slate-700"
+        class="absolute right-1 top-9 z-30 w-36 overflow-hidden rounded-lg bg-surface-raised py-1 text-[13px] font-medium shadow-lg ring-1 ring-border-subtle"
       >
         <button
           type="button"
           role="menuitem"
-          class="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-700"
+          class="block w-full px-3 py-1.5 text-left text-ink-700 hover:bg-surface-muted hover:text-ink-900"
           @click="startRename"
         >
           Rename
@@ -121,7 +111,7 @@ const closeMenu = (): void => {
         <button
           type="button"
           role="menuitem"
-          class="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-700"
+          class="block w-full px-3 py-1.5 text-left text-ink-700 hover:bg-surface-muted hover:text-ink-900"
           @click="
             closeMenu();
             emit('archive', conversation.id);
@@ -129,10 +119,11 @@ const closeMenu = (): void => {
         >
           Archive
         </button>
+        <div class="my-1 h-px bg-border-subtle" />
         <button
           type="button"
           role="menuitem"
-          class="block w-full px-3 py-2 text-left text-red-400 hover:bg-slate-700"
+          class="block w-full px-3 py-1.5 text-left text-danger-600 hover:bg-danger-50"
           @click="
             closeMenu();
             emit('remove', conversation);
