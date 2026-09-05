@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse } from '@hadiya/shared';
+import type { ChatRequest, ChatResponse, ToolCategory, ToolRisk } from '@hadiya/shared';
 
 import { api, type RequestOptions } from './http';
 
