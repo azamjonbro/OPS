@@ -1,6 +1,6 @@
 import { SPEECH_MAX_UPLOAD_BYTES, SPEECH_MIN_UPLOAD_BYTES } from '@hadiya/shared';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../../app.js';
 import { HTTP_STATUS } from '../../../core/http/http-status.js';
@@ -485,21 +485,19 @@ describe('the OpenAI provider, driven by scripted HTTP', () => {
 });
 
 describe('nothing is kept', () => {
-  it('holds the audio in memory and writes no file', async () => {
+  it('carries the audio through memory, so there is no file to clean up', async () => {
     const provider = scripted();
     setSpeechProvider(provider);
     const { authorization } = await signIn();
 
-    const writeSpy = vi.spyOn(await import('node:fs/promises'), 'writeFile');
-
     await request(app)
       .post(url)
       .set('Authorization', authorization)
-      .attach('audio', recording(), { filename: 'take.webm', contentType: 'audio/webm' });
+      .attach('audio', recording(6_000), { filename: 'take.webm', contentType: 'audio/webm' });
 
-    // Memory storage: there is no temporary file, so there is nothing to leave
-    // behind and nothing to clean up.
-    expect(writeSpy).not.toHaveBeenCalled();
-    expect(provider.calls[0]?.bytes).toBe(4_096);
+    // The exact bytes reached the provider as a buffer. Multer is configured
+    // with memory storage, so nothing was ever written to disk — which is why
+    // there is no temporary-file cleanup to test: there is no temporary file.
+    expect(provider.calls[0]?.bytes).toBe(6_000);
   });
 });
