@@ -28,7 +28,7 @@ const html = computed(() => renderMarkdown(props.text));
     as text.
   -->
   <!-- eslint-disable-next-line vue/no-v-html -->
-  <div class="markdown-body text-sm leading-relaxed text-ink-900" v-html="html" />
+  <div class="markdown-body text-[15px] leading-[1.65] text-ink-900" v-html="html" />
 </template>
 
 <style scoped>

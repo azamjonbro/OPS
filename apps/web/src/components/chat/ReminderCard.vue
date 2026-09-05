@@ -51,48 +51,49 @@ const cancel = async (): Promise<void> => {
 </script>
 
 <template>
-  <article class="flex flex-col gap-3 rounded-xl bg-surface p-4 ring-1 ring-border-subtle">
-    <div class="flex items-start justify-between gap-3">
+  <article class="flex flex-col gap-4 rounded-[14px] bg-surface p-5 shadow-sm ring-1 ring-border-subtle my-2">
+    <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <h3 class="truncate text-sm font-semibold text-ink-900">{{ reminder.title }}</h3>
-        <p v-if="reminder.description" class="mt-0.5 text-xs text-ink-500">
+        <h3 class="truncate text-[15px] font-semibold text-ink-900">{{ reminder.title }}</h3>
+        <p v-if="reminder.description" class="mt-1 text-[13px] text-ink-500 leading-relaxed">
           {{ reminder.description }}
         </p>
       </div>
-      <BaseBadge :tone="TONES[status as keyof typeof TONES] ?? 'neutral'" dot>
+      <BaseBadge :tone="TONES[status as keyof typeof TONES] ?? 'neutral'" dot class="!rounded-md">
         {{ status }}
       </BaseBadge>
     </div>
 
-    <dl class="grid grid-cols-2 gap-2 text-xs">
+    <dl class="grid grid-cols-2 gap-4 rounded-xl bg-surface-muted/50 p-4 ring-1 ring-border-subtle">
       <div>
-        <dt class="text-ink-500">When</dt>
-        <dd class="mt-0.5 font-medium text-ink-900">
+        <dt class="text-[11px] font-semibold uppercase tracking-wider text-ink-400">When</dt>
+        <dd class="mt-1 text-[13px] font-medium text-ink-900">
           {{ reminder.localScheduledAt || reminder.scheduledAt }}
         </dd>
       </div>
       <div v-if="reminder.timezone">
-        <dt class="text-ink-500">Time zone</dt>
-        <dd class="mt-0.5 text-ink-900">{{ reminder.timezone }}</dd>
+        <dt class="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Time zone</dt>
+        <dd class="mt-1 text-[13px] font-medium text-ink-900">{{ reminder.timezone }}</dd>
       </div>
       <div v-if="reminder.recurrenceRule" class="col-span-2">
-        <dt class="text-ink-500">Repeats</dt>
-        <dd class="mt-0.5 font-mono text-ink-900">{{ reminder.recurrenceRule }}</dd>
+        <dt class="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Repeats</dt>
+        <dd class="mt-1 font-mono text-[13px] text-ink-900 bg-surface px-2 py-1 rounded-md inline-block ring-1 ring-border-subtle shadow-sm">{{ reminder.recurrenceRule }}</dd>
       </div>
     </dl>
 
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap gap-2.5 mt-1">
       <BaseButton
         v-if="status === 'scheduled'"
         variant="secondary"
         size="sm"
         :loading="isCancelling"
+        class="!rounded-lg"
         @click="cancel"
       >
         Cancel reminder
       </BaseButton>
       <RouterLink :to="{ name: 'reminders' }">
-        <BaseButton variant="ghost" size="sm">All reminders</BaseButton>
+        <BaseButton variant="ghost" size="sm" class="!rounded-lg text-ink-600 hover:text-ink-900">All reminders</BaseButton>
       </RouterLink>
     </div>
   </article>

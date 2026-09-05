@@ -34,16 +34,18 @@ const ICONS: Record<string, string> = {
 
 <template>
   <div
-    class="flex items-center gap-2.5 rounded-lg bg-surface-muted px-3 py-2 text-xs ring-1 ring-border-subtle"
+    class="my-1.5 flex w-fit items-center gap-3 rounded-[12px] bg-surface px-3.5 py-2 text-[13px] font-medium shadow-sm ring-1 ring-border-subtle transition-all duration-300"
+    :class="running ? 'opacity-90 animate-pulse' : 'opacity-100'"
     :aria-busy="running ? 'true' : undefined"
   >
     <span
-      class="grid size-6 shrink-0 place-items-center rounded-md bg-surface text-ink-500 ring-1 ring-border-subtle"
+      class="grid size-6 shrink-0 place-items-center rounded-md text-ink-500"
+      :class="running ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'bg-surface-muted text-ink-400'"
       aria-hidden="true"
     >
       <svg
         v-if="running"
-        class="size-3.5 animate-spin text-brand-600"
+        class="size-3.5 animate-spin"
         viewBox="0 0 24 24"
         fill="none"
       >
@@ -56,7 +58,7 @@ const ICONS: Record<string, string> = {
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        stroke-width="1.8"
+        stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
       >
@@ -64,13 +66,15 @@ const ICONS: Record<string, string> = {
       </svg>
     </span>
 
-    <span class="min-w-0 flex-1 text-ink-700">
+    <span class="min-w-0 flex-1" :class="running ? 'text-brand-700 dark:text-brand-300' : 'text-ink-600'">
       {{ running ? `${label.running}…` : label.done }}
     </span>
 
-    <details v-if="!running && call.result" class="shrink-0">
-      <summary class="cursor-pointer list-none text-ink-500 hover:text-ink-900">Details</summary>
-      <p class="mt-2 max-w-md whitespace-pre-line text-left text-ink-700">{{ call.result }}</p>
+    <details v-if="!running && call.result" class="shrink-0 group">
+      <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-900 transition-colors">Details</summary>
+      <div class="absolute left-0 mt-2 z-10 w-full max-w-sm rounded-lg bg-surface p-3 shadow-lg ring-1 ring-border-subtle">
+        <p class="max-w-md whitespace-pre-line text-left text-[12px] font-mono leading-relaxed text-ink-600 break-words">{{ call.result }}</p>
+      </div>
     </details>
   </div>
 </template>

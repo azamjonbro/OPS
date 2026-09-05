@@ -67,7 +67,7 @@ describe('POST /api/v1/auth/login', () => {
 
 describe('authentication guard', () => {
   it('refuses a request with no token', async () => {
-    const response = await request(app).get('/api/v1/products');
+    const response = await request(app).get('/api/v1/conversations');
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
     expect(response.body).toMatchObject({
@@ -78,7 +78,7 @@ describe('authentication guard', () => {
 
   it('refuses a token that was not signed by this API', async () => {
     const response = await request(app)
-      .get('/api/v1/products')
+      .get('/api/v1/conversations')
       .set('Authorization', 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.wrong-signature');
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
@@ -93,13 +93,13 @@ describe('authentication guard', () => {
     const authorization = `Bearer ${login.body.data.tokens.accessToken}`;
 
     expect(
-      (await request(app).get('/api/v1/products').set('Authorization', authorization)).status,
+      (await request(app).get('/api/v1/conversations').set('Authorization', authorization)).status,
     ).toBe(HTTP_STATUS.OK);
 
     const { UserModel } = await import('../users/user.model.js');
     await UserModel.updateOne({ _id: user._id }, { $set: { status: 'suspended' } }).exec();
 
-    const response = await request(app).get('/api/v1/products').set('Authorization', authorization);
+    const response = await request(app).get('/api/v1/conversations').set('Authorization', authorization);
 
     expect(response.status).toBe(HTTP_STATUS.UNAUTHORIZED);
   });

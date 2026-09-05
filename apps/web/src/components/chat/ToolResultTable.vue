@@ -6,18 +6,6 @@ import type { TableBlock } from '@/chat/message-content';
 
 const props = defineProps<{ table: TableBlock }>();
 
-/**
- * Rows a tool answered with — products, reminders, plans, whatever comes next.
- *
- * The columns are derived from the rows rather than declared per tool, so a
- * capability the frontend has not been taught about still renders as a table.
- * That is the point: the backend owns which tools exist, and the chat should
- * not need a release to show one legibly.
- *
- * Long results are cut, with the true count shown, because a chat column is not
- * a report and forty rows in a bubble is not readable. The proper list lives on
- * its own screen.
- */
 const MAX_ROWS = 8;
 
 const rows = computed(() => props.table.rows.slice(0, MAX_ROWS));
@@ -36,17 +24,16 @@ const cell = (value: string | number | null, money: boolean): string => {
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-xl bg-surface ring-1 ring-border-subtle">
-    <!-- A wide result scrolls inside the bubble rather than widening the page. -->
+  <div class="overflow-hidden rounded-[14px] bg-surface shadow-sm ring-1 ring-border-subtle my-2">
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
+      <table class="w-full text-left text-[13px]">
         <thead>
-          <tr class="border-b border-border-subtle bg-surface-muted">
+          <tr class="border-b border-border-subtle bg-surface-muted/50">
             <th
               v-for="column in table.columns"
               :key="column.key"
               scope="col"
-              class="whitespace-nowrap px-3 py-2 font-semibold text-ink-700"
+              class="whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-ink-500"
               :class="column.money ? 'text-right' : ''"
             >
               {{ column.label }}
@@ -54,12 +41,12 @@ const cell = (value: string | number | null, money: boolean): string => {
           </tr>
         </thead>
         <tbody class="divide-y divide-border-subtle">
-          <tr v-for="(row, index) in rows" :key="index">
+          <tr v-for="(row, index) in rows" :key="index" class="transition-colors hover:bg-surface-muted/30">
             <td
               v-for="column in table.columns"
               :key="column.key"
-              class="px-3 py-2 text-ink-900"
-              :class="column.money ? 'whitespace-nowrap text-right tabular-nums' : ''"
+              class="px-4 py-2.5 text-ink-900"
+              :class="column.money ? 'whitespace-nowrap text-right tabular-nums font-medium' : ''"
             >
               {{ cell(row[column.key] ?? null, column.money) }}
             </td>
@@ -68,7 +55,7 @@ const cell = (value: string | number | null, money: boolean): string => {
       </table>
     </div>
 
-    <p v-if="hidden > 0" class="border-t border-border-subtle px-3 py-2 text-xs text-ink-500">
+    <p v-if="hidden > 0" class="border-t border-border-subtle px-4 py-2 text-[12px] font-medium text-ink-500 bg-surface-muted/30">
       {{ hidden }} more not shown.
     </p>
   </div>

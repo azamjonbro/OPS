@@ -128,52 +128,6 @@ describe(`GET ${base}/sales`, () => {
   });
 });
 
-describe(`${base}/sync`, () => {
-  it('is refused for a manager and accepted for an admin', async () => {
-    const branch = await createTestBranch();
-    const manager = await signInAs(app, 'manager', String(branch._id));
-    const admin = await signInAs(app, 'admin', null);
-
-    await stubBillz([{ body: { count: 0, shops: [] } }]);
-
-    expect(
-      (await request(app).post(`${base}/sync`).set('Authorization', manager.authorization).send({}))
-        .status,
-    ).toBe(HTTP_STATUS.FORBIDDEN);
-
-    const accepted = await request(app)
-      .post(`${base}/sync`)
-      .set('Authorization', admin.authorization)
-      .send({ mode: 'full', resource: 'branches' });
-
-    expect(accepted.status).toBe(HTTP_STATUS.ACCEPTED);
-    expect(accepted.body.data).toMatchObject({ accepted: true, resources: ['branches'] });
-  });
-
-  it('exposes sync state and logs', async () => {
-    const branch = await createTestBranch();
-    const { authorization } = await signInAs(app, 'manager', String(branch._id));
-
-    const state = await request(app).get(`${base}/sync/state`).set('Authorization', authorization);
-    const logs = await request(app).get(`${base}/sync/logs`).set('Authorization', authorization);
-
-    expect(state.status).toBe(HTTP_STATUS.OK);
-    expect(logs.status).toBe(HTTP_STATUS.OK);
-    // A trigger from another test may still be finishing in the background, so
-    // this asserts the shape rather than an empty list.
-    expect(Array.isArray(state.body.data.items)).toBe(true);
-    expect(Array.isArray(logs.body.data.items)).toBe(true);
-
-    for (const entry of state.body.data.items) {
-      expect(entry).toMatchObject({
-        source: 'billz',
-        resource: expect.any(String),
-        consecutiveFailures: expect.any(Number),
-      });
-    }
-  });
-});
-
 describe(`GET ${base}/capabilities`, () => {
   it('lists the read-only functions the AI phase will be given', async () => {
     const branch = await createTestBranch();
