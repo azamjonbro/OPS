@@ -28,9 +28,7 @@ const receipt = (overrides: Partial<NormalisedReceipt> = {}): NormalisedReceipt 
   shopName: 'Chilonzor',
   customerExternalId: null,
   localDate: '2026-09-01',
-  lines: [
-    { productExternalId: 'p1', name: 'Choy', quantity: 2, lineTotal: 100_000 },
-  ],
+  lines: [{ productExternalId: 'p1', name: 'Choy', quantity: 2, lineTotal: 100_000 }],
   ...overrides,
 });
 
@@ -137,7 +135,10 @@ describe('period metrics', () => {
 
   it('subtracts returned units from the units sold', () => {
     const metrics = calculateMetrics([
-      receipt({ externalId: 'a', lines: [{ productExternalId: 'p1', name: 'Choy', quantity: 5, lineTotal: 250_000 }] }),
+      receipt({
+        externalId: 'a',
+        lines: [{ productExternalId: 'p1', name: 'Choy', quantity: 5, lineTotal: 250_000 }],
+      }),
       receipt({
         externalId: 'b',
         isReturn: true,
@@ -168,11 +169,7 @@ describe('the daily series', () => {
 
     // A closed Sunday is exactly the day an anomaly check needs to see; a
     // series built only from days with trade would omit it.
-    expect(series.map((point) => point.date)).toEqual([
-      '2026-09-01',
-      '2026-09-02',
-      '2026-09-03',
-    ]);
+    expect(series.map((point) => point.date)).toEqual(['2026-09-01', '2026-09-02', '2026-09-03']);
     expect(series[1]?.revenue).toBe(0);
     expect(series[1]?.saleCount).toBe(0);
   });
@@ -234,12 +231,40 @@ describe('top contributors', () => {
   it('names what accounts for a fall, largest mover first', () => {
     const contributors = findTopContributors({
       current: [
-        { name: 'A', externalId: 'a', revenue: 55_000_000, units: 5, saleCount: 5, shareOfRevenue: null },
-        { name: 'B', externalId: 'b', revenue: 75_000_000, units: 7, saleCount: 7, shareOfRevenue: null },
+        {
+          name: 'A',
+          externalId: 'a',
+          revenue: 55_000_000,
+          units: 5,
+          saleCount: 5,
+          shareOfRevenue: null,
+        },
+        {
+          name: 'B',
+          externalId: 'b',
+          revenue: 75_000_000,
+          units: 7,
+          saleCount: 7,
+          shareOfRevenue: null,
+        },
       ],
       previous: [
-        { name: 'A', externalId: 'a', revenue: 100_000_000, units: 9, saleCount: 9, shareOfRevenue: null },
-        { name: 'B', externalId: 'b', revenue: 100_000_000, units: 9, saleCount: 9, shareOfRevenue: null },
+        {
+          name: 'A',
+          externalId: 'a',
+          revenue: 100_000_000,
+          units: 9,
+          saleCount: 9,
+          shareOfRevenue: null,
+        },
+        {
+          name: 'B',
+          externalId: 'b',
+          revenue: 100_000_000,
+          units: 9,
+          saleCount: 9,
+          shareOfRevenue: null,
+        },
       ],
       dimension: 'product',
     });
@@ -254,7 +279,14 @@ describe('top contributors', () => {
   it('counts a product that appeared where there was none before', () => {
     const contributors = findTopContributors({
       current: [
-        { name: 'New', externalId: 'n', revenue: 10_000, units: 1, saleCount: 1, shareOfRevenue: null },
+        {
+          name: 'New',
+          externalId: 'n',
+          revenue: 10_000,
+          units: 1,
+          saleCount: 1,
+          shareOfRevenue: null,
+        },
       ],
       previous: [],
       dimension: 'product',
@@ -268,12 +300,40 @@ describe('top contributors', () => {
   it('drops movers below the noise threshold', () => {
     const contributors = findTopContributors({
       current: [
-        { name: 'Big', externalId: 'a', revenue: 200_000, units: 1, saleCount: 1, shareOfRevenue: null },
-        { name: 'Tiny', externalId: 'b', revenue: 1_001, units: 1, saleCount: 1, shareOfRevenue: null },
+        {
+          name: 'Big',
+          externalId: 'a',
+          revenue: 200_000,
+          units: 1,
+          saleCount: 1,
+          shareOfRevenue: null,
+        },
+        {
+          name: 'Tiny',
+          externalId: 'b',
+          revenue: 1_001,
+          units: 1,
+          saleCount: 1,
+          shareOfRevenue: null,
+        },
       ],
       previous: [
-        { name: 'Big', externalId: 'a', revenue: 100_000, units: 1, saleCount: 1, shareOfRevenue: null },
-        { name: 'Tiny', externalId: 'b', revenue: 1_000, units: 1, saleCount: 1, shareOfRevenue: null },
+        {
+          name: 'Big',
+          externalId: 'a',
+          revenue: 100_000,
+          units: 1,
+          saleCount: 1,
+          shareOfRevenue: null,
+        },
+        {
+          name: 'Tiny',
+          externalId: 'b',
+          revenue: 1_000,
+          units: 1,
+          saleCount: 1,
+          shareOfRevenue: null,
+        },
       ],
       dimension: 'product',
       minSharePercent: 5,

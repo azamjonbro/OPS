@@ -168,11 +168,6 @@ describe('enumerating a period', () => {
       to: '2026-03-02',
     });
 
-    expect(daysInPeriod(period)).toEqual([
-      '2026-02-27',
-      '2026-02-28',
-      '2026-03-01',
-      '2026-03-02',
-    ]);
+    expect(daysInPeriod(period)).toEqual(['2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02']);
   });
 });

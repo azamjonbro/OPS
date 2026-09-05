@@ -203,9 +203,7 @@ export const insightFromDataQuality = (
  * suggestion built on a maybe is worse than no suggestion, because it reads
  * with exactly the same authority as one built on a certainty.
  */
-export const buildRecommendations = (
-  insights: AnalyticsInsight[],
-): AnalyticsRecommendation[] => {
+export const buildRecommendations = (insights: AnalyticsInsight[]): AnalyticsRecommendation[] => {
   const recommendations: AnalyticsRecommendation[] = [];
   // A period where several days each look unusual would otherwise produce the
   // same sentence once per day. Ten identical suggestions are not ten times the
@@ -252,7 +250,10 @@ export const buildRecommendations = (
       continue;
     }
 
-    if (insight.direction === 'up' && (insight.severity === 'high' || insight.severity === 'medium')) {
+    if (
+      insight.direction === 'up' &&
+      (insight.severity === 'high' || insight.severity === 'medium')
+    ) {
       add({
         basedOn: insight.headline,
         recommendation:

@@ -368,7 +368,6 @@ export const readMetrics = (call: MessageToolCall): MetricsBlock | null => {
   };
 };
 
-
 /**
  * The headline figures a summary tool returned.
  *
@@ -437,7 +436,9 @@ export const readAnalyticsInsights = (call: MessageToolCall): AnalyticsInsightsB
       ? (data.recommendations as AnalyticsRecommendation[])
       : [],
     incompleteNotes:
-      quality?.complete === false && Array.isArray(quality.notes) ? (quality.notes as string[]) : [],
+      quality?.complete === false && Array.isArray(quality.notes)
+        ? (quality.notes as string[])
+        : [],
   };
 };
 

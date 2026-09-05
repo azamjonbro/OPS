@@ -297,7 +297,10 @@ describe('the tools the agent sees', () => {
     });
 
     const summary = tools(runner).find((tool) => tool.name === 'analytics_get_summary');
-    const result = await summary?.execute({ period: 'custom', from: '2026-09-06', to: '2026-09-06', compare: false }, context());
+    const result = await summary?.execute(
+      { period: 'custom', from: '2026-09-06', to: '2026-09-06', compare: false },
+      context(),
+    );
 
     // The whole cost argument: 400 receipts become one sentence. A model asked
     // to total a column of 400 rows is slower, dearer and less accurate.
@@ -330,12 +333,9 @@ describe('the tools the agent sees', () => {
       ],
     });
 
-    const result = await getTopProducts(
-      actor(),
-      period('2026-09-06', '2026-09-06'),
-      10,
-      { runner },
-    );
+    const result = await getTopProducts(actor(), period('2026-09-06', '2026-09-06'), 10, {
+      runner,
+    });
 
     expect(result.items[0]?.name).toBe('Qahva');
     expect(result.items[0]?.units).toBe(3);

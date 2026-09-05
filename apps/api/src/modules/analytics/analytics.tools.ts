@@ -180,7 +180,9 @@ const buildCompareTool = (deps: AnalyticsDependencies): RegisteredTool => ({
                     : ` (${contributor.shareOfChange}% of the movement)`
                 }`,
             )
-            .join(', ')}. These account for the change arithmetically; they do not explain its cause.`
+            .join(
+              ', ',
+            )}. These account for the change arithmetically; they do not explain its cause.`
         : '';
 
     return {

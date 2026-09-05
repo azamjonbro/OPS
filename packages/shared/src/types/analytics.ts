@@ -1,4 +1,8 @@
-import type { AnalyticsPeriodKey, InsightSeverity, TrendDirection } from '../constants/analytics.js';
+import type {
+  AnalyticsPeriodKey,
+  InsightSeverity,
+  TrendDirection,
+} from '../constants/analytics.js';
 
 /**
  * The shapes analytics answers in.

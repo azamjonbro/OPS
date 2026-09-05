@@ -79,7 +79,10 @@ describe('trend detection', () => {
 
   it('never reports more confidence than the evidence supports', () => {
     const short = detectTrend('revenue', series([100, 100, 300, 300]));
-    const long = detectTrend('revenue', series(Array.from({ length: 20 }, (_u, i) => (i < 10 ? 100 : 300))));
+    const long = detectTrend(
+      'revenue',
+      series(Array.from({ length: 20 }, (_u, i) => (i < 10 ? 100 : 300))),
+    );
 
     expect(long.confidence).toBeGreaterThan(short.confidence);
     expect(long.confidence).toBeLessThanOrEqual(1);
@@ -89,10 +92,7 @@ describe('trend detection', () => {
 describe('anomaly detection', () => {
   it('flags a day far below the baseline, and says by how much', () => {
     // Six ordinary days at 100m, then a collapse to 42m.
-    const anomalies = detectAnomalies(
-      'revenue',
-      series([100, 100, 100, 100, 100, 100, 42]),
-    );
+    const anomalies = detectAnomalies('revenue', series([100, 100, 100, 100, 100, 100, 42]));
 
     expect(anomalies).toHaveLength(1);
     expect(anomalies[0]?.direction).toBe('drop');

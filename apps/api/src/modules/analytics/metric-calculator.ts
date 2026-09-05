@@ -200,7 +200,9 @@ const rank = (aggregates: Map<string, Aggregate>, netSales: number, limit: numbe
       // Share is undefined against a zero or negative net, not zero: a period
       // that broke even has no meaningful denominator.
       shareOfRevenue:
-        netSales > 0 ? Math.round(((entry.revenue / netSales) * 100 + Number.EPSILON) * 100) / 100 : null,
+        netSales > 0
+          ? Math.round(((entry.revenue / netSales) * 100 + Number.EPSILON) * 100) / 100
+          : null,
     }));
 
 /**
@@ -353,31 +355,33 @@ export const findTopContributors = (options: {
 
   const minShare = options.minSharePercent ?? 0;
 
-  return [...names]
-    .map<AnalyticsContributor>((name) => {
-      const current = options.current.find((row) => row.name === name)?.revenue ?? 0;
-      const previous = previousByName.get(name)?.revenue ?? 0;
-      const absoluteChange = current - previous;
+  return (
+    [...names]
+      .map<AnalyticsContributor>((name) => {
+        const current = options.current.find((row) => row.name === name)?.revenue ?? 0;
+        const previous = previousByName.get(name)?.revenue ?? 0;
+        const absoluteChange = current - previous;
 
-      return {
-        name,
-        dimension: options.dimension,
-        current,
-        previous,
-        absoluteChange,
-        percentageChange: roundPercent(percentageChange(current, previous)),
-        shareOfChange:
-          totalMovement > 0
-            ? Math.round((Math.abs(absoluteChange) / totalMovement) * 10_000) / 100
-            : null,
-      };
-    })
-    .filter(
-      (contributor) =>
-        contributor.absoluteChange !== 0 && (contributor.shareOfChange ?? 0) >= minShare,
-    )
-    // Largest mover first regardless of direction: the question is "what moved",
-    // and the biggest fall matters as much as the biggest rise.
-    .sort((left, right) => Math.abs(right.absoluteChange) - Math.abs(left.absoluteChange))
-    .slice(0, options.limit ?? 5);
+        return {
+          name,
+          dimension: options.dimension,
+          current,
+          previous,
+          absoluteChange,
+          percentageChange: roundPercent(percentageChange(current, previous)),
+          shareOfChange:
+            totalMovement > 0
+              ? Math.round((Math.abs(absoluteChange) / totalMovement) * 10_000) / 100
+              : null,
+        };
+      })
+      .filter(
+        (contributor) =>
+          contributor.absoluteChange !== 0 && (contributor.shareOfChange ?? 0) >= minShare,
+      )
+      // Largest mover first regardless of direction: the question is "what moved",
+      // and the biggest fall matters as much as the biggest rise.
+      .sort((left, right) => Math.abs(right.absoluteChange) - Math.abs(left.absoluteChange))
+      .slice(0, options.limit ?? 5)
+  );
 };
