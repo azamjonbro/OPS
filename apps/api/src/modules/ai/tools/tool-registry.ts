@@ -171,7 +171,8 @@ export interface ToolPlan {
 
 export const resolveToolPlan = (tool: RegisteredTool): ToolPlan => {
   const requiresConfirmation = tool.requiresConfirmation ?? false;
-  const risk = tool.risk ?? (requiresConfirmation ? 'destructive' : tool.mutates ? 'write' : 'read');
+  const risk =
+    tool.risk ?? (requiresConfirmation ? 'destructive' : tool.mutates ? 'write' : 'read');
 
   return {
     name: tool.name,
@@ -293,9 +294,7 @@ export class ToolRegistry {
       }
 
       if (plan.requiresConfirmation) {
-        notes.push(
-          'Ask the user first and call again with confirm: true only after they agree.',
-        );
+        notes.push('Ask the user first and call again with confirm: true only after they agree.');
       }
 
       return {
@@ -375,11 +374,7 @@ export class ToolRegistry {
    * error to decide whether it looks transient enough to retry, and flattening
    * it into a string here would throw that decision away.
    */
-  static async run(
-    tool: RegisteredTool,
-    args: unknown,
-    context: ToolContext,
-  ): Promise<ToolResult> {
+  static async run(tool: RegisteredTool, args: unknown, context: ToolContext): Promise<ToolResult> {
     return tool.execute(args, context);
   }
 

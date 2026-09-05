@@ -170,11 +170,7 @@ describe('running several tools in one round', () => {
     const provider = createScriptedProvider([
       {
         content: '',
-        toolCalls: [
-          toolCall('read_sales'),
-          toolCall('read_expenses'),
-          toolCall('read_debts'),
-        ],
+        toolCalls: [toolCall('read_sales'), toolCall('read_expenses'), toolCall('read_debts')],
       },
       { content: 'Hammasi tekshirildi.' },
     ]);
@@ -281,7 +277,10 @@ describe('confirmation', () => {
     const actor = await anActor();
     const { probe, registry } = invoiceRegistry();
     const provider = createScriptedProvider([
-      { content: '', toolCalls: [toolCall('crm_invoice', { customerId: 'c-1', amount: 1_200_000 })] },
+      {
+        content: '',
+        toolCalls: [toolCall('crm_invoice', { customerId: 'c-1', amount: 1_200_000 })],
+      },
       { content: '1 200 000 so‘mlik invoice tayyor. Yarataymi?' },
     ]);
 
@@ -433,16 +432,14 @@ describe('confirmation', () => {
         content: '',
         // The same tool, a different amount. Whatever the person agreed to, it
         // was not this.
-        toolCalls: [toolCall('crm_invoice', { customerId: 'c-1', amount: 9_000_000, confirm: true })],
+        toolCalls: [
+          toolCall('crm_invoice', { customerId: 'c-1', amount: 9_000_000, confirm: true }),
+        ],
       },
       { content: 'Summani tasdiqlashingiz kerak.' },
     ]);
 
-    await sendMessage(
-      actor,
-      { conversationId, message: 'Ha' },
-      { provider, registry, limits },
-    );
+    await sendMessage(actor, { conversationId, message: 'Ha' }, { provider, registry, limits });
 
     expect(probe.calls).toHaveLength(0);
     const toolMessage = promptOf(provider, 1).find((message) => message.role === 'tool');
@@ -754,9 +751,7 @@ describe('cost control', () => {
   it('stops asking for tools after the round limit and still answers', async () => {
     const actor = await anActor();
     const probe = createToolProbe({ name: 'read_thing' });
-    const provider = createScriptedProvider([
-      { content: '', toolCalls: [toolCall('read_thing')] },
-    ]);
+    const provider = createScriptedProvider([{ content: '', toolCalls: [toolCall('read_thing')] }]);
 
     const result = await sendMessage(
       actor,
@@ -779,9 +774,7 @@ describe('cost control', () => {
   it('holds a completion back for the answer when the model-call budget runs out', async () => {
     const actor = await anActor();
     const probe = createToolProbe({ name: 'read_thing' });
-    const provider = createScriptedProvider([
-      { content: '', toolCalls: [toolCall('read_thing')] },
-    ]);
+    const provider = createScriptedProvider([{ content: '', toolCalls: [toolCall('read_thing')] }]);
 
     const result = await sendMessage(
       actor,
@@ -1043,9 +1036,7 @@ describe('MCP tools behave like any other', () => {
 
     const registry = await buildActorToolRegistry(actor);
 
-    expect(
-      registry.list().some((tool) => tool.name.endsWith('.search_customers')),
-    ).toBe(false);
+    expect(registry.list().some((tool) => tool.name.endsWith('.search_customers'))).toBe(false);
   });
 });
 

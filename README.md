@@ -216,6 +216,15 @@ Credentials are never remembered: passwords, API keys, tokens, card and account 
 before anything is stored. Anything the assistant is not confident about is held as `pending` and is
 not used until a person confirms it (`POST /api/v1/memory/:id/confirm`).
 
+One message can be several steps. The agent plans across rounds, runs independent reads
+**concurrently** and dependent ones in order, puts a deadline and a bounded retry on every call,
+and never retries a write that is not safe to repeat. Anything that changes data and needs agreeing
+to is written down server-side before the person is asked — validated arguments, a description and
+an expiry — so a later "ha" is checked against what Hadiya actually proposed rather than taken on
+the model's word. A run can be cancelled (`POST /api/v1/ai/chat/cancel`), and the closing summary is
+written from Hadiya's own record of what the tools returned, so a step that failed is never reported
+as done. See [docs/agent.md](docs/agent.md).
+
 **A model client is not wired up yet** — that is the assistant phase's job. Until one is registered,
 `/ai/chat` answers `503` rather than inventing a reply; everything below it is complete and tested
 against a scripted provider.

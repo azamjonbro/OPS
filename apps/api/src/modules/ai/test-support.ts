@@ -7,11 +7,7 @@ import { CONTENT_TOOLS } from './tools/content.tools.js';
 import { IMAGE_TOOLS } from './tools/image.tools.js';
 import { MEMORY_TOOLS } from './tools/memory.tools.js';
 import { REMINDER_TOOLS } from './tools/reminder.tools.js';
-import {
-  ToolRegistry,
-  type RegisteredTool,
-  type ToolContext,
-} from './tools/tool-registry.js';
+import { ToolRegistry, type RegisteredTool, type ToolContext } from './tools/tool-registry.js';
 
 /**
  * A scripted model, for tests.

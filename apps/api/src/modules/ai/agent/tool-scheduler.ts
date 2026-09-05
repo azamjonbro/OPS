@@ -422,7 +422,8 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
 
   const kind = classifyFailure(lastError);
   const cancelled = lastError instanceof ToolCancelledError || options.signal.aborted;
-  const message = lastError instanceof Error ? lastError.message : `The "${call.name}" tool failed.`;
+  const message =
+    lastError instanceof Error ? lastError.message : `The "${call.name}" tool failed.`;
 
   options.events.emit('tool.failed', {
     tool: call.name,

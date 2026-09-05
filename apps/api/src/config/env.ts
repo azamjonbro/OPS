@@ -102,8 +102,18 @@ const envSchema = z
      * shared package, which is also what a test pins; the variables exist so a
      * deployment can tighten them without a release.
      */
-    AGENT_MAX_TOOL_ROUNDS: z.coerce.number().int().min(1).max(20).default(AGENT_LIMITS.maxToolRounds),
-    AGENT_MAX_MODEL_CALLS: z.coerce.number().int().min(2).max(30).default(AGENT_LIMITS.maxModelCalls),
+    AGENT_MAX_TOOL_ROUNDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(AGENT_LIMITS.maxToolRounds),
+    AGENT_MAX_MODEL_CALLS: z.coerce
+      .number()
+      .int()
+      .min(2)
+      .max(30)
+      .default(AGENT_LIMITS.maxModelCalls),
     AGENT_MAX_PARALLEL_TOOLS: z.coerce
       .number()
       .int()
@@ -117,7 +127,12 @@ const envSchema = z
       .min(1_000)
       .max(300_000)
       .default(AGENT_LIMITS.toolTimeoutMs),
-    AGENT_MAX_TOOL_RETRIES: z.coerce.number().int().min(0).max(5).default(AGENT_LIMITS.maxToolRetries),
+    AGENT_MAX_TOOL_RETRIES: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(5)
+      .default(AGENT_LIMITS.maxToolRetries),
     AGENT_RETRY_BACKOFF_MS: z.coerce
       .number()
       .int()

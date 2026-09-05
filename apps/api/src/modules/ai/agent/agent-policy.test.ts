@@ -18,7 +18,9 @@ import { backoffFor, classifyFailure, shouldRetry, ToolTimeoutError } from './to
 const planFor = (tool: Partial<RegisteredTool> & { name: string }) =>
   resolveToolPlan({
     description: '',
-    schema: { safeParse: () => ({ success: true, data: {} }) } as unknown as RegisteredTool['schema'],
+    schema: {
+      safeParse: () => ({ success: true, data: {} }),
+    } as unknown as RegisteredTool['schema'],
     mutates: false,
     ...tool,
   } as RegisteredTool);

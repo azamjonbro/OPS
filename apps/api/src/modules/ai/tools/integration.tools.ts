@@ -1,8 +1,4 @@
-import {
-  mcpToolRegistryName,
-  type AuthenticatedUser,
-  type ToolProvenance,
-} from '@hadiya/shared';
+import { mcpToolRegistryName, type AuthenticatedUser, type ToolProvenance } from '@hadiya/shared';
 import { z } from 'zod';
 
 import { createLogger } from '../../../core/logger/logger.js';
