@@ -5,8 +5,6 @@ import { createApp } from '../../app.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
 import {
   createTestBranch,
-  createTestCategory,
-  createTestProduct,
   signInAs,
 } from '../../test/factories.js';
 import { ContentItemModel } from '../content/content-item.model.js';
@@ -15,7 +13,7 @@ import * as contentService from '../content/content.service.js';
 import * as memoryService from '../memory/memory.service.js';
 import { sendMessage } from './agent/agent.service.js';
 import { setAiProvider } from './provider/index.js';
-import { createScriptedProvider } from './test-support.js';
+import { billzProduct, createRegistryWithBillz, createScriptedProvider } from './test-support.js';
 import { createToolRegistry } from './tools/index.js';
 
 /**
@@ -509,14 +507,22 @@ describe('through /ai/chat', () => {
 
   it('reads the shop’s own products first, then writes about them', async () => {
     const { actor } = await signIn();
-    const category = await createTestCategory();
-    await createTestProduct(String(category._id), { name: 'Cola 1L' });
+    const registry = createRegistryWithBillz({
+      searchProducts: async () => ({
+        items: [billzProduct({ name: 'Cola 1L' })],
+        total: 1,
+      }),
+    });
 
     const provider = createScriptedProvider([
       {
         content: '',
         toolCalls: [
-          { callId: 'call-1', name: 'get_products', arguments: { search: 'Cola', limit: 5 } },
+          {
+            callId: 'call-1',
+            name: 'billz_search_products',
+            arguments: { query: 'Cola', limit: 5 },
+          },
         ],
       },
       {
@@ -539,14 +545,16 @@ describe('through /ai/chat', () => {
 
     setAiProvider(provider);
 
-    await sendMessage(actor, {
-      message: 'Eng ko‘p sotilayotgan mahsulotlar asosida 3 kunlik plan tuz.',
-    });
+    await sendMessage(
+      actor,
+      { message: 'Eng ko‘p sotilayotgan mahsulotlar asosida 3 kunlik plan tuz.' },
+      { registry },
+    );
 
-    // The real product reached the generator's brief — it was never read by the
-    // content engine itself.
+    // The product Billz returned reached the generator's brief — it was never
+    // read by the content engine itself, and was never invented by the model.
     const briefs = provider.requests.map((entry) => JSON.stringify(entry.messages));
-    expect(briefs.some((brief) => /Cola 1L — 12 000 UZS/.test(brief))).toBe(true);
+    expect(briefs.some((brief) => brief.includes('Cola 1L'))).toBe(true);
     expect(await ContentPlanModel.countDocuments().exec()).toBe(1);
   });
 

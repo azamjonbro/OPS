@@ -4,17 +4,6 @@ import type { Conversation } from '@hadiya/shared';
 import type { ConversationGroup } from '@/stores/conversations';
 import ConversationItem from './ConversationItem.vue';
 
-/**
- * The thread list, in date buckets.
- *
- * "Today / Yesterday / Previous 7 days / Older" is how somebody remembers a
- * conversation — by roughly when they had it — and it is the only grouping that
- * needs no explanation.
- *
- * The list is paged. `Load more` is a button rather than an automatic fetch on
- * scroll, because the sidebar is not the thing being read: silently pulling
- * pages while somebody hunts for a thread costs requests for nothing.
- */
 defineProps<{
   groups: Array<{ title: ConversationGroup; items: Conversation[] }>;
   activeId: string | null;
@@ -32,10 +21,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <section v-for="group in groups" :key="group.title">
+  <div class="flex flex-col gap-1">
+    <section v-for="group in groups" :key="group.title" class="mb-4 first:mt-2 last:mb-0">
       <h3
-        class="px-2.5 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500"
+        class="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-400 select-none"
       >
         {{ group.title }}
       </h3>
@@ -56,11 +45,11 @@ const emit = defineEmits<{
     <button
       v-if="hasMore"
       type="button"
-      class="mx-2.5 rounded-lg py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-60"
+      class="mx-2.5 mt-2 rounded-lg py-2 text-[12px] font-medium text-ink-500 transition-colors hover:bg-surface hover:text-ink-900 disabled:opacity-50"
       :disabled="isLoadingMore"
       @click="emit('loadMore')"
     >
-      {{ isLoadingMore ? 'Loading…' : 'Load more' }}
+      {{ isLoadingMore ? 'Loading…' : 'Load older' }}
     </button>
   </div>
 </template>

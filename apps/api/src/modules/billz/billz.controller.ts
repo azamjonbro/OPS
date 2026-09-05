@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 
-import { sendAccepted, sendSuccess } from '../../core/http/api-response.js';
+import { sendSuccess } from '../../core/http/api-response.js';
 import { requireActor } from '../../core/security/actor.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import * as billzService from './billz.service.js';

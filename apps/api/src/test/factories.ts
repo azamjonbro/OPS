@@ -5,8 +5,6 @@ import request from 'supertest';
 
 import { hashPassword } from '../core/security/password.js';
 import { BranchModel, type BranchDocument } from '../modules/branches/branch.model.js';
-import { CategoryModel, type CategoryDocument } from '../modules/categories/category.model.js';
-import { ProductModel, type ProductDocument } from '../modules/products/product.model.js';
 import { UserModel, type UserDocument } from '../modules/users/user.model.js';
 
 /**
@@ -50,39 +48,6 @@ export const createTestUser = async (
     branch: branchId,
     timezone: DEFAULT_TIMEZONE,
     lastLoginAt: null,
-    ...overrides,
-  });
-
-export const createTestCategory = (
-  overrides: Partial<CategoryDocument> = {},
-): Promise<HydratedDocument<CategoryDocument>> =>
-  CategoryModel.create({
-    name: `Drinks ${suffix()}`,
-    description: null,
-    parent: null,
-    isActive: true,
-    ...overrides,
-  });
-
-export const createTestProduct = (
-  categoryId: string,
-  overrides: Partial<ProductDocument> = {},
-): Promise<HydratedDocument<ProductDocument>> =>
-  ProductModel.create({
-    name: 'Cola 1L',
-    sku: `SKU${suffix().toUpperCase()}`,
-    barcode: null,
-    description: null,
-    category: categoryId,
-    price: COLA_PRICE,
-    costPrice: COLA_COST,
-    currency: 'UZS',
-    unit: 'piece',
-    trackInventory: true,
-    reorderLevel: 5,
-    isActive: true,
-    images: [],
-    externalRefs: [],
     ...overrides,
   });
 
