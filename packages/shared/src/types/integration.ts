@@ -151,6 +151,16 @@ export interface IntegrationProviderInfo {
   available: boolean;
   /** Why it is unavailable, for the disabled card's tooltip. */
   unavailableReason: string | null;
+  /**
+   * What a person has to supply, in one sentence.
+   *
+   * Written by the adapter rather than derived from the flags below, because
+   * "needs no credential" has several different reasons — Billz reads a token
+   * the deployment already holds, while an MCP server may genuinely be open —
+   * and a person deciding whether to press the button needs the reason, not the
+   * flag.
+   */
+  setupHint: string;
   /** Auth methods this provider can actually complete. */
   authMethods: McpAuthMethod[];
   /** Whether the person supplies a server URL. */

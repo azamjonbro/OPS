@@ -47,6 +47,7 @@ const catalogue: IntegrationProviderInfo[] = [
     provider: 'billz',
     type: 'native',
     label: 'Billz',
+    setupHint: 'Nothing to enter. Billz is configured once for the whole deployment.',
     description: 'The shop itself.',
     available: true,
     unavailableReason: null,
@@ -58,6 +59,7 @@ const catalogue: IntegrationProviderInfo[] = [
     provider: 'notion',
     type: 'native',
     label: 'Notion',
+    setupHint: 'You will need an internal integration token from notion.so/my-integrations.',
     description: 'Your workspace notes.',
     available: false,
     unavailableReason: 'This deployment cannot store credentials.',
@@ -69,6 +71,7 @@ const catalogue: IntegrationProviderInfo[] = [
     provider: 'custom_mcp',
     type: 'mcp',
     label: 'Custom MCP server',
+    setupHint: 'You will need the server address (https), and a token unless the server is open.',
     description: 'Connect your own tools.',
     available: true,
     unavailableReason: null,
@@ -312,6 +315,34 @@ describe('adding an integration', () => {
     expect(options.join(' ')).not.toContain('OAuth');
   });
 
+  it('says what each provider will ask for, before it is picked', async () => {
+    stubHub([]);
+    await openDialog();
+
+    // "Only asks for a name" is a fair complaint about a form that gives no
+    // warning that a token is coming.
+    expect(dialogText()).toContain('a token unless the server is open');
+    // And the opposite case is worth saying too: Billz asks for nothing, which
+    // looks like a broken form unless somebody explains it.
+    expect(dialogText()).toContain('Nothing to enter');
+    // An unavailable provider shows why instead — the reason is the useful
+    // sentence there, not what it would have asked for.
+    expect(dialogText()).toContain('This deployment cannot store credentials.');
+    expect(dialogText()).not.toContain('notion.so/my-integrations');
+  });
+
+  it('asks for a token by default rather than hiding it behind "None"', async () => {
+    stubHub([]);
+    await openDialog();
+    await clickText('Custom MCP server');
+
+    // Most MCP servers need one, and defaulting to no authentication made the
+    // form look complete while missing the only field that mattered.
+    const auth = dialogElements<HTMLSelectElement>('select')[1];
+    expect(auth?.value).toBe('bearer');
+    expect(dialogElements<HTMLInputElement>('input[type="password"]')).toHaveLength(1);
+  });
+
   it('sends the token once and goes to the new integration', async () => {
     stubHub([]);
     const create = vi
@@ -322,12 +353,7 @@ describe('adding an integration', () => {
     await clickText('Custom MCP server');
 
     await fill('input[type="url"]', 'https://crm.example.com/mcp');
-    // The second select is the auth method; the first is the transport.
-    const authSelect = dialogElements<HTMLSelectElement>('select')[1];
-    authSelect!.value = 'bearer';
-    authSelect!.dispatchEvent(new Event('change'));
-    await nextTick();
-
+    // No need to touch the auth select: bearer is the default now.
     await fill('input[type="password"]', 'crm-secret-token');
     await clickText('Add integration');
     await flushPromises();

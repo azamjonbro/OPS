@@ -32,6 +32,8 @@ export const billzProvider: IntegrationProviderAdapter = {
     unavailableReason: config.integrations.billz.configured
       ? null
       : 'This deployment has no Billz token configured.',
+    setupHint:
+      'Nothing to enter. Billz is configured once for the whole deployment, so connecting it here just switches it on for your account.',
     authMethods: [],
     requiresServerUrl: false,
     // The token is the deployment's, not the person's.

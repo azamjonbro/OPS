@@ -45,6 +45,8 @@ export const mcpProvider: IntegrationProviderAdapter = {
     // Only what is actually implemented. OAuth is absent because offering a
     // flow that cannot complete produces an integration stuck forever at
     // "authentication required".
+    setupHint:
+      'You will need the server address (https), and a token unless the server is open to anyone.',
     authMethods: [...MCP_AUTH_METHODS],
     requiresServerUrl: true,
     // Only when the chosen auth method needs one; `prepare` decides.

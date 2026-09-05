@@ -34,6 +34,8 @@ export const notionProvider: IntegrationProviderAdapter = {
     unavailableReason: canStoreCredentials()
       ? null
       : 'This deployment cannot store credentials: no encryption key is configured.',
+    setupHint:
+      'You will need an internal integration token from notion.so/my-integrations, and you must share the pages you want Hadiya to see with that integration.',
     authMethods: [],
     requiresServerUrl: false,
     requiresCredential: true,
