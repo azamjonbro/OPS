@@ -103,12 +103,43 @@ export const routes: RouteRecordRaw[] = [
           breadcrumb: [{ label: 'Settings', to: { name: 'settings' } }],
         },
       },
+      /**
+       * The Integration Hub: what this account has connected, and what the
+       * assistant may do there.
+       *
+       * At the top level rather than under `settings`, because connecting a CRM
+       * is not a preference — it changes what Hadiya can do — and because the
+       * detail page is where MCP tool permissions are set, which is the most
+       * consequential screen in the application.
+       */
       {
-        path: 'settings/integrations',
-        name: 'integrations',
+        path: 'integrations',
+        name: 'integration-hub',
+        component: () => import('@/pages/IntegrationHubPage.vue'),
+        meta: { title: 'Integrations', requiresAuth: true },
+      },
+      {
+        path: 'integrations/:id',
+        name: 'integration',
+        component: () => import('@/pages/IntegrationDetailPage.vue'),
+        meta: {
+          title: 'Integration',
+          requiresAuth: true,
+          breadcrumb: [{ label: 'Integrations', to: { name: 'integration-hub' } }],
+        },
+      },
+      /**
+       * The older screen, which is about something else despite the name it
+       * had: the health of the model and image providers configured in the
+       * deployment's environment, and what they have cost. Kept, and renamed to
+       * what it is, so the hub above can own the word "integrations".
+       */
+      {
+        path: 'settings/providers',
+        name: 'provider-usage',
         component: () => import('@/pages/IntegrationsPage.vue'),
         meta: {
-          title: 'Integrations',
+          title: 'Providers & usage',
           requiresAuth: true,
           breadcrumb: [{ label: 'Settings', to: { name: 'settings' } }],
         },

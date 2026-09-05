@@ -97,9 +97,7 @@ export const acquireToolSlot = (key: GuardKey): (() => void) => {
     );
   }
 
-  if (
-    record(`integration:${key.integrationId}`, now) > MCP_LIMITS.callsPerMinutePerIntegration
-  ) {
+  if (record(`integration:${key.integrationId}`, now) > MCP_LIMITS.callsPerMinutePerIntegration) {
     throw new McpError(
       'rate_limited',
       'This integration has been called too often in the last minute; try again shortly.',

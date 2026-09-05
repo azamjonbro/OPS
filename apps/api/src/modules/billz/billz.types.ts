@@ -101,6 +101,14 @@ export interface BillzSaleItem {
   isReturned: boolean;
 }
 
+/** What one payment method covered on a receipt. */
+export interface BillzSalePayment {
+  paymentTypeExternalId: string;
+  paymentTypeName: string | null;
+  paidAmount: MinorUnits;
+  returnedAmount: MinorUnits;
+}
+
 export interface BillzSale {
   externalId: string;
   /** `sale` or `return`; a return points back at the sale it reverses. */
@@ -114,6 +122,8 @@ export interface BillzSale {
   /** Present when the receipt was left on credit. */
   debtAmount: MinorUnits | null;
   items: BillzSaleItem[];
+  /** How it was settled, per method. Empty when the receipt went on credit. */
+  payments: BillzSalePayment[];
   soldAt: string | null;
 }
 

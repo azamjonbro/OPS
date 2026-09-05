@@ -7,7 +7,11 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { config } from '../../../config/index.js';
 import { createLogger } from '../../../core/logger/logger.js';
 import { McpError, toMcpError } from './mcp-error.js';
-import { sanitiseExternalText, validateDiscoveredTools, type ValidatedMcpTool } from './mcp-tool-schema.js';
+import {
+  sanitiseExternalText,
+  validateDiscoveredTools,
+  type ValidatedMcpTool,
+} from './mcp-tool-schema.js';
 import { describeServerUrl, parseMcpServerUrl } from './mcp-url.js';
 
 const log = createLogger('mcp-client');
@@ -157,7 +161,10 @@ const flattenContent = (content: unknown): { text: string; skipped: number } => 
 };
 
 /** Builds the transport for the configured protocol. */
-const createTransport = (settings: McpConnectionSettings, headers: Record<string, string>): Transport => {
+const createTransport = (
+  settings: McpConnectionSettings,
+  headers: Record<string, string>,
+): Transport => {
   // Validated again here rather than trusted from the database: a row could
   // predate the rule, or have been written before the deployment tightened it.
   const url = parseMcpServerUrl(settings.serverUrl);
@@ -272,11 +279,9 @@ export const createMcpClient = (settings: McpConnectionSettings): McpClient => {
 
       try {
         const response = await withDeadline(
-          client.callTool(
-            { name, arguments: args },
-            undefined,
-            { timeout: config.mcp.toolTimeoutMs },
-          ),
+          client.callTool({ name, arguments: args }, undefined, {
+            timeout: config.mcp.toolTimeoutMs,
+          }),
           config.mcp.toolTimeoutMs,
         );
 

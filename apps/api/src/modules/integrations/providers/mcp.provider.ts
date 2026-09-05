@@ -195,7 +195,8 @@ const withConnection = async <TResult>(
 ): Promise<TResult> => {
   const integrationId = String(integration._id);
   const authMethod = (integration.authMethod as McpAuthMethod | null) ?? 'none';
-  const needsSecret = authMethod !== 'none' && (await hasSecret(integrationId, CREDENTIAL_PURPOSE.token));
+  const needsSecret =
+    authMethod !== 'none' && (await hasSecret(integrationId, CREDENTIAL_PURPOSE.token));
 
   const base: Omit<McpConnectionSettings, 'secret'> = {
     serverUrl: integration.serverUrl ?? '',
@@ -204,8 +205,7 @@ const withConnection = async <TResult>(
     authHeaderName: integration.authHeaderName,
   };
 
-  return withOptionalSecret(
-    { integrationId, userId: actor.id, needsSecret },
-    (secret) => withMcpConnection({ ...base, secret }, use),
+  return withOptionalSecret({ integrationId, userId: actor.id, needsSecret }, (secret) =>
+    withMcpConnection({ ...base, secret }, use),
   );
 };

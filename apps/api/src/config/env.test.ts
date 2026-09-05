@@ -50,6 +50,13 @@ const baseEnv: Env = {
   IMAGE_MAX_RETRIES: 1,
   STORAGE_DRIVER: 'local',
   STORAGE_LOCAL_DIR: 'storage',
+  CREDENTIALS_ENCRYPTION_KEY: undefined,
+  MCP_CONNECT_TIMEOUT_MS: 10_000,
+  MCP_TOOL_TIMEOUT_MS: 30_000,
+  MCP_ALLOW_PRIVATE_HOSTS: false,
+  NOTION_API_VERSION: '2022-06-28',
+  NOTION_BASE_URL: 'https://api.notion.com',
+  NOTION_TIMEOUT_MS: 15_000,
 };
 
 describe('buildConfig', () => {

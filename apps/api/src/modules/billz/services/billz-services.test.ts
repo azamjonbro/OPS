@@ -125,63 +125,94 @@ describe('pagination', () => {
   });
 });
 
-describe('sales normalisation', () => {
-  const orderSearchBody = {
-    count: 2,
-    orders_sorted_by_date_list: [
-      {
-        date: '2026-09-01',
-        orders: [
-          {
-            id: 'order-1',
-            order_type: 'SALE',
+/**
+ * Shaped exactly like a real `/v3/order-search` payload, and that is the
+ * whole point of it.
+ *
+ * An earlier version of this fixture put `total_price`, `shop_id` and
+ * `customer` at the top of the order — which is where the mapper happened to
+ * look, so the suite passed while production reported every day's takings as
+ * zero. Billz actually puts all of it under `order_detail`, and a missing
+ * number does not throw: it becomes 0 and reads as a real figure. So this
+ * fixture mirrors the live response, nesting and all.
+ */
+const orderSearchBody = {
+  count: 2,
+  orders_sorted_by_date_list: [
+    {
+      date: '2026-09-01',
+      orders: [
+        {
+          id: 'order-1',
+          order_type: 'SALE',
+          order_number: '000900041236',
+          customer_id: 'client-1',
+          created_at: '2026-09-01 12:00:00',
+          sold_at: '2026-09-01 12:04:11',
+          deleted: false,
+          debt: { amount: 4_000 },
+          order_detail: {
             total_price: 24_000,
             shop_id: 'shop-1',
-            created_at: '2026-09-01T12:00:00Z',
-            customer_id: 'client-1',
-            customer: { first_name: 'Dilnoza', last_name: 'Karimova' },
-            debt: { amount: 4_000 },
-            order_detail: {
-              order_items: [
-                {
-                  product: {
-                    id: 'p1',
-                    name: 'Cola 1L',
-                    sku: 'SKU-1',
-                    measurement_unit: { short_name: 'dona' },
-                  },
-                  measurement_value: 2,
-                  sale_price: 12_000,
-                  total_price: 24_000,
-                  discount_amount: 0,
+            shop: { id: 'shop-1', name: 'Store Hadiya' },
+            customer: { id: 'client-1', first_name: 'Dilnoza', last_name: 'Karimova' },
+            order_items: [
+              {
+                product: {
+                  id: 'p1',
+                  name: 'Cola 1L',
+                  sku: 'SKU-1',
+                  measurement_unit: { short_name: 'dona' },
                 },
-              ],
-            },
+                measurement_value: 2,
+                sale_price: 12_000,
+                total_price: 24_000,
+                discount_amount: 0,
+              },
+            ],
+            // Settled with two methods, which Billz splits per method.
+            order_payments: [
+              {
+                company_payment_type_id: 'pay-cash',
+                company_payment_type: { id: 'pay-cash', name: 'Naqd' },
+                paid_amount: 20_000,
+                returned_amount: 0,
+              },
+              {
+                company_payment_type_id: 'pay-card',
+                company_payment_type: { id: 'pay-card', name: 'Karta' },
+                paid_amount: 4_000,
+                returned_amount: 0,
+              },
+            ],
           },
-          {
-            id: 'order-2',
-            order_type: 'RETURN',
+        },
+        {
+          id: 'order-2',
+          order_type: 'RETURN',
+          parent_id: 'order-1',
+          deleted: false,
+          order_detail: {
             total_price: -12_000,
-            parent_id: 'order-1',
-            is_deleted: false,
-            order_detail: {
-              order_items: [
-                {
-                  product: { id: 'p1', name: 'Cola 1L' },
-                  measurement_value: 0,
-                  returned_measurement_value: 1,
-                  sale_price: 12_000,
-                  total_price: -12_000,
-                  is_returned: true,
-                },
-              ],
-            },
+            order_items: [
+              {
+                product: { id: 'p1', name: 'Cola 1L' },
+                measurement_value: 0,
+                returned_measurement_value: 1,
+                sale_price: 12_000,
+                total_price: -12_000,
+                is_returned: true,
+              },
+            ],
+            order_payments: [],
           },
-        ],
-      },
-    ],
-  };
+        },
+      ],
+    },
+  ],
+};
 
+describe('sales normalisation', () => {
   it('flattens the day grouping and normalises both sales and returns', async () => {
     const { services } = buildServices([{ body: orderSearchBody }]);
 
@@ -204,6 +235,35 @@ describe('sales normalisation', () => {
     // A return reports its units in its own field and points back at the sale.
     expect(items[1]).toMatchObject({ type: 'return', parentExternalId: 'order-1' });
     expect(items[1]?.items[0]).toMatchObject({ quantity: 1, isReturned: true });
+  });
+
+  it('reads the money from order_detail, where Billz actually puts it', async () => {
+    const { services } = buildServices([{ body: orderSearchBody }]);
+
+    const { items } = await services.sales.listSales({ from: '2026-09-01', to: '2026-09-01' });
+
+    // The regression this guards: every one of these lives under `order_detail`
+    // on the real payload. Reading the envelope instead yields `undefined`,
+    // which becomes 0 or null and reads as a real answer rather than a failure.
+    expect(items[0]?.total).toBe(2_400_000);
+    expect(items[0]?.shopExternalId).toBe('shop-1');
+    expect(items[0]?.shopName).toBe('Store Hadiya');
+    expect(items[0]?.customerName).toBe('Dilnoza Karimova');
+    expect(items[0]?.soldAt).toBe('2026-09-01 12:04:11');
+    expect(items[0]?.total).not.toBe(0);
+  });
+
+  it('excludes a receipt Billz marked deleted', async () => {
+    const voided = structuredClone(orderSearchBody);
+    voided.orders_sorted_by_date_list[0]!.orders[0]!.deleted = true;
+
+    const { services } = buildServices([{ body: voided }]);
+    const { items } = await services.sales.listSales({ from: '2026-09-01', to: '2026-09-01' });
+
+    // Billz spells this `deleted`. An earlier version filtered on `is_deleted`,
+    // a field that is not on the payload, so the filter matched everything and
+    // voided receipts were counted as trade.
+    expect(items.map((sale) => sale.externalId)).toEqual(['order-2']);
   });
 
   it('nets returns against sales when summarising a period', async () => {
@@ -278,6 +338,82 @@ describe('customers and directory', () => {
       { externalId: 'pt-1', name: 'Naqd', isCash: true },
       { externalId: 'pt-2', name: 'Karta', isCash: false },
     ]);
+  });
+});
+
+describe('payment breakdown', () => {
+  /**
+   * Each receipt carries its own payment rows, so a split receipt can be split.
+   *
+   * An earlier implementation asked Billz once per payment method which
+   * receipts it had touched, then set aside any receipt that came back under
+   * more than one — reporting the money as unsplittable. Billz does report the
+   * split, on the receipt, and this holds the rows to it.
+   */
+  const paymentTypesBody = {
+    count: 2,
+    company_payment_types: [
+      { id: 'pay-cash', name: 'Naqd', is_cash_payment_type: true },
+      { id: 'pay-card', name: 'Karta' },
+    ],
+  };
+
+  it('splits a receipt across the methods that settled it', async () => {
+    const route = (call: { url: string }) =>
+      call.url.includes('/v3/order-search')
+        ? { body: orderSearchBody }
+        : { body: paymentTypesBody };
+
+    const { services } = buildServices([route, route]);
+
+    const breakdown = await services.finance.paymentBreakdown({
+      from: '2026-09-01',
+      to: '2026-09-01',
+    });
+
+    expect(breakdown.rows).toEqual([
+      {
+        paymentTypeId: 'pay-cash',
+        paymentTypeName: 'Naqd',
+        isCash: true,
+        receiptCount: 1,
+        total: 2_000_000,
+      },
+      {
+        paymentTypeId: 'pay-card',
+        paymentTypeName: 'Karta',
+        isCash: false,
+        receiptCount: 1,
+        total: 400_000,
+      },
+    ]);
+
+    // The rows account for the whole receipt, and it is still reported as one
+    // that took two methods.
+    expect(breakdown.rows.reduce((total, row) => total + row.total, 0)).toBe(2_400_000);
+    expect(breakdown.mixedReceiptCount).toBe(1);
+  });
+
+  it('reports a receipt with no payment rows as credit, not as cash', async () => {
+    const onCredit = structuredClone(orderSearchBody);
+    onCredit.orders_sorted_by_date_list[0]!.orders[0]!.order_detail.order_payments = [];
+
+    const route = (call: { url: string }) =>
+      call.url.includes('/v3/order-search') ? { body: onCredit } : { body: paymentTypesBody };
+
+    const { services } = buildServices([route, route]);
+
+    const breakdown = await services.finance.paymentBreakdown({
+      from: '2026-09-01',
+      to: '2026-09-01',
+    });
+
+    expect(breakdown.creditReceiptCount).toBe(1);
+    expect(breakdown.creditTotal).toBe(2_400_000);
+    expect(breakdown.rows).toEqual([]);
+    // The return in the fixture also has no payment rows, but a refund is not
+    // money owed — counting it would net against real debt in the same period.
+    expect(breakdown.creditTotal).not.toBe(1_200_000);
   });
 });
 

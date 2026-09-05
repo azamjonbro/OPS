@@ -172,6 +172,34 @@ an external-ID mapping table, so re-running changes nothing that has not changed
 [docs/billz-api.md](docs/billz-api.md) lists every endpoint used, the evidence for it, and the
 capabilities Billz does not expose to an API key (expenses, sales reports, warehouses, suppliers).
 
+## Integration Hub and MCP
+
+Hadiya connects to two kinds of thing, and the difference decides everything about how each is
+treated.
+
+**Native** integrations are ones Hadiya was taught: Billz (the shop, read-only, credential from the
+deployment's environment) and Notion (a person's own workspace, read-only, per-account token). A
+client was written for each, and the operations exposed were chosen deliberately.
+
+**MCP** integrations are ones the user brought — any server speaking the Model Context Protocol,
+connected through the official SDK over Streamable HTTP or SSE. Hadiya has never seen it and treats
+everything it says as untrusted: server addresses are refused if they point inside a private
+network, discovered tool metadata is validated and bounded, and results reach the model inside a
+labelled data block rather than as conversation.
+
+Every discovered tool gets a permission. Reads are enabled; anything that writes, deletes, or that
+Hadiya could not classify **asks the person first** — through the same confirmation mechanism every
+other destructive tool in the application uses. Disabled and blocked tools are never mentioned to
+the model at all.
+
+Credentials are encrypted with AES-256-GCM (`CREDENTIALS_ENCRYPTION_KEY`) in their own collection,
+bound to the integration and account they belong to. No API response carries one, and disconnecting
+destroys it rather than parking it.
+
+Integrations live at `/api/v1/integrations` and are strictly per-account; the screen is at
+`/integrations`. See [docs/integrations.md](docs/integrations.md) for the architecture, the MCP
+connection lifecycle, the permission model, and how to add a native integration.
+
 ## Assistant, conversations and memory
 
 Conversations, messages and long-term memory are implemented and are **strictly per-user**: every

@@ -1,6 +1,10 @@
+import type { AuthenticatedUser } from '@hadiya/shared';
+
+import { createLogger } from '../../../core/logger/logger.js';
 import { createBillzTools } from './billz.tools.js';
 import { CONTENT_TOOLS } from './content.tools.js';
 import { IMAGE_TOOLS } from './image.tools.js';
+import { buildIntegrationTools } from './integration.tools.js';
 import { MEMORY_TOOLS } from './memory.tools.js';
 import { REMINDER_TOOLS } from './reminder.tools.js';
 import {
@@ -41,6 +45,41 @@ export const createToolRegistry = (): ToolRegistry => {
   return registry;
 };
 
+const log = createLogger('ai-tools-registry');
+
+/**
+ * The registry for one person, for one turn.
+ *
+ * The built-in tools are the same for everybody, so they are built the way they
+ * always were. What varies is what that account has connected: their MCP
+ * servers, their Notion workspace. Those cannot live in a process-wide
+ * singleton — one account's CRM tools appearing in another's registry would be
+ * the exact cross-tenant leak this phase exists to prevent — so the per-actor
+ * half is assembled fresh here and thrown away with the turn.
+ *
+ * A failure to load integrations degrades rather than fails. If the database is
+ * slow or an integration is broken, the assistant answers with its built-in
+ * tools instead of refusing to answer at all: losing access to a CRM should not
+ * mean losing the ability to ask what sold yesterday.
+ */
+export const buildActorToolRegistry = async (actor: AuthenticatedUser): Promise<ToolRegistry> => {
+  const registry = createToolRegistry();
+
+  try {
+    for (const tool of await buildIntegrationTools(actor)) {
+      // `register` throws on a duplicate name, which is the collision guard.
+      // MCP names are namespaced by integration id and so cannot collide with
+      // each other; this catches a built-in tool being shadowed, which would be
+      // a bug worth hearing about rather than silently resolving.
+      registry.register(tool);
+    }
+  } catch (error) {
+    log.warn({ user: actor.id, err: error }, 'integration tools could not be loaded');
+  }
+
+  return registry;
+};
+
 let cached: ToolRegistry | null = null;
 
 export const getToolRegistry = (): ToolRegistry => {
@@ -59,5 +98,6 @@ export type { RegisteredTool, ToolContext, ToolResult };
 export { createBillzTools } from './billz.tools.js';
 export { CONTENT_TOOLS } from './content.tools.js';
 export { IMAGE_TOOLS } from './image.tools.js';
+export { asUntrustedData, buildIntegrationTools } from './integration.tools.js';
 export { MEMORY_TOOLS } from './memory.tools.js';
 export { REMINDER_TOOLS } from './reminder.tools.js';

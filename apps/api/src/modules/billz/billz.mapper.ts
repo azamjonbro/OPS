@@ -7,6 +7,7 @@ import type {
   BillzRawCurrency,
   BillzRawOrder,
   BillzRawOrderItem,
+  BillzRawOrderPayment,
   BillzRawPaymentType,
   BillzRawProduct,
   BillzRawShop,
@@ -20,6 +21,7 @@ import type {
   BillzProduct,
   BillzSale,
   BillzSaleItem,
+  BillzSalePayment,
   BillzShop,
   BillzShopPriceView,
   BillzStockLevel,
@@ -170,8 +172,34 @@ const mapSaleItem = (raw: BillzRawOrderItem): BillzSaleItem => {
   };
 };
 
+/**
+ * What one method covered on a receipt.
+ *
+ * Billz does record this per method — `paid_amount` against a
+ * `company_payment_type` — so a receipt settled with cash *and* card can be
+ * split exactly rather than reported as an unsplittable lump.
+ */
+const mapSalePayment = (raw: BillzRawOrderPayment): BillzSalePayment => ({
+  paymentTypeExternalId:
+    text(raw.company_payment_type_id) ?? text(raw.company_payment_type?.id) ?? '',
+  paymentTypeName: text(raw.company_payment_type?.name),
+  paidAmount: money(raw.paid_amount),
+  returnedAmount: money(raw.returned_amount),
+});
+
+/**
+ * One receipt.
+ *
+ * Nearly every field is read from `order_detail` rather than from the envelope
+ * around it. That is where `/v3/order-search` actually puts them, and reading
+ * the envelope instead does not fail — it yields `undefined`, which becomes a
+ * zero, so a day of real trade reports as no money at all rather than as an
+ * error somebody would notice.
+ */
 export const mapSale = (raw: BillzRawOrder): BillzSale => {
-  const customerName = [text(raw.customer?.first_name), text(raw.customer?.last_name)]
+  const detail = raw.order_detail;
+  const customer = detail?.customer;
+  const customerName = [text(customer?.first_name), text(customer?.last_name)]
     .filter(Boolean)
     .join(' ');
 
@@ -179,13 +207,17 @@ export const mapSale = (raw: BillzRawOrder): BillzSale => {
     externalId: raw.id ?? '',
     type: raw.order_type?.toUpperCase() === 'RETURN' ? 'return' : 'sale',
     parentExternalId: text(raw.parent_id),
-    shopExternalId: text(raw.shop_id),
-    shopName: text(raw.shop_name),
-    customerExternalId: text(raw.customer_id) ?? text(raw.customer?.id),
+    shopExternalId: text(detail?.shop_id) ?? text(detail?.shop?.id),
+    shopName: text(detail?.shop?.name),
+    customerExternalId: text(raw.customer_id) ?? text(customer?.id),
     customerName: customerName.length > 0 ? customerName : null,
-    total: money(raw.total_price),
+    total: money(detail?.total_price),
     debtAmount: raw.debt?.amount === undefined ? null : money(raw.debt.amount),
-    items: (raw.order_detail?.order_items ?? []).map(mapSaleItem),
-    soldAt: text(raw.finished_date) ?? text(raw.created_at),
+    items: (detail?.order_items ?? []).map(mapSaleItem),
+    payments: (detail?.order_payments ?? []).map(mapSalePayment),
+    // `sold_at` is when the till finished the sale; `created_at` is when the
+    // basket was opened, which can be a different day for a receipt left open
+    // over midnight.
+    soldAt: text(raw.sold_at) ?? text(raw.finished_at) ?? text(raw.created_at),
   };
 };

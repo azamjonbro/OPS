@@ -14,8 +14,13 @@ export interface BillzPaymentBreakdownRow {
 
 export interface BillzPaymentBreakdown {
   rows: BillzPaymentBreakdownRow[];
-  /** Receipts settled with more than one method; Billz gives no per-method split. */
+  /**
+   * Receipts settled with more than one method. Their money *is* in `rows`,
+   * split per method; this only says how many receipts were split, which is a
+   * question about how people pay rather than an admission of missing data.
+   */
   mixedReceiptCount: number;
+  /** The full value of those receipts, already counted across `rows`. */
   mixedTotal: number;
   /** Receipts that matched no payment method at all — sold on credit. */
   creditReceiptCount: number;
@@ -46,6 +51,20 @@ export class BillzFinanceService {
     private readonly directory: BillzDirectoryService,
   ) {}
 
+  /**
+   * How a period's takings split across payment methods.
+   *
+   * Read from each receipt's own payment rows, which carry `paid_amount` per
+   * method. That matters twice over. A receipt settled with cash *and* card is
+   * split exactly rather than being set aside as unsplittable — the earlier
+   * implementation believed Billz did not report the split, and it does. And
+   * the whole thing is now one request: the previous version asked Billz once
+   * per payment method to find out which receipts each had touched, which was
+   * a query per method per report and still could not say how much.
+   *
+   * A receipt with no payment rows went out on credit, and is reported as such
+   * rather than being dropped or counted against a method it never used.
+   */
   async paymentBreakdown(
     query: Omit<SalesQuery, 'paymentTypeIds'>,
   ): Promise<BillzPaymentBreakdown> {
@@ -54,15 +73,7 @@ export class BillzFinanceService {
       this.directory.listPaymentTypes(),
     ]);
 
-    const idsByType = new Map<string, Set<string>>();
-
-    for (const paymentType of paymentTypes) {
-      idsByType.set(
-        paymentType.externalId,
-        await this.sales.listSaleIdsByPaymentType(query, paymentType.externalId),
-      );
-    }
-
+    const typesById = new Map(paymentTypes.map((type) => [type.externalId, type]));
     const rows = new Map<string, BillzPaymentBreakdownRow>();
     let mixedReceiptCount = 0;
     let mixedTotal = 0;
@@ -70,42 +81,47 @@ export class BillzFinanceService {
     let creditTotal = 0;
 
     for (const receipt of receipts) {
-      const methods = paymentTypes.filter((type) =>
-        idsByType.get(type.externalId)?.has(receipt.externalId),
-      );
+      const paid = receipt.payments.filter((payment) => payment.paidAmount !== 0);
 
-      if (methods.length === 0) {
-        creditReceiptCount += 1;
-        creditTotal += receipt.total;
+      if (paid.length === 0) {
+        // Only a *sale* with nothing paid against it is credit. A return also
+        // has no payment rows, and counting it here would report a refund as
+        // money somebody owes — with a negative total, which quietly cancels
+        // out real debt in the same period.
+        if (receipt.type === 'sale') {
+          creditReceiptCount += 1;
+          creditTotal += receipt.total;
+        }
+
         continue;
       }
 
-      if (methods.length > 1) {
-        // Billz records which methods settled a receipt, never how much each
-        // one covered, so a split receipt is reported as split rather than
-        // divided by a guess.
+      // Still counted, because "how many receipts took more than one method" is
+      // a real question. It no longer withholds the money, though: each part is
+      // attributed to the method that actually covered it.
+      if (paid.length > 1) {
         mixedReceiptCount += 1;
         mixedTotal += receipt.total;
-        continue;
       }
 
-      const [method] = methods;
+      for (const payment of paid) {
+        const type = typesById.get(payment.paymentTypeExternalId);
+        const id = payment.paymentTypeExternalId || 'unknown';
 
-      if (!method) {
-        continue;
+        const row = rows.get(id) ?? {
+          paymentTypeId: id,
+          // The receipt names the method too, so one Billz has since renamed or
+          // removed still reports as something a person recognises.
+          paymentTypeName: type?.name ?? payment.paymentTypeName ?? 'Unknown method',
+          isCash: type?.isCash ?? false,
+          receiptCount: 0,
+          total: 0,
+        };
+
+        row.receiptCount += 1;
+        row.total += payment.paidAmount - payment.returnedAmount;
+        rows.set(id, row);
       }
-
-      const row = rows.get(method.externalId) ?? {
-        paymentTypeId: method.externalId,
-        paymentTypeName: method.name,
-        isCash: method.isCash,
-        receiptCount: 0,
-        total: 0,
-      };
-
-      row.receiptCount += 1;
-      row.total += receipt.total;
-      rows.set(method.externalId, row);
     }
 
     return {

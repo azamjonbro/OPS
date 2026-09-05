@@ -5,6 +5,7 @@ import type {
   AuthenticatedUser,
 } from '@hadiya/shared';
 
+import type { ValidatedMcpTool } from '../mcp/mcp-tool-schema.js';
 import type { IntegrationDocument } from '../integration.model.js';
 
 /**
@@ -90,5 +91,5 @@ export interface IntegrationProviderAdapter {
   discoverTools?: (
     actor: AuthenticatedUser,
     integration: IntegrationDocument,
-  ) => Promise<{ tools: import('../mcp/mcp-tool-schema.js').ValidatedMcpTool[] }>;
+  ) => Promise<{ tools: ValidatedMcpTool[] }>;
 }
