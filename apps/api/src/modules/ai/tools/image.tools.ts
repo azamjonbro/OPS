@@ -35,6 +35,7 @@ const aspectRatioDescription = IMAGE_ASPECT_RATIOS.map(
 
 export const generateImageTool: RegisteredTool = {
   name: 'generate_image',
+  category: 'image',
   description: [
     'Generate an image with AI. Use it when the user asks for a picture, a banner, a product shot or a visual for a post — "shu post uchun rasm yarat", "Instagram uchun banner yarat".',
     'Write the prompt as a description of the scene, in English, however the user wrote to you: what is in frame, the setting, the lighting, the mood. Do not simply repeat their sentence.',

@@ -119,6 +119,7 @@ const summariseItem = (item: ContentItemDocument) => ({
 
 export const createContentPlanTool: RegisteredTool = {
   name: 'create_content_plan',
+  category: 'content',
   description:
     'Create and save a content plan. Give a brief and how many days it covers and the plan is written for you, validated and stored — this is what to call for "7 kunlik Instagram plan tuz". If the user dictated the exact days themselves, pass them as `items` instead and nothing is generated. Base a plan on real figures by calling billz_get_sales_summary or billz_get_products first and passing what you found as businessContext.',
   mutates: true,
@@ -255,6 +256,7 @@ export const createContentPlanTool: RegisteredTool = {
 
 export const listContentPlansTool: RegisteredTool = {
   name: 'list_content_plans',
+  category: 'content',
   description:
     'The user’s own content plans, newest first. Use it to find the plan they mean before changing or deleting one.',
   mutates: false,
@@ -299,6 +301,7 @@ export const listContentPlansTool: RegisteredTool = {
 
 export const getContentPlanTool: RegisteredTool = {
   name: 'get_content_plan',
+  category: 'content',
   description:
     'One plan with every day in it. Call this before editing a specific day, so you have the item ids.',
   mutates: false,
@@ -321,6 +324,7 @@ export const getContentPlanTool: RegisteredTool = {
 
 export const updateContentPlanTool: RegisteredTool = {
   name: 'update_content_plan',
+  category: 'content',
   description:
     'Change a plan’s own details — its title, description, platform or status. This does not touch the days inside it; use update_content_item for those.',
   mutates: true,
@@ -356,6 +360,7 @@ export const updateContentPlanTool: RegisteredTool = {
 
 export const deleteContentPlanTool: RegisteredTool = {
   name: 'delete_content_plan',
+  category: 'content',
   description:
     'Delete a content plan and every day in it. This cannot be undone, so the user has to agree first: call it once to see what would go, tell them, and call it again with confirm: true only after they say yes.',
   mutates: true,
@@ -394,6 +399,12 @@ export const deleteContentPlanTool: RegisteredTool = {
 
 export const createContentItemTool: RegisteredTool = {
   name: 'create_content_item',
+  category: 'content',
+  // An item lives inside a plan. When a round asks for both, the item does not
+  // run against a plan that was never made: there is no invented id standing in
+  // for one. Across rounds this does nothing, because by then the model has the
+  // real id in front of it.
+  dependsOn: ['create_content_plan'],
   description:
     'Add one day to an existing plan. Give the caption yourself if the user dictated it; leave it out and describe the topic instead, and the copy is written and validated for you.',
   mutates: true,
@@ -460,6 +471,7 @@ export const createContentItemTool: RegisteredTool = {
 
 export const updateContentItemTool: RegisteredTool = {
   name: 'update_content_item',
+  category: 'content',
   description:
     'Change one day of a plan. Only send the fields that change — anything you leave out keeps the value it already had, so this is how to edit a caption without losing the idea or the hashtags. Use it when the user dictated the new wording; use regenerate_content_item when they want you to write it.',
   mutates: true,
@@ -507,6 +519,7 @@ export const updateContentItemTool: RegisteredTool = {
 
 export const deleteContentItemTool: RegisteredTool = {
   name: 'delete_content_item',
+  category: 'content',
   description:
     'Remove one day from a plan. It cannot be undone, so ask the user first: call it once to see what would go, tell them, and call again with confirm: true after they agree.',
   mutates: true,
@@ -538,6 +551,7 @@ export const deleteContentItemTool: RegisteredTool = {
 
 export const regenerateContentItemTool: RegisteredTool = {
   name: 'regenerate_content_item',
+  category: 'content',
   description:
     'Rewrite one day of a plan. This is what to call for "captionni qisqartir", "ko\'proq professional qil" or "hashtaglarni yangila". Name the fields to change and everything else is kept exactly as it is, so an approved idea is not lost when only the copy was wrong.',
   mutates: true,
@@ -584,6 +598,7 @@ export const regenerateContentItemTool: RegisteredTool = {
 
 export const generateCaptionTool: RegisteredTool = {
   name: 'generate_caption',
+  category: 'content',
   description:
     'Write a caption for a post without saving anything. Use it for "bugungi post uchun caption yoz", or to rework a caption the user pasted in. It follows the user’s stored language, tone and style.',
   // Nothing is written; the user decides afterwards whether to keep it.
@@ -635,6 +650,7 @@ export const generateCaptionTool: RegisteredTool = {
 
 export const generateContentIdeasTool: RegisteredTool = {
   name: 'generate_content_ideas',
+  category: 'content',
   description:
     'Suggest content ideas without saving anything — "Ramazon uchun 10 ta content idea ber". Each idea comes back with an angle and hashtags, so the user can pick one and you can then add it to a plan.',
   mutates: false,

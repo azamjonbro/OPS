@@ -265,6 +265,18 @@ const buildTool = (
   // Nothing here writes. That is a property of the capability layer, not a
   // promise made here: Billz's write endpoints have no capability at all.
   mutates: false,
+  category: 'business',
+  risk: 'read',
+  // Every one of these is a read of a different endpoint, so a round that asks
+  // for sales, expenses and debts at once is three requests that have no reason
+  // to queue: the shopkeeper waits for the slowest rather than for the sum.
+  parallelSafe: true,
+  provenance: {
+    source: 'billz',
+    integrationId: null,
+    integrationName: 'Billz',
+    externalName: capability.name,
+  },
   schema: capability.schema,
   execute: async (args) => {
     // The runner is resolved per call, not when the registry is built.
