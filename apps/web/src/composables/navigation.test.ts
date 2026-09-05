@@ -50,14 +50,14 @@ describe('permission-based navigation', () => {
 
     const sections = useNavigation().sections.value;
     const finance = sections.find((section) => section.title === 'Finance');
-    const administration = sections.find((section) => section.title === 'Administration');
+    const account = sections.find((section) => section.title === 'Account');
 
     // Finance keeps Expenses and loses Reports.
     expect(finance?.items.map((item) => item.label)).toEqual(['Expenses']);
-    // Administration keeps Settings, which everybody may reach, and loses
+    // Account keeps Preferences, which everybody may reach, and loses
     // Employees. A heading over an empty list would advertise an area the
     // person cannot get to.
-    expect(administration?.items.map((item) => item.label)).toEqual(['Settings']);
+    expect(account?.items.map((item) => item.label)).toEqual(['Preferences']);
     expect(sections.every((section) => section.items.length > 0)).toBe(true);
   });
 
@@ -74,5 +74,15 @@ describe('permission-based navigation', () => {
 
     expect(manager.canManageCatalogue.value).toBe(true);
     expect(manager.canManageStaff.value).toBe(false);
+  });
+});
+
+describe('the assistant is the product', () => {
+  it('is not one of the back-office sections', () => {
+    signIn('manager');
+
+    // The chat has a sidebar of its own, full of conversations. Listing it
+    // here as a peer of Products would say it is one screen among twenty.
+    expect(labels()).not.toContain('Assistant');
   });
 });

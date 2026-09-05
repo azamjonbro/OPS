@@ -1,19 +1,25 @@
 import type { NavigationSection } from '@/types/navigation';
 
 /**
- * The sidebar.
+ * Where everything lives, now that the assistant is the product.
+ *
+ * Hadiya is an AI business assistant. Talking to it is the whole interface, so
+ * the chat is not one item in a menu of twenty — it *is* the application, and
+ * it has a sidebar of its own full of conversations rather than modules.
+ *
+ * Everything below is what remains: the screens that read and edit records
+ * directly. They are kept because somebody occasionally needs to look a thing
+ * up or correct it by hand, and because most of them mirror data Billz owns —
+ * but they are a back office, not the front door, so they sit under Settings
+ * instead of competing with the conversation for attention.
  *
  * `minimumRole` mirrors the role each module's service actually requires, so
- * the menu offers only what the person can carry out — an entry that always
- * answered "403" would be worse than no entry. It is UX, not security: the
- * backend enforces the same rule and does not care what was rendered.
- *
- * Entries with `to: null` are modules scheduled for a later phase; they render
- * disabled rather than hidden, so the shape of the product stays visible.
+ * the menu offers only what the person can carry out. It is UX, not security:
+ * the backend enforces the same rule and does not care what was rendered.
  */
-export const navigationSections: NavigationSection[] = [
+export const settingsSections: NavigationSection[] = [
   {
-    title: 'Overview',
+    title: 'Operations',
     items: [
       {
         label: 'Dashboard',
@@ -27,17 +33,6 @@ export const navigationSections: NavigationSection[] = [
         to: { name: 'pos' },
         icon: 'M3 3h2l3 12h10l3-8H7M9 21h.01M18 21h.01',
       },
-      {
-        label: 'Assistant',
-        module: 'assistant',
-        to: { name: 'assistant' },
-        icon: 'M12 3a9 9 0 0 0-9 9v5a3 3 0 0 0 3 3h1v-6H5v-2a7 7 0 1 1 14 0v2h-2v6h1a3 3 0 0 0 3-3v-5a9 9 0 0 0-9-9Z',
-      },
-    ],
-  },
-  {
-    title: 'Operations',
-    items: [
       {
         label: 'Sales',
         module: 'sales',
@@ -91,7 +86,7 @@ export const navigationSections: NavigationSection[] = [
     ],
   },
   {
-    title: 'Marketing',
+    title: 'What the assistant made',
     items: [
       {
         label: 'Content',
@@ -120,17 +115,19 @@ export const navigationSections: NavigationSection[] = [
     ],
   },
   {
-    title: 'Administration',
+    title: 'Account',
     items: [
       {
         label: 'Employees',
         module: 'employees',
+        // Scheduled for a later phase; rendered disabled rather than hidden so
+        // the shape of the product stays legible.
         to: null,
         icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM5 21a7 7 0 0 1 14 0',
         minimumRole: 'admin',
       },
       {
-        label: 'Settings',
+        label: 'Preferences',
         module: 'auth',
         to: { name: 'settings' },
         icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z',
@@ -138,3 +135,16 @@ export const navigationSections: NavigationSection[] = [
     ],
   },
 ];
+
+/**
+ * The one entry above the back office: the way back to the conversation.
+ *
+ * Kept separate from the sections because it is not one of them — it is the
+ * thing they are subordinate to.
+ */
+export const assistantLink: NavigationSection['items'][number] = {
+  label: 'Assistant',
+  module: 'assistant',
+  to: { name: 'assistant' },
+  icon: 'M12 3a9 9 0 0 0-9 9v5a3 3 0 0 0 3 3h1v-6H5v-2a7 7 0 1 1 14 0v2h-2v6h1a3 3 0 0 0 3-3v-5a9 9 0 0 0-9-9Z',
+};
