@@ -1,5 +1,7 @@
 import type { Message, MessageToolCall } from '@hadiya/shared';
 
+import { toolLabel } from './tool-labels';
+
 /**
  * What a message *is*, as far as the interface is concerned.
  *
@@ -22,7 +24,7 @@ export type MessageBlock =
   | { kind: 'metrics'; metrics: MetricsBlock; call: MessageToolCall }
   | { kind: 'table'; table: TableBlock; call: MessageToolCall }
   | { kind: 'confirmation'; call: MessageToolCall; question: string }
-  | { kind: 'error'; call: MessageToolCall; message: string };
+  | { kind: 'error'; call: MessageToolCall; message: string; detail: string | null };
 
 export interface GeneratedImageBlock {
   id: string;
@@ -336,7 +338,17 @@ export const toolToBlock = (call: MessageToolCall): MessageBlock => {
   }
 
   if (call.status === 'failed') {
-    return { kind: 'error', call, message: call.result ?? 'That step did not work.' };
+    // The upstream message is written for whoever reads the logs: it can name a
+    // host, a path or a status code, none of which helps a shopkeeper and some
+    // of which should not be on their screen at all. So the card says which
+    // step failed, in the same words the successful one would have used, and
+    // the raw text is tucked behind a details toggle for whoever wants it.
+    return {
+      kind: 'error',
+      call,
+      message: `${toolLabel(call.name).running} — that step did not work.`,
+      detail: call.result,
+    };
   }
 
   const data = dataOf(call);

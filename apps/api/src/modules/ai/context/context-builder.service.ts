@@ -65,7 +65,7 @@ export const buildSystemPrompt = (
     'If a requested time is vague, ask for an exact one rather than guessing.',
     // Content work is where a model is most tempted to invent a product or a
     // price, and where the tools it needs are least obvious from the request.
-    'For content work, base posts on real products and figures: read them with get_products or get_sales_summary first and pass what you found as businessContext. Never invent a product, a price or a discount.',
+    'For content work, base posts on real products and figures: read them with billz_get_products or billz_get_sales_summary first and pass what you found as businessContext. Never invent a product, a price or a discount.',
   ];
 
   if (memories.length > 0) {

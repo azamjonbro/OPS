@@ -247,7 +247,7 @@ const GUIDANCE: Partial<Record<BillzCapabilityName, string>> = {
   getProducts:
     'Prefer billz_search_products when the user named a product; this is the raw catalogue.',
   searchProducts:
-    'Use this whenever the user mentions a product by name, SKU or barcode — including before generating an image of it, so you describe the real thing.',
+    'Use this when the user names something the shop sells and the answer depends on the shop\'s own copy of it — its price, its stock, its exact label. Do not reach for it to illustrate a generic request: "xitoy xidli sovun chizib ber" is a drawing, not a catalogue lookup.',
   getInventory:
     'Use maxQuantity to answer "qaysi mahsulot tugayapti?" — for example maxQuantity 5 lists what is nearly out.',
   getDebts: 'Answers "kimning qarzi bor?" and "falon mijozning qarzi qancha?".',

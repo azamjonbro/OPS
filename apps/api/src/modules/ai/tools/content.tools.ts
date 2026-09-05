@@ -37,7 +37,7 @@ import type { RegisteredTool } from './tool-registry.js';
  * tool argument the model improvised is exactly the thing that would not.
  *
  * Business facts are never read here. When a plan should be based on what is
- * selling, the assistant calls `get_sales_summary` or `get_products` first and
+ * selling, the assistant calls `billz_get_sales_summary` or `billz_get_products` first and
  * passes what it found as `businessContext` — so the data in a plan is data
  * somebody asked for.
  */
@@ -54,7 +54,7 @@ const businessContextSchema = z
   .max(4_000)
   .optional()
   .describe(
-    'Real figures or product details you gathered with get_sales_summary or get_products. Never invent this.',
+    'Real figures or product details you gathered with billz_get_sales_summary or billz_get_products. Never invent this.',
   );
 
 const objectIdArgument = (what: string) =>
@@ -120,7 +120,7 @@ const summariseItem = (item: ContentItemDocument) => ({
 export const createContentPlanTool: RegisteredTool = {
   name: 'create_content_plan',
   description:
-    'Create and save a content plan. Give a brief and how many days it covers and the plan is written for you, validated and stored — this is what to call for "7 kunlik Instagram plan tuz". If the user dictated the exact days themselves, pass them as `items` instead and nothing is generated. Base a plan on real figures by calling get_sales_summary or get_products first and passing what you found as businessContext.',
+    'Create and save a content plan. Give a brief and how many days it covers and the plan is written for you, validated and stored — this is what to call for "7 kunlik Instagram plan tuz". If the user dictated the exact days themselves, pass them as `items` instead and nothing is generated. Base a plan on real figures by calling billz_get_sales_summary or billz_get_products first and passing what you found as businessContext.',
   mutates: true,
   schema: z.object({
     brief: z

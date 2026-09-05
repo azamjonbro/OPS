@@ -6,6 +6,7 @@ import GeneratedImageCard from './GeneratedImageCard.vue';
 import MarkdownRenderer from './MarkdownRenderer.vue';
 import MetricsCard from './MetricsCard.vue';
 import ReminderCard from './ReminderCard.vue';
+import ToolErrorCard from './ToolErrorCard.vue';
 import ToolExecutionCard from './ToolExecutionCard.vue';
 import ToolResultTable from './ToolResultTable.vue';
 
@@ -49,12 +50,11 @@ const emit = defineEmits<{ reply: [text: string] }>();
         @reply="emit('reply', $event)"
       />
 
-      <p
+      <ToolErrorCard
         v-else-if="block.kind === 'error'"
-        class="rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700 ring-1 ring-danger-600/25"
-      >
-        {{ block.message }}
-      </p>
+        :message="block.message"
+        :detail="block.detail"
+      />
 
       <ToolExecutionCard v-else :call="block.call" />
     </template>

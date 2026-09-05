@@ -38,7 +38,7 @@ export const generateImageTool: RegisteredTool = {
   description: [
     'Generate an image with AI. Use it when the user asks for a picture, a banner, a product shot or a visual for a post — "shu post uchun rasm yarat", "Instagram uchun banner yarat".',
     'Write the prompt as a description of the scene, in English, however the user wrote to you: what is in frame, the setting, the lighting, the mood. Do not simply repeat their sentence.',
-    'If they mention a real product, call get_products first and describe that product — never invent a product, a price or a label that Hadiya does not have.',
+    'If they are asking for a picture of something the shop actually sells, call billz_search_products first and describe that product — never invent a price or a label the shop does not have. For a generic picture, draw it directly; do not go looking through the catalogue for something that is not in it.',
     'Pass contentItemId when the image belongs to a specific day of a content plan; use get_content_plan to find the id. Nothing else about the plan is changed.',
     'Each image costs money, so generate one unless the user asked for options.',
   ].join(' '),
