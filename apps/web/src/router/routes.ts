@@ -104,6 +104,16 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'settings/integrations',
+        name: 'integrations',
+        component: () => import('@/pages/IntegrationsPage.vue'),
+        meta: {
+          title: 'Integrations',
+          requiresAuth: true,
+          breadcrumb: [{ label: 'Settings', to: { name: 'settings' } }],
+        },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/pages/SettingsPage.vue'),
