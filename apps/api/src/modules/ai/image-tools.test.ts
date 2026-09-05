@@ -5,8 +5,6 @@ import { createApp } from '../../app.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
 import {
   createTestBranch,
-  createTestCategory,
-  createTestProduct,
   signInAs,
 } from '../../test/factories.js';
 import * as contentService from '../content/content.service.js';
@@ -21,7 +19,7 @@ import {
 } from '../images/test-support.js';
 import { sendMessage } from './agent/agent.service.js';
 import { setAiProvider } from './provider/index.js';
-import { createScriptedProvider } from './test-support.js';
+import { billzProduct, createRegistryWithBillz, createScriptedProvider } from './test-support.js';
 import { createToolRegistry } from './tools/index.js';
 
 /**
@@ -286,14 +284,22 @@ describe('through /ai/chat', () => {
 
   it('reads the real product first, then draws it', async () => {
     const { actor } = await signIn();
-    const category = await createTestCategory();
-    await createTestProduct(String(category._id), { name: 'Gold wristwatch' });
+    const registry = createRegistryWithBillz({
+      searchProducts: async () => ({
+        items: [billzProduct({ name: 'Gold wristwatch' })],
+        total: 1,
+      }),
+    });
 
     const provider = createScriptedProvider([
       {
         content: '',
         toolCalls: [
-          { callId: 'call-1', name: 'get_products', arguments: { search: 'watch', limit: 5 } },
+          {
+            callId: 'call-1',
+            name: 'billz_search_products',
+            arguments: { query: 'watch', limit: 5 },
+          },
         ],
       },
       {

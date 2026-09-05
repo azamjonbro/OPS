@@ -50,10 +50,10 @@ const ui = useUiStore();
       </div>
     </div>
 
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-muted">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-surface relative">
       <slot name="header" />
 
-      <main id="chat-main" class="flex min-h-0 flex-1 flex-col" tabindex="-1">
+      <main id="chat-main" class="flex min-h-0 flex-1 flex-col relative" tabindex="-1">
         <slot />
       </main>
 
