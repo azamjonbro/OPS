@@ -50,29 +50,29 @@ const openPreview = (image: GeneratedImageBlock): void => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
+  <div class="flex flex-col gap-3 my-2">
     <ul
-      class="grid gap-2"
+      class="grid gap-3"
       :class="images.length > 1 ? 'grid-cols-2 sm:grid-cols-3' : 'max-w-sm grid-cols-1'"
     >
       <li v-for="image in images" :key="image.id">
         <button
           v-if="sources.get(image.id)"
           type="button"
-          class="group block w-full overflow-hidden rounded-xl ring-1 ring-border-subtle focus:outline-none focus:ring-2 focus:ring-brand-600"
+          class="group block w-full overflow-hidden rounded-[14px] ring-1 ring-border-subtle shadow-sm transition-all hover:shadow-md hover:ring-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500"
           :aria-label="`Open a larger view of ${image.prompt}`"
           @click="openPreview(image)"
         >
           <img
             :src="sources.get(image.id)"
             :alt="image.revisedPrompt ?? image.prompt"
-            class="aspect-square w-full object-cover transition-opacity group-hover:opacity-90"
+            class="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         </button>
 
         <div
           v-else-if="image.status === 'failed'"
-          class="grid aspect-square place-items-center rounded-xl bg-danger-50 p-3 text-center text-xs text-danger-700 ring-1 ring-danger-600/30"
+          class="grid aspect-square place-items-center rounded-[14px] bg-danger-50 p-4 text-center text-[12px] text-danger-700 ring-1 ring-danger-600/30"
         >
           The image could not be created.
         </div>
