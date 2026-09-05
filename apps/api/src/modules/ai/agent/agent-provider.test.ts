@@ -3,18 +3,15 @@ import { pino } from 'pino';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../../test/database.js';
-import {
-  createTestBranch,
-  createTestCategory,
-  createTestProduct,
-  signInAs,
-} from '../../../test/factories.js';
+import { createTestBranch, signInAs } from '../../../test/factories.js';
 import { createApp } from '../../../app.js';
+import type { BillzCapabilityRunner } from '../../billz/index.js';
 import { MessageModel } from '../../conversations/message.model.js';
 import { MemoryModel } from '../../memory/memory.model.js';
 import * as memoryService from '../../memory/memory.service.js';
-import * as saleService from '../../sales/sale.service.js';
-import { recordMovement } from '../../inventory/inventory.service.js';
+import { createBillzTools } from '../tools/billz.tools.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { MEMORY_TOOLS } from '../tools/memory.tools.js';
 import { OpenAiProvider } from '../provider/openai.provider.js';
 import {
   createProviderHttpDouble,
@@ -79,37 +76,39 @@ describe('the full loop through the real provider', () => {
     expect(result.message.usage).toEqual({ promptTokens: 120, completionTokens: 30 });
   });
 
-  it('runs a sales tool the model asks for and answers from its result', async () => {
-    const { actor, branch } = await signIn();
-    const category = await createTestCategory();
-    const product = await createTestProduct(String(category._id));
+  it('runs a Billz tool the model asks for and answers from its result', async () => {
+    const { actor } = await signIn();
 
-    await recordMovement({
-      actorId: actor.id,
-      productId: String(product._id),
-      branchId: String(branch._id),
-      type: 'purchase',
-      quantity: 10,
-      reference: { kind: 'manual', id: null },
-    });
-    await saleService.createSale(actor, {
-      items: [{ productId: String(product._id), quantity: 3 }],
-      payments: [{ method: 'cash', amount: 3_600_000 }],
-    });
+    // Billz stands in for the till, so the figures come from a scripted runner
+    // rather than from a row this test inserted. That is the whole point of the
+    // change: Hadiya no longer keeps its own copy of what was sold.
+    const asked: Array<{ from: string; to: string }> = [];
+    const runner = {
+      getSalesSummary: async (args: { from: string; to: string }) => {
+        asked.push(args);
+
+        return { netTotal: 3_600_000, saleCount: 1, returnCount: 0, outstandingDebt: 0 };
+      },
+    } as unknown as BillzCapabilityRunner;
+
+    const registry = new ToolRegistry();
+    for (const tool of [...MEMORY_TOOLS, ...createBillzTools(() => runner)]) {
+      registry.register(tool);
+    }
 
     // The user's today, not the server's — which is what the model is told in
     // its instructions and what the sales tool reads a bare date as.
     const today = formatIsoDateInTimeZone(new Date(), actor.timezone);
     const double = useScriptedOpenAi([
-      { body: openAiToolResponse('get_sales_summary', { from: today, to: today }) },
+      { body: openAiToolResponse('billz_get_sales_summary', { from: today, to: today }) },
       { body: openAiTextResponse('Bugun 1 ta sotuv, jami 36 000 so‘m.') },
     ]);
 
-    const result = await sendMessage(actor, { message: "Bugungi savdoni ko'rsat." });
+    const result = await sendMessage(actor, { message: "Bugungi savdoni ko'rsat." }, { registry });
 
     expect(result.message.content).toBe('Bugun 1 ta sotuv, jami 36 000 so‘m.');
+    expect(asked).toEqual([{ from: today, to: today }]);
 
-    // The tool ran for real against the sales service.
     const messages = await MessageModel.find({ conversation: result.conversationId })
       .sort({ createdAt: 1 })
       .lean()
@@ -121,10 +120,16 @@ describe('the full loop through the real provider', () => {
       'assistant',
     ]);
     expect(messages[1]?.toolCalls[0]).toMatchObject({
-      name: 'get_sales_summary',
+      name: 'billz_get_sales_summary',
       status: 'succeeded',
     });
+    // The model reads formatted money, never minor units it would have to divide.
     expect(messages[2]?.content).toContain('1 sale(s)');
+    expect(messages[2]?.content).not.toContain('3600000');
+
+    // The structured payload is stored for the chat to render, and is not what
+    // the model was shown.
+    expect(messages[1]?.toolCalls[0]?.data).toMatchObject({ saleCount: 1 });
 
     // The second request carried the tool result back to the model.
     const secondBody = double.calls[1]?.body as { messages: Array<{ role: string }> };
@@ -186,7 +191,7 @@ describe('the full loop through the real provider', () => {
     // Pending and forgotten memories never reach the model.
     expect(system?.content).not.toContain('unconfirmed_guess');
     expect(system?.content).not.toContain('old_fact');
-    expect(body.tools.map((tool) => tool.function.name)).toContain('get_sales_summary');
+    expect(body.tools.map((tool) => tool.function.name)).toContain('billz_get_sales_summary');
   });
 
   it('keeps another employee’s memory out of the prompt', async () => {

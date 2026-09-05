@@ -26,8 +26,8 @@ const { sections } = useNavigation();
       class="absolute -right-3 top-7 z-50 hidden size-6 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-300 shadow-md transition-all hover:bg-brand-600 hover:text-white lg:flex hover:scale-110 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-slate-900"
       :aria-expanded="!ui.sidebarCollapsed"
       aria-controls="app-sidebar"
-      @click="ui.toggleSidebar()"
       :title="ui.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      @click="ui.toggleSidebar()"
     >
       <svg
         class="size-3.5 transition-transform duration-300"
@@ -70,7 +70,9 @@ const { sections } = useNavigation();
         :title="ui.sidebarCollapsed ? assistantLink.label : undefined"
         @click="emit('navigate')"
       >
-        <div class="rounded-lg bg-brand-500/20 p-1 text-brand-300 transition-colors group-hover:bg-white/20 group-hover:text-white">
+        <div
+          class="rounded-lg bg-brand-500/20 p-1 text-brand-300 transition-colors group-hover:bg-white/20 group-hover:text-white"
+        >
           <svg
             class="size-4.5 shrink-0"
             viewBox="0 0 24 24"
@@ -110,17 +112,21 @@ const { sections } = useNavigation();
             <RouterLink
               v-if="item.to"
               :to="item.to"
-              class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-slate-800 hover:text-white overflow-hidden"
+              class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-slate-800 hover:text-white overflow-hidden [&.router-link-active>div.absolute]:opacity-100 [&.router-link-active>svg]:text-brand-400"
               active-class="bg-brand-600/10 text-brand-400"
               :title="ui.sidebarCollapsed ? item.label : undefined"
               @click="emit('navigate')"
             >
               <!-- Active state indicator -->
-              <div class="absolute left-0 top-1/2 h-1/2 w-1 -translate-y-1/2 rounded-r-full bg-brand-500 opacity-0 transition-opacity" />
-              
+              <div
+                class="absolute left-0 top-1/2 h-1/2 w-1 -translate-y-1/2 rounded-r-full bg-brand-500 opacity-0 transition-opacity"
+              />
+
               <svg
                 class="size-5 shrink-0 text-slate-400 transition-colors group-hover:text-white"
-                :class="{'text-brand-400': false /* Use router active class to style svg via parent */}"
+                :class="{
+                  'text-brand-400': false /* Use router active class to style svg via parent */,
+                }"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -173,7 +179,6 @@ const { sections } = useNavigation();
 </template>
 
 <style scoped>
-/* Optional: Custom scrollbar for the navigation area to look more elegant */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -187,17 +192,8 @@ const { sections } = useNavigation();
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background-color: #475569;
 }
-/* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
-}
-
-/* Add active state styles for the pseudo-element via router-link-exact-active */
-:deep(.router-link-exact-active) div.absolute {
-  opacity: 1 !important;
-}
-:deep(.router-link-exact-active) svg {
-  @apply text-brand-400 !important;
 }
 </style>
