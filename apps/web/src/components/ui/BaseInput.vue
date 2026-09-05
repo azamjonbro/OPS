@@ -1,22 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
 
-/**
- * A labelled text input.
- *
- * The label is part of the component rather than left to each page, because a
- * placeholder is not a label: it disappears on focus and screen readers do not
- * announce it as one. `describedby` wires the hint and the error to the field
- * so both are read out, and `aria-invalid` marks the field itself.
- *
- * The model is always a string, even for `type="number"`. Vue's own `v-model`
- * coerces a number field to a number, which means a caller that trims or
- * pattern-matches the value crashes the moment somebody types a digit — so the
- * value is bound and read manually here, once, rather than every form having to
- * defend against it.
- */
-const model = defineModel<string>({ default: '' });
-
 const props = withDefaults(
   defineProps<{
     label?: string;
@@ -50,12 +34,29 @@ const props = withDefaults(
   },
 );
 
+/**
+ * A labelled text input.
+ *
+ * The label is part of the component rather than left to each page, because a
+ * placeholder is not a label: it disappears on focus and screen readers do not
+ * announce it as one. `describedby` wires the hint and the error to the field
+ * so both are read out, and `aria-invalid` marks the field itself.
+ *
+ * The model is always a string, even for `type="number"`. Vue's own `v-model`
+ * coerces a number field to a number, which means a caller that trims or
+ * pattern-matches the value crashes the moment somebody types a digit — so the
+ * value is bound and read manually here, once, rather than every form having to
+ * defend against it.
+ */
+const model = defineModel<string>({ default: '' });
+
 const id = useId();
 const hintId = `${id}-hint`;
 const errorId = `${id}-error`;
 
-const describedBy = computed(() =>
-  [props.hint ? hintId : '', props.error ? errorId : ''].filter(Boolean).join(' ') || undefined,
+const describedBy = computed(
+  () =>
+    [props.hint ? hintId : '', props.error ? errorId : ''].filter(Boolean).join(' ') || undefined,
 );
 </script>
 
@@ -82,7 +83,9 @@ const describedBy = computed(() =>
       :aria-invalid="error ? 'true' : undefined"
       :aria-describedby="describedBy"
       class="h-10 w-full rounded-lg bg-surface px-3 text-sm text-ink-900 ring-1 ring-inset transition-shadow placeholder:text-ink-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-      :class="error ? 'ring-danger-600 focus:ring-danger-600' : 'ring-border-subtle focus:ring-brand-600'"
+      :class="
+        error ? 'ring-danger-600 focus:ring-danger-600' : 'ring-border-subtle focus:ring-brand-600'
+      "
       @input="model = ($event.target as HTMLInputElement).value"
     />
 

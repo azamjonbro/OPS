@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { formatMoney, PAYMENT_METHODS, type Customer, type PaymentMethod, type Sale } from '@hadiya/shared';
+import {
+  formatMoney,
+  PAYMENT_METHODS,
+  type Customer,
+  type PaymentMethod,
+  type Sale,
+} from '@hadiya/shared';
 import { computed, ref } from 'vue';
 
 import ProductSearchPanel from '@/components/pos/ProductSearchPanel.vue';
@@ -185,7 +191,9 @@ const startNextSale = (): void => {
             class="flex items-center justify-between gap-3 py-2 text-sm"
           >
             <span class="min-w-0 truncate text-ink-700">{{ line.name }} ×{{ line.quantity }}</span>
-            <span class="shrink-0 tabular-nums text-ink-900">{{ formatMoney(line.lineTotal) }}</span>
+            <span class="shrink-0 tabular-nums text-ink-900">{{
+              formatMoney(line.lineTotal)
+            }}</span>
           </li>
         </ul>
 
@@ -210,7 +218,9 @@ const startNextSale = (): void => {
         class="flex min-h-0 flex-col rounded-xl bg-surface ring-1 ring-border-subtle"
         aria-label="Current sale"
       >
-        <header class="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
+        <header
+          class="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3"
+        >
           <h2 class="text-sm font-semibold text-ink-900">
             Current sale
             <span v-if="!cart.isEmpty.value" class="font-normal text-ink-500">
@@ -324,7 +334,9 @@ const startNextSale = (): void => {
             </div>
             <div v-if="cart.discountTotal.value > 0" class="flex justify-between">
               <dt class="text-ink-500">Discount</dt>
-              <dd class="tabular-nums text-ink-700">−{{ formatMoney(cart.discountTotal.value) }}</dd>
+              <dd class="tabular-nums text-ink-700">
+                −{{ formatMoney(cart.discountTotal.value) }}
+              </dd>
             </div>
             <div class="flex justify-between border-t border-border-subtle pt-1.5">
               <dt class="font-semibold text-ink-900">Total</dt>
@@ -404,7 +416,11 @@ const startNextSale = (): void => {
           @update:model-value="searchCustomers"
         />
 
-        <BaseButton variant="secondary" size="sm" @click="((customer = null), (isCustomerOpen = false))">
+        <BaseButton
+          variant="secondary"
+          size="sm"
+          @click="((customer = null), (isCustomerOpen = false))"
+        >
           Walk-in (no customer)
         </BaseButton>
 

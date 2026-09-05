@@ -16,7 +16,7 @@ import { useImagesStore } from '@/stores/images';
  */
 const props = defineProps<{ images: GeneratedImageBlock[] }>();
 
-const images = useImagesStore();
+const gallery = useImagesStore();
 const sources = ref(new Map<string, string>());
 const preview = ref<GeneratedImageBlock | null>(null);
 const isPreviewOpen = ref(false);
@@ -27,7 +27,7 @@ const load = async (): Promise<void> => {
       continue;
     }
 
-    const url = await images.objectUrlFor(image.id);
+    const url = await gallery.objectUrlFor(image.id);
 
     if (url) {
       sources.value = new Map(sources.value).set(image.id, url);

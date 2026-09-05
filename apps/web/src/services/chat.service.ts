@@ -1,95 +1,65 @@
-import type {
-  ChatResponse,
-  Conversation,
-  ConversationStatus,
-  Memory,
-  Message,
-  PaginatedResult,
-} from '@hadiya/shared';
+import type { ChatRequest, ChatResponse } from '@hadiya/shared';
 
 import { api, type RequestOptions } from './http';
 
 /**
- * The assistant's endpoints, exactly as the API defines them.
+ * The assistant's endpoint. There is one, and this is it.
  *
- * There is one chat endpoint and this is it. Everything the assistant can do —
- * reading Billz, writing content, drawing an image, setting a reminder — happens
- * because the *backend* chose a tool, so the client sends a sentence and a
- * conversation id and nothing more. No capability here is addressed directly,
- * which is what keeps the assistant one thing rather than a menu of features
- * wearing a chat interface.
+ * Everything Hadiya can do — reading the shop's figures, searching Notion,
+ * writing a content plan, drawing an image, setting a reminder — happens
+ * because the *backend* chose a tool for the sentence it was given. So the
+ * client sends text and a conversation id and nothing else: no tool name, no
+ * intent, no routing. That is what keeps the assistant one thing rather than a
+ * menu of features wearing a chat interface, and it is why there is no second
+ * endpoint here to be tempted by.
  */
-export interface ListConversationsParams {
-  page?: number;
-  pageSize?: number;
-  status?: ConversationStatus;
-  search?: string;
+export interface AssistantTool {
+  name: string;
+  description: string;
+  mutates: boolean;
+  requiresConfirmation: boolean;
 }
-
-export interface ListMessagesParams {
-  page?: number;
-  pageSize?: number;
-}
-
-export const chatService = {
-  /**
-   * Sends a turn. Omit the id and the API opens a conversation, titled from
-   * this first message — which is why the response carries the id back.
-   */
-  send: (message: string, conversationId?: string, options: RequestOptions = {}) =>
-    api.post<ChatResponse>(
-      '/v1/ai/chat',
-      { message, ...(conversationId ? { conversationId } : {}) },
-      options,
-    ),
-
-  status: (options: RequestOptions = {}) =>
-    api.get<AssistantStatus>('/v1/ai/status', options),
-};
 
 export interface AssistantStatus {
   provider: string;
   available: boolean;
   model: string | null;
+  /** Why it cannot answer, when it cannot. Never a credential or a stack. */
   reason: string | null;
-  tools: Array<{
-    name: string;
-    description: string;
-    mutates: boolean;
-    requiresConfirmation: boolean;
-  }>;
+  tools: AssistantTool[];
 }
 
-export const conversationService = {
-  list: (params: ListConversationsParams = {}, options: RequestOptions = {}) =>
-    api.get<PaginatedResult<Conversation>>('/v1/conversations', { ...options, params }),
-
-  get: (id: string, options: RequestOptions = {}) =>
-    api.get<Conversation>(`/v1/conversations/${id}`, options),
-
-  create: (title?: string) =>
-    api.post<Conversation>('/v1/conversations', title ? { title } : {}),
-
-  messages: (id: string, params: ListMessagesParams = {}, options: RequestOptions = {}) =>
-    api.get<PaginatedResult<Message>>(`/v1/conversations/${id}/messages`, { ...options, params }),
-
-  rename: (id: string, title: string) =>
-    api.patch<Conversation>(`/v1/conversations/${id}`, { title }),
-
-  setStatus: (id: string, status: ConversationStatus) =>
-    api.patch<Conversation>(`/v1/conversations/${id}`, { status }),
-
-  remove: (id: string) => api.delete<void>(`/v1/conversations/${id}`),
-};
-
 /**
- * Memory the assistant proposed but has not been allowed to keep.
+ * How long one turn may take.
  *
- * Surfaced by the chat response as `pendingMemories`; confirming or forgetting
- * goes through the memory module's own endpoints rather than through the chat,
- * so the decision is recorded as the person's rather than the model's.
+ * The default 30 seconds is right for a list or a form and far too short here:
+ * a turn can involve several model calls, and a content plan or a generated
+ * image runs for a minute or more server-side. Timing out at 30s would report
+ * a failure for work that is still running and will still be saved — the person
+ * would then retry and get two plans. This is a ceiling, not an expectation:
+ * it exists so a genuinely stuck request eventually fails rather than hanging.
  */
-export const memoryService = {
-  confirm: (id: string) => api.post<Memory>(`/v1/memory/${id}/confirm`),
-  forget: (id: string) => api.delete<{ forgotten: number }>(`/v1/memory/${id}`),
+const CHAT_TIMEOUT_MS = 180_000;
+
+export const chatService = {
+  /**
+   * Sends one turn.
+   *
+   * Omitting the id opens a conversation, titled server-side from this first
+   * message — which is why the response carries the id back rather than the
+   * client inventing one.
+   */
+  send: (
+    message: string,
+    conversationId?: string,
+    options: RequestOptions = {},
+  ): Promise<ChatResponse> =>
+    api.post<ChatResponse>(
+      '/v1/ai/chat',
+      { message, ...(conversationId ? { conversationId } : {}) } satisfies ChatRequest,
+      { timeout: CHAT_TIMEOUT_MS, ...options },
+    ),
+
+  status: (options: RequestOptions = {}): Promise<AssistantStatus> =>
+    api.get<AssistantStatus>('/v1/ai/status', options),
 };

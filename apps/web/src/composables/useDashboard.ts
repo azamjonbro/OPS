@@ -77,7 +77,11 @@ export const useDashboard = (branchId?: () => string | undefined) => {
 
     const now = new Date();
     const scope = branchId?.();
-    const range = { from: startOfDay(now), to: endOfDay(now), ...(scope ? { branchId: scope } : {}) };
+    const range = {
+      from: startOfDay(now),
+      to: endOfDay(now),
+      ...(scope ? { branchId: scope } : {}),
+    };
 
     try {
       const [sales, expenses, lowStock] = await Promise.all([
@@ -104,7 +108,8 @@ export const useDashboard = (branchId?: () => string | undefined) => {
               0,
             ),
           expenses: 0,
-          itemsSold: running.itemsSold + sale.items.reduce((count, line) => count + line.quantity, 0),
+          itemsSold:
+            running.itemsSold + sale.items.reduce((count, line) => count + line.quantity, 0),
         }),
         {
           saleCount: 0,

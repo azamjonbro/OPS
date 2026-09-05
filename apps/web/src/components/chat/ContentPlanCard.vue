@@ -28,7 +28,9 @@ const toggle = (day: number): void => {
 
 <template>
   <article class="overflow-hidden rounded-xl bg-surface ring-1 ring-border-subtle">
-    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-3">
+    <header
+      class="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-3"
+    >
       <div class="min-w-0">
         <h3 class="truncate text-sm font-semibold text-ink-900">{{ plan.title }}</h3>
         <p class="text-xs text-ink-500">

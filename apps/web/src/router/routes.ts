@@ -127,18 +127,36 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Notifications', requiresAuth: true },
       },
       {
-        path: 'assistant',
-        name: 'assistant',
-        component: () => import('@/pages/AssistantPage.vue'),
-        meta: { title: 'Assistant', requiresAuth: true },
-      },
-      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/pages/SettingsPage.vue'),
         meta: { title: 'Settings', requiresAuth: true },
       },
     ],
+  },
+  /**
+   * The assistant sits outside `AppLayout`.
+   *
+   * Not an oversight: a conversation needs the whole viewport, with only the
+   * transcript scrolling and the composer pinned to the bottom. `AppLayout`'s
+   * main area scrolls the page instead, and nesting the two gives the double
+   * scrollbar every chat-in-a-dashboard has. `ChatLayout` provides its own
+   * sidebar and top bar, so nothing from the shell is lost.
+   *
+   * Both routes render the same page: `/assistant` is a thread that has not
+   * been created yet, and the id appears once the first turn has been sent.
+   */
+  {
+    path: '/assistant',
+    name: 'assistant',
+    component: () => import('@/pages/AssistantPage.vue'),
+    meta: { title: 'Assistant', requiresAuth: true },
+  },
+  {
+    path: '/assistant/:id',
+    name: 'assistant-conversation',
+    component: () => import('@/pages/AssistantPage.vue'),
+    meta: { title: 'Assistant', requiresAuth: true },
   },
   {
     path: '/auth',

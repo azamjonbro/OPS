@@ -7,9 +7,6 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-/** A labelled native select — keyboard and screen-reader behaviour for free. */
-const model = defineModel<string>({ default: '' });
-
 const props = withDefaults(
   defineProps<{
     label?: string;
@@ -30,12 +27,16 @@ const props = withDefaults(
   },
 );
 
+/** A labelled native select — keyboard and screen-reader behaviour for free. */
+const model = defineModel<string>({ default: '' });
+
 const id = useId();
 const hintId = `${id}-hint`;
 const errorId = `${id}-error`;
 
-const describedBy = computed(() =>
-  [props.hint ? hintId : '', props.error ? errorId : ''].filter(Boolean).join(' ') || undefined,
+const describedBy = computed(
+  () =>
+    [props.hint ? hintId : '', props.error ? errorId : ''].filter(Boolean).join(' ') || undefined,
 );
 </script>
 
@@ -54,7 +55,9 @@ const describedBy = computed(() =>
       :aria-invalid="error ? 'true' : undefined"
       :aria-describedby="describedBy"
       class="h-10 w-full rounded-lg bg-surface px-3 text-sm text-ink-900 ring-1 ring-inset focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60"
-      :class="error ? 'ring-danger-600 focus:ring-danger-600' : 'ring-border-subtle focus:ring-brand-600'"
+      :class="
+        error ? 'ring-danger-600 focus:ring-danger-600' : 'ring-border-subtle focus:ring-brand-600'
+      "
     >
       <option v-if="placeholder" value="">{{ placeholder }}</option>
       <option

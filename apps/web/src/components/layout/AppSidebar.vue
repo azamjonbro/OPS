@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router';
 import { useNavigation } from '@/composables/useNavigation';
 import { useUiStore } from '@/stores/ui';
 
+const emit = defineEmits<{ navigate: [] }>();
 /**
  * The main navigation.
  *
@@ -15,8 +16,6 @@ import { useUiStore } from '@/stores/ui';
  */
 const ui = useUiStore();
 const { sections } = useNavigation();
-
-const emit = defineEmits<{ navigate: [] }>();
 </script>
 
 <template>

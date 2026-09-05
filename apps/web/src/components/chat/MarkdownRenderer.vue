@@ -20,6 +20,14 @@ const html = computed(() => renderMarkdown(props.text));
 </script>
 
 <template>
+  <!--
+    The usual objection to `v-html` does not apply here: `renderMarkdown`
+    HTML-escapes every character before it adds a single tag, so this string
+    contains only markup the renderer itself produced. `markdown.test.ts` holds
+    that down — script tags, event handlers and `javascript:` links all come out
+    as text.
+  -->
+  <!-- eslint-disable-next-line vue/no-v-html -->
   <div class="markdown-body text-sm leading-relaxed text-ink-900" v-html="html" />
 </template>
 

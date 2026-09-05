@@ -10,6 +10,10 @@ import { useToast } from '@/composables/useToast';
 import { toErrorMessage } from '@/services/api-error';
 import { productService } from '@/services/catalogue.service';
 
+const props = defineProps<{ product: Product | null; categories: Category[] }>();
+
+const emit = defineEmits<{ saved: [product: Product] }>();
+
 /**
  * Creating and editing a product.
  *
@@ -22,10 +26,6 @@ import { productService } from '@/services/catalogue.service';
  * nothing downstream can accumulate a rounding error.
  */
 const open = defineModel<boolean>('open', { required: true });
-
-const props = defineProps<{ product: Product | null; categories: Category[] }>();
-
-const emit = defineEmits<{ saved: [product: Product] }>();
 
 const toast = useToast();
 const isSubmitting = ref(false);
@@ -147,7 +147,13 @@ const submit = async (): Promise<void> => {
   >
     <form class="grid gap-4 sm:grid-cols-2" novalidate @submit.prevent="submit">
       <div class="sm:col-span-2">
-        <BaseInput v-model="form.name" label="Name" required :error="errors.name" :maxlength="200" />
+        <BaseInput
+          v-model="form.name"
+          label="Name"
+          required
+          :error="errors.name"
+          :maxlength="200"
+        />
       </div>
 
       <BaseInput
@@ -208,7 +214,12 @@ const submit = async (): Promise<void> => {
       </label>
 
       <div class="sm:col-span-2">
-        <BaseInput v-model="form.description" label="Description" placeholder="Optional" :maxlength="2000" />
+        <BaseInput
+          v-model="form.description"
+          label="Description"
+          placeholder="Optional"
+          :maxlength="2000"
+        />
       </div>
 
       <p v-if="formError" class="text-sm text-danger-600 sm:col-span-2" role="alert">

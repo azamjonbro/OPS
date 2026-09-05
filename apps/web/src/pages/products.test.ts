@@ -55,10 +55,7 @@ const clickInDialog = async (text: string): Promise<void> => {
  * the teleport keeps them inside the component tree even though the DOM node
  * sits on `document.body`.
  */
-const clickByText = async (
-  wrapper: ReturnType<typeof mountPage>,
-  text: string,
-): Promise<void> => {
+const clickByText = async (wrapper: ReturnType<typeof mountPage>, text: string): Promise<void> => {
   const button = wrapper.findAll('button').find((candidate) => candidate.text().trim() === text);
 
   if (!button) {
@@ -177,14 +174,12 @@ describe('product search', () => {
 
 describe('pagination', () => {
   it('asks for the next page when Next is pressed', async () => {
-    const list = vi
-      .spyOn(productService, 'list')
-      .mockResolvedValue(
-        paginated(
-          Array.from({ length: 20 }, (_, index) => makeProduct({ name: `Product ${index}` })),
-          { total: 60, pageSize: 20, page: 1 },
-        ),
-      );
+    const list = vi.spyOn(productService, 'list').mockResolvedValue(
+      paginated(
+        Array.from({ length: 20 }, (_, index) => makeProduct({ name: `Product ${index}` })),
+        { total: 60, pageSize: 20, page: 1 },
+      ),
+    );
 
     const wrapper = mountPage();
     await flushPromises();

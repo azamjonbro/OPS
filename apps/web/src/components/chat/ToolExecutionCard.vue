@@ -26,7 +26,8 @@ const ICONS: Record<string, string> = {
   content: 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5',
   image: 'M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6',
   reminder: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-  memory: 'M12 3a9 9 0 0 0-9 9v5a3 3 0 0 0 3 3h1v-6H5v-2a7 7 0 1 1 14 0v2h-2v6h1a3 3 0 0 0 3-3v-5a9 9 0 0 0-9-9Z',
+  memory:
+    'M12 3a9 9 0 0 0-9 9v5a3 3 0 0 0 3 3h1v-6H5v-2a7 7 0 1 1 14 0v2h-2v6h1a3 3 0 0 0 3-3v-5a9 9 0 0 0-9-9Z',
   other: 'M12 6v6l4 2M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20Z',
 };
 </script>

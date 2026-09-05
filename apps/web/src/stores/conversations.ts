@@ -2,8 +2,9 @@ import type { Conversation } from '@hadiya/shared';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
-import { toErrorMessage } from '@/services/api-error';
-import { conversationService } from '@/services/chat.service';
+import { toChatError } from '@/chat/chat-errors';
+import { isCancelled } from '@/services/api-error';
+import { conversationService } from '@/services/conversation.service';
 
 const PAGE_SIZE = 25;
 
@@ -106,11 +107,13 @@ export const useConversationsStore = defineStore('conversations', () => {
       total.value = result.pagination.total;
       error.value = null;
     } catch (caught) {
-      if ((caught as { code?: string }).code === 'CANCELLED') {
+      if (isCancelled(caught)) {
         return;
       }
 
-      error.value = toErrorMessage(caught);
+      // The same translation the transcript uses: "A bearer token is required"
+      // is the server talking to its own logs, not to a shopkeeper.
+      error.value = toChatError(caught).message;
 
       if (nextPage === 1) {
         conversations.value = [];
@@ -153,12 +156,12 @@ export const useConversationsStore = defineStore('conversations', () => {
     conversations.value = [conversation, ...rest];
   };
 
-  const rename = async (id: string, title: string): Promise<void> => {
+  const rename = async (id: string, title: string): Promise<Conversation> => {
     const updated = await conversationService.rename(id, title);
 
-    conversations.value = conversations.value.map((entry) =>
-      entry.id === id ? updated : entry,
-    );
+    conversations.value = conversations.value.map((entry) => (entry.id === id ? updated : entry));
+
+    return updated;
   };
 
   /**

@@ -1,14 +1,20 @@
-import type {
-  ChatResponse,
-  Conversation,
-  ConversationStatus,
-  Memory,
-  Message,
-  PaginatedResult,
-} from '@hadiya/shared';
+import type { Conversation, ConversationStatus, Message, PaginatedResult } from '@hadiya/shared';
 
-import { api } from './http';
+import { api, type RequestOptions } from './http';
 
+/**
+ * The conversation endpoints, exactly as the API defines them.
+ *
+ * Everything here is already scoped to the signed-in employee by the API, so
+ * the client never sends a user id and cannot ask for another person's threads.
+ * A conversation id typed into the URL is not a permission: the server answers
+ * "not found" for a thread that is not yours, and this module does nothing to
+ * soften that.
+ *
+ * Every read takes a `signal`, because the two that matter — the sidebar list
+ * and a transcript page — are both routinely abandoned mid-flight when somebody
+ * types in the search box or opens a different thread.
+ */
 export interface ListConversationsParams {
   page?: number;
   pageSize?: number;
@@ -21,23 +27,25 @@ export interface ListMessagesParams {
   pageSize?: number;
 }
 
-/**
- * The conversation and memory endpoints, in one place.
- *
- * Everything here is already scoped to the signed-in employee by the API, so
- * the client never sends a user id and cannot ask for someone else's threads.
- */
 export const conversationService = {
-  list: (params: ListConversationsParams = {}): Promise<PaginatedResult<Conversation>> =>
-    api.get<PaginatedResult<Conversation>>('/v1/conversations', { params }),
+  list: (
+    params: ListConversationsParams = {},
+    options: RequestOptions = {},
+  ): Promise<PaginatedResult<Conversation>> =>
+    api.get<PaginatedResult<Conversation>>('/v1/conversations', { ...options, params }),
 
-  get: (id: string): Promise<Conversation> => api.get<Conversation>(`/v1/conversations/${id}`),
+  get: (id: string, options: RequestOptions = {}): Promise<Conversation> =>
+    api.get<Conversation>(`/v1/conversations/${id}`, options),
 
   create: (title?: string): Promise<Conversation> =>
     api.post<Conversation>('/v1/conversations', title ? { title } : {}),
 
-  messages: (id: string, params: ListMessagesParams = {}): Promise<PaginatedResult<Message>> =>
-    api.get<PaginatedResult<Message>>(`/v1/conversations/${id}/messages`, { params }),
+  messages: (
+    id: string,
+    params: ListMessagesParams = {},
+    options: RequestOptions = {},
+  ): Promise<PaginatedResult<Message>> =>
+    api.get<PaginatedResult<Message>>(`/v1/conversations/${id}/messages`, { ...options, params }),
 
   rename: (id: string, title: string): Promise<Conversation> =>
     api.patch<Conversation>(`/v1/conversations/${id}`, { title }),
@@ -46,18 +54,4 @@ export const conversationService = {
     api.patch<Conversation>(`/v1/conversations/${id}`, { status }),
 
   remove: (id: string): Promise<void> => api.delete<void>(`/v1/conversations/${id}`),
-
-  /** Sends a turn to the assistant; omit the id to open a new conversation. */
-  chat: (message: string, conversationId?: string): Promise<ChatResponse> =>
-    api.post<ChatResponse>('/v1/ai/chat', {
-      message,
-      ...(conversationId ? { conversationId } : {}),
-    }),
-};
-
-export const memoryService = {
-  list: (): Promise<PaginatedResult<Memory>> => api.get<PaginatedResult<Memory>>('/v1/memory'),
-  confirm: (id: string): Promise<Memory> => api.post<Memory>(`/v1/memory/${id}/confirm`),
-  forget: (id: string): Promise<{ forgotten: number }> =>
-    api.delete<{ forgotten: number }>(`/v1/memory/${id}`),
 };

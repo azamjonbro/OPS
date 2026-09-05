@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 
+const props = withDefaults(
+  defineProps<{ title: string; description?: string; size?: 'sm' | 'md' | 'lg' }>(),
+  { description: undefined, size: 'md' },
+);
+
+const emit = defineEmits<{ close: [] }>();
+
 /**
  * A modal dialog.
  *
@@ -14,13 +21,6 @@ import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
  * underneath from moving on a phone.
  */
 const open = defineModel<boolean>('open', { required: true });
-
-const props = withDefaults(
-  defineProps<{ title: string; description?: string; size?: 'sm' | 'md' | 'lg' }>(),
-  { description: undefined, size: 'md' },
-);
-
-const emit = defineEmits<{ close: [] }>();
 
 const id = useId();
 const panel = ref<HTMLElement | null>(null);
@@ -114,7 +114,9 @@ onBeforeUnmount(() => {
         class="relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-surface shadow-xl ring-1 ring-border-subtle sm:rounded-2xl"
         :class="SIZES[props.size]"
       >
-        <header class="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4">
+        <header
+          class="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4"
+        >
           <div>
             <h2 :id="`${id}-title`" class="text-base font-semibold text-ink-900">{{ title }}</h2>
             <p v-if="description" :id="`${id}-description`" class="mt-0.5 text-sm text-ink-500">

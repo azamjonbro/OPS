@@ -60,9 +60,7 @@ const movements = usePaginatedResource<InventoryMovement>(
     inventoryService.movements(
       {
         ...params,
-        ...(movementType.value
-          ? { type: movementType.value as InventoryMovement['type'] }
-          : {}),
+        ...(movementType.value ? { type: movementType.value as InventoryMovement['type'] } : {}),
         ...(branches.scopeBranchId ? { branchId: branches.scopeBranchId } : {}),
       },
       { signal },
@@ -261,7 +259,9 @@ onMounted(async () => {
           v-model="form.productId"
           label="Product"
           required
-          :options="[...products.values()].map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))"
+          :options="
+            [...products.values()].map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))
+          "
           placeholder="Choose a product"
         />
         <BaseSelect
@@ -281,9 +281,7 @@ onMounted(async () => {
           step="0.001"
           required
           :hint="
-            form.type === 'adjustment'
-              ? 'Signed: negative reduces stock'
-              : 'How many units to add'
+            form.type === 'adjustment' ? 'Signed: negative reduces stock' : 'How many units to add'
           "
         />
         <BaseInput v-model="form.note" label="Note" placeholder="Optional" :maxlength="500" />

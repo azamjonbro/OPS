@@ -2,16 +2,6 @@
 import BaseButton from './BaseButton.vue';
 import BaseModal from './BaseModal.vue';
 
-/**
- * The one confirmation in the application.
- *
- * Destructive actions get a dialog rather than an inline "are you sure?",
- * because a mis-click on a list row should not be able to delete the thing
- * under the cursor. The confirm button is disabled while the action runs, so a
- * slow delete cannot be submitted twice.
- */
-const open = defineModel<boolean>('open', { required: true });
-
 withDefaults(
   defineProps<{
     title: string;
@@ -30,6 +20,16 @@ withDefaults(
 );
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
+
+/**
+ * The one confirmation in the application.
+ *
+ * Destructive actions get a dialog rather than an inline "are you sure?",
+ * because a mis-click on a list row should not be able to delete the thing
+ * under the cursor. The confirm button is disabled while the action runs, so a
+ * slow delete cannot be submitted twice.
+ */
+const open = defineModel<boolean>('open', { required: true });
 </script>
 
 <template>

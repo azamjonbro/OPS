@@ -6,14 +6,14 @@ export interface TabItem {
   badge?: number | string;
 }
 
+const props = defineProps<{ tabs: TabItem[]; label?: string }>();
+
 /**
  * A tab strip following the ARIA pattern: arrow keys move between tabs, and the
  * selected tab is the only one in the tab order, so Tab moves *out* of the strip
  * rather than through every tab in it.
  */
 const model = defineModel<string>({ required: true });
-
-const props = defineProps<{ tabs: TabItem[]; label?: string }>();
 
 const onKeydown = (event: KeyboardEvent, index: number): void => {
   const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;

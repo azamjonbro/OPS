@@ -17,7 +17,10 @@ import { useUiStore } from '@/stores/ui';
 const ui = useUiStore();
 const route = useRoute();
 
-watch(() => route.fullPath, () => ui.toggleMobileSidebar(false));
+watch(
+  () => route.fullPath,
+  () => ui.toggleMobileSidebar(false),
+);
 </script>
 
 <template>

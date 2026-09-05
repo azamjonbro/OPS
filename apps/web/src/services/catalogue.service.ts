@@ -1,9 +1,4 @@
-import type {
-  Category,
-  PaginatedResult,
-  Product,
-  ProductUnit,
-} from '@hadiya/shared';
+import type { Category, PaginatedResult, Product, ProductUnit } from '@hadiya/shared';
 
 import { api, type RequestOptions } from './http';
 
