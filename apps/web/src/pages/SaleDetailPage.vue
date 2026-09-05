@@ -175,7 +175,9 @@ watch(() => route.params.id, load);
         <BaseButton variant="ghost" :disabled="isCancelling" @click="isCancelOpen = false">
           Keep sale
         </BaseButton>
-        <BaseButton variant="danger" :loading="isCancelling" @click="cancel">Cancel sale</BaseButton>
+        <BaseButton variant="danger" :loading="isCancelling" @click="cancel"
+          >Cancel sale</BaseButton
+        >
       </template>
     </BaseModal>
   </div>

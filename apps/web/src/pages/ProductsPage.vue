@@ -176,7 +176,9 @@ onMounted(async () => {
 
       <template #cell-sku="{ row }">
         <span class="font-mono text-xs text-ink-700">{{ row.sku }}</span>
-        <span v-if="row.barcode" class="block font-mono text-xs text-ink-400">{{ row.barcode }}</span>
+        <span v-if="row.barcode" class="block font-mono text-xs text-ink-400">{{
+          row.barcode
+        }}</span>
       </template>
 
       <template #cell-price="{ row }">
@@ -193,12 +195,7 @@ onMounted(async () => {
       <template #cell-actions="{ row }">
         <div v-if="canManageCatalogue" class="flex justify-end gap-1">
           <BaseButton variant="ghost" size="sm" @click="openEdit(row)">Edit</BaseButton>
-          <BaseButton
-            v-if="row.isActive"
-            variant="ghost"
-            size="sm"
-            @click="deactivating = row"
-          >
+          <BaseButton v-if="row.isActive" variant="ghost" size="sm" @click="deactivating = row">
             Deactivate
           </BaseButton>
           <BaseButton v-else variant="ghost" size="sm" @click="reactivate(row)">Restore</BaseButton>

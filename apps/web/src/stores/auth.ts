@@ -35,9 +35,19 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = result.user;
   };
 
+  /**
+   * Signing out is a client-side discard: the tokens are stateless, so dropping
+   * them *is* the sign-out and the server call is a courtesy.
+   *
+   * Its failure is swallowed rather than rethrown. A caller that navigated only
+   * on success would strand somebody offline on a page whose session had
+   * already been cleared — signed out, but still looking at the application.
+   */
   const logout = async (): Promise<void> => {
     try {
       await authService.logout();
+    } catch {
+      // Nothing to recover: the session is discarded either way.
     } finally {
       clearSession();
     }

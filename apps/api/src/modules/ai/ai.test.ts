@@ -252,9 +252,13 @@ describe('tool registry', () => {
       'generate_caption',
       'generate_content_ideas',
       'generate_image',
-      'get_sales_summary',
-      'get_products',
+      // Then every Billz capability, generated from that module's own registry
+      // rather than listed again here — which is why this asserts the prefix
+      // and not a copy of the list that would rot the moment one is added.
+      ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('billz_')),
     ]);
+    expect(definitions.map((tool) => tool.name)).toContain('billz_get_sales_summary');
+    expect(definitions.map((tool) => tool.name)).toContain('billz_search_products');
     expect(definitions[0]?.parameters).toMatchObject({ type: 'object' });
   });
 });
@@ -508,8 +512,8 @@ describe('POST /api/v1/ai/chat', () => {
         'create_content_plan',
         'generate_caption',
         'generate_image',
-        'get_sales_summary',
-        'get_products',
+        'billz_get_sales_summary',
+        'billz_search_products',
       ]),
     );
 
@@ -523,10 +527,18 @@ describe('POST /api/v1/ai/chat', () => {
         'list_content_plans',
         'generate_caption',
         'generate_content_ideas',
-        'get_sales_summary',
-        'get_products',
+        'billz_get_sales_summary',
+        'billz_get_products',
       ]),
     );
+
+    // Every Billz tool is a read. The write endpoints of that API have no
+    // capability at all, so no prompt can reach them.
+    expect(
+      response.body.data.tools
+        .filter((tool: { name: string }) => tool.name.startsWith('billz_'))
+        .every((tool: { mutates: boolean }) => !tool.mutates),
+    ).toBe(true);
 
     // Only what cannot be undone asks first.
     expect(

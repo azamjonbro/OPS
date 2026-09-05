@@ -80,9 +80,7 @@ export const useCart = () => {
 
   const grandTotal = computed(() => Math.max(0, subtotal.value - discountTotal.value));
 
-  const itemCount = computed(() =>
-    lines.value.reduce((count, line) => count + line.quantity, 0),
-  );
+  const itemCount = computed(() => lines.value.reduce((count, line) => count + line.quantity, 0));
 
   const isEmpty = computed(() => lines.value.length === 0);
 

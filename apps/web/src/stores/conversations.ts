@@ -1,174 +1,243 @@
-import type { Conversation, ConversationStatus, Message } from '@hadiya/shared';
+import type { Conversation } from '@hadiya/shared';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
-import { toErrorMessage } from '@/services/api-error';
+import { toChatError } from '@/chat/chat-errors';
+import { isCancelled } from '@/services/api-error';
 import { conversationService } from '@/services/conversation.service';
 
+const PAGE_SIZE = 25;
+
+export type ConversationGroup = 'Today' | 'Yesterday' | 'Previous 7 days' | 'Older';
+
+const GROUP_ORDER: ConversationGroup[] = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
+
+/** Which bucket a thread belongs to, by when it was last used. */
+export const groupFor = (conversation: Conversation, now = new Date()): ConversationGroup => {
+  const stamp = conversation.lastMessageAt ?? conversation.createdAt;
+  const when = new Date(stamp);
+
+  if (Number.isNaN(when.getTime())) {
+    return 'Older';
+  }
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  if (when >= startOfToday) {
+    return 'Today';
+  }
+
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  if (when >= startOfYesterday) {
+    return 'Yesterday';
+  }
+
+  const sevenDaysAgo = new Date(startOfToday);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  return when >= sevenDaysAgo ? 'Previous 7 days' : 'Older';
+};
+
 /**
- * Chat state for the UI.
+ * The conversation list in the sidebar.
  *
- * It holds the thread list, the open thread and its messages, and the two flags
- * every screen needs: whether something is in flight and what went wrong. The
- * final chat interface is a later phase; this is the state it will bind to.
+ * Only the list lives here, and deliberately: it is the one piece of chat state
+ * two places need at once — the sidebar renders it and the chat view renames
+ * and deletes into it. The open thread's *messages* are not here, because
+ * nothing outside the transcript reads them and holding them globally would
+ * mean every navigation re-rendered a thousand bubbles.
  *
- * Sending is tracked separately from loading, because typing a new message must
- * not blank the transcript that is already on screen.
+ * Pages are appended rather than replaced, so the sidebar grows as the person
+ * scrolls instead of loading a year of history to show today's.
  */
 export const useConversationsStore = defineStore('conversations', () => {
   const conversations = ref<Conversation[]>([]);
-  const activeConversationId = ref<string | null>(null);
-  const messages = ref<Message[]>([]);
+  const page = ref(1);
+  const totalPages = ref(1);
+  const total = ref(0);
+  const search = ref('');
 
-  const isLoadingConversations = ref(false);
-  const isLoadingMessages = ref(false);
-  const isSending = ref(false);
+  const isLoading = ref(false);
+  const isLoadingMore = ref(false);
   const error = ref<string | null>(null);
 
-  const activeConversation = computed(
-    () => conversations.value.find((entry) => entry.id === activeConversationId.value) ?? null,
-  );
+  let controller: AbortController | null = null;
 
-  const hasConversations = computed(() => conversations.value.length > 0);
+  const hasMore = computed(() => page.value < totalPages.value);
+  const isEmpty = computed(() => conversations.value.length === 0);
 
-  const run = async <TResult>(
-    flag: { value: boolean },
-    action: () => Promise<TResult>,
-  ): Promise<TResult | null> => {
-    flag.value = true;
-    error.value = null;
+  /** The list as the sidebar renders it: date buckets, newest first. */
+  const grouped = computed(() => {
+    const buckets = new Map<ConversationGroup, Conversation[]>();
+
+    for (const conversation of conversations.value) {
+      const key = groupFor(conversation);
+      buckets.set(key, [...(buckets.get(key) ?? []), conversation]);
+    }
+
+    return GROUP_ORDER.flatMap((title) => {
+      const items = buckets.get(title);
+
+      return items && items.length > 0 ? [{ title, items }] : [];
+    });
+  });
+
+  const fetchPage = async (nextPage: number): Promise<void> => {
+    controller?.abort();
+    controller = new AbortController();
 
     try {
-      return await action();
+      const result = await conversationService.list(
+        {
+          page: nextPage,
+          pageSize: PAGE_SIZE,
+          status: 'active',
+          ...(search.value.trim() ? { search: search.value.trim() } : {}),
+        },
+        { signal: controller.signal },
+      );
+
+      conversations.value =
+        nextPage === 1 ? result.items : [...conversations.value, ...result.items];
+      page.value = result.pagination.page;
+      totalPages.value = result.pagination.totalPages;
+      total.value = result.pagination.total;
+      error.value = null;
     } catch (caught) {
-      error.value = toErrorMessage(caught);
+      if (isCancelled(caught)) {
+        return;
+      }
 
-      return null;
+      // The same translation the transcript uses: "A bearer token is required"
+      // is the server talking to its own logs, not to a shopkeeper.
+      error.value = toChatError(caught).message;
+
+      if (nextPage === 1) {
+        conversations.value = [];
+      }
+    }
+  };
+
+  const load = async (): Promise<void> => {
+    isLoading.value = true;
+
+    try {
+      await fetchPage(1);
     } finally {
-      flag.value = false;
+      isLoading.value = false;
     }
   };
 
-  const loadConversations = async (status: ConversationStatus = 'active'): Promise<void> => {
-    const result = await run(isLoadingConversations, () => conversationService.list({ status }));
+  const loadMore = async (): Promise<void> => {
+    if (!hasMore.value || isLoadingMore.value || isLoading.value) {
+      return;
+    }
 
-    if (result) {
-      conversations.value = result.items;
+    isLoadingMore.value = true;
+
+    try {
+      await fetchPage(page.value + 1);
+    } finally {
+      isLoadingMore.value = false;
     }
   };
 
-  const loadMessages = async (conversationId: string): Promise<void> => {
-    activeConversationId.value = conversationId;
-
-    const result = await run(isLoadingMessages, () => conversationService.messages(conversationId));
-
-    if (result) {
-      messages.value = result.items;
-    }
+  const setSearch = async (term: string): Promise<void> => {
+    search.value = term;
+    await load();
   };
 
-  const openConversation = async (title?: string): Promise<Conversation | null> => {
-    const created = await run(isLoadingConversations, () => conversationService.create(title));
+  /** Puts a thread at the top, or moves it there once it is used again. */
+  const upsert = (conversation: Conversation): void => {
+    const rest = conversations.value.filter((entry) => entry.id !== conversation.id);
+    conversations.value = [conversation, ...rest];
+  };
 
-    if (created) {
-      conversations.value = [created, ...conversations.value];
-      activeConversationId.value = created.id;
-      messages.value = [];
-    }
+  const rename = async (id: string, title: string): Promise<Conversation> => {
+    const updated = await conversationService.rename(id, title);
 
-    return created;
+    conversations.value = conversations.value.map((entry) => (entry.id === id ? updated : entry));
+
+    return updated;
   };
 
   /**
-   * Sends a turn and folds the reply into the open thread.
+   * Removes a thread, restoring it if the server refuses.
    *
-   * The message is appended only once the server confirms it, so the transcript
-   * never shows a turn that was not stored.
+   * Optimistic because the row vanishing instantly is the whole point of the
+   * gesture, and safe because the rollback is exact: the removed entry and its
+   * position are both kept until the call comes back.
    */
-  const sendMessage = async (text: string): Promise<void> => {
-    const trimmed = text.trim();
+  const remove = async (id: string): Promise<void> => {
+    const index = conversations.value.findIndex((entry) => entry.id === id);
+    const removed = conversations.value[index];
 
-    if (trimmed.length === 0 || isSending.value) {
-      return;
-    }
+    conversations.value = conversations.value.filter((entry) => entry.id !== id);
 
-    const response = await run(isSending, () =>
-      conversationService.chat(trimmed, activeConversationId.value ?? undefined),
-    );
-
-    if (!response) {
-      return;
-    }
-
-    const isNewThread = activeConversationId.value !== response.conversationId;
-    activeConversationId.value = response.conversationId;
-
-    if (isNewThread) {
-      // A new thread was opened server-side; pull the list so it appears with
-      // the title the API derived from this first message.
-      await loadConversations();
-      await loadMessages(response.conversationId);
-      return;
-    }
-
-    await loadMessages(response.conversationId);
-  };
-
-  const archiveConversation = async (conversationId: string): Promise<void> => {
-    const updated = await run(isLoadingConversations, () =>
-      conversationService.setStatus(conversationId, 'archived'),
-    );
-
-    if (updated) {
-      conversations.value = conversations.value.filter((entry) => entry.id !== conversationId);
-
-      if (activeConversationId.value === conversationId) {
-        activeConversationId.value = null;
-        messages.value = [];
+    try {
+      await conversationService.remove(id);
+      total.value = Math.max(0, total.value - 1);
+    } catch (caught) {
+      if (removed) {
+        const restored = [...conversations.value];
+        restored.splice(index, 0, removed);
+        conversations.value = restored;
       }
+
+      throw caught;
     }
   };
 
-  const deleteConversation = async (conversationId: string): Promise<void> => {
-    const done = await run(isLoadingConversations, async () => {
-      await conversationService.remove(conversationId);
+  const archive = async (id: string): Promise<void> => {
+    const index = conversations.value.findIndex((entry) => entry.id === id);
+    const removed = conversations.value[index];
 
-      return true;
-    });
+    // The list only shows active threads, so archiving removes it from view.
+    conversations.value = conversations.value.filter((entry) => entry.id !== id);
 
-    if (done) {
-      conversations.value = conversations.value.filter((entry) => entry.id !== conversationId);
-
-      if (activeConversationId.value === conversationId) {
-        activeConversationId.value = null;
-        messages.value = [];
+    try {
+      await conversationService.setStatus(id, 'archived');
+    } catch (caught) {
+      if (removed) {
+        const restored = [...conversations.value];
+        restored.splice(index, 0, removed);
+        conversations.value = restored;
       }
+
+      throw caught;
     }
   };
 
   const reset = (): void => {
+    controller?.abort();
     conversations.value = [];
-    messages.value = [];
-    activeConversationId.value = null;
+    page.value = 1;
+    totalPages.value = 1;
+    total.value = 0;
+    search.value = '';
     error.value = null;
   };
 
   return {
     conversations,
-    messages,
-    activeConversationId,
-    activeConversation,
-    hasConversations,
-    isLoadingConversations,
-    isLoadingMessages,
-    isSending,
+    grouped,
+    search,
+    total,
+    isLoading,
+    isLoadingMore,
+    isEmpty,
+    hasMore,
     error,
-    loadConversations,
-    loadMessages,
-    openConversation,
-    sendMessage,
-    archiveConversation,
-    deleteConversation,
+    load,
+    loadMore,
+    setSearch,
+    upsert,
+    rename,
+    remove,
+    archive,
     reset,
   };
 });

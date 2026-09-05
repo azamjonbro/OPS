@@ -152,6 +152,9 @@ export const sendMessage = async (
         arguments: call.arguments,
         status: outcome.status,
         result: outcome.result.summary,
+        // Only the summary goes back to the model; the structured payload is
+        // stored alongside it so the chat can render what the tool produced.
+        data: outcome.result.data ?? null,
         durationMs: outcome.durationMs,
       });
 

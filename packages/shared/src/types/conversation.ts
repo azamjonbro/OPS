@@ -26,6 +26,15 @@ export interface MessageToolCall {
   status: ToolCallStatus;
   /** Result summary, or the error message when the call failed. */
   result: string | null;
+  /**
+   * The tool's structured result — an image, a plan, a reminder, a set of
+   * figures — as the tool itself shaped it.
+   *
+   * `unknown` because every tool answers differently and the union would be a
+   * frontend concern leaking into the contract; a client narrows what it can
+   * render and falls back to `result` for the rest. Never sent to the model raw.
+   */
+  data: unknown;
   durationMs: number | null;
 }
 

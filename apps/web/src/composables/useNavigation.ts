@@ -1,11 +1,11 @@
 import { computed, type ComputedRef } from 'vue';
 
-import { navigationSections } from '@/config/navigation';
+import { settingsSections } from '@/config/navigation';
 import { usePermissions } from '@/composables/usePermissions';
 import type { NavigationSection } from '@/types/navigation';
 
 /**
- * The sidebar as this employee sees it.
+ * The back office as this employee sees it.
  *
  * Sections with nothing left in them disappear entirely: a heading over an
  * empty list tells a cashier there is a "Finance" area they cannot reach, which
@@ -15,7 +15,7 @@ export const useNavigation = (): { sections: ComputedRef<NavigationSection[]> } 
   const { can } = usePermissions();
 
   const sections = computed(() =>
-    navigationSections
+    settingsSections
       .map((section) => ({
         ...section,
         items: section.items.filter((item) => !item.minimumRole || can(item.minimumRole)),

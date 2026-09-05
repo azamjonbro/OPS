@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 
+defineProps<{ title: string; description?: string }>();
+
+const emit = defineEmits<{ close: [] }>();
+
 /**
  * A side panel, for detail that should not lose the list behind it.
  *
@@ -10,10 +14,6 @@ import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
  * screen is just a modal with the edges cut off.
  */
 const open = defineModel<boolean>('open', { required: true });
-
-defineProps<{ title: string; description?: string }>();
-
-const emit = defineEmits<{ close: [] }>();
 
 const id = useId();
 const panel = ref<HTMLElement | null>(null);
@@ -62,7 +62,9 @@ onBeforeUnmount(() => {
         tabindex="-1"
         class="absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-surface shadow-xl"
       >
-        <header class="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4">
+        <header
+          class="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4"
+        >
           <div>
             <h2 :id="`${id}-title`" class="text-base font-semibold text-ink-900">{{ title }}</h2>
             <p v-if="description" class="mt-0.5 text-sm text-ink-500">{{ description }}</p>

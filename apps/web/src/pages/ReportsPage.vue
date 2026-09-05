@@ -122,7 +122,10 @@ const daily = computed<DailyPoint[]>(() => {
 const peak = computed(() => Math.max(1, ...daily.value.map((point) => point.revenue)));
 
 const topProducts = computed(() => {
-  const byProduct = new Map<string, { name: string; sku: string; quantity: number; revenue: number }>();
+  const byProduct = new Map<
+    string,
+    { name: string; sku: string; quantity: number; revenue: number }
+  >();
 
   for (const sale of sales.value) {
     for (const line of sale.items) {
@@ -155,9 +158,14 @@ const expensesByCategory = computed(() => {
 });
 
 const customersServed = computed(() => {
-  const identified = new Set(sales.value.filter((sale) => sale.customer).map((sale) => sale.customer));
+  const identified = new Set(
+    sales.value.filter((sale) => sale.customer).map((sale) => sale.customer),
+  );
 
-  return { identified: identified.size, walkIn: sales.value.filter((sale) => !sale.customer).length };
+  return {
+    identified: identified.size,
+    walkIn: sales.value.filter((sale) => !sale.customer).length,
+  };
 });
 
 onMounted(load);
@@ -218,7 +226,11 @@ onMounted(load);
         />
         <div v-else class="overflow-x-auto">
           <div class="flex min-w-max items-end gap-2" role="img" aria-label="Revenue by day">
-            <div v-for="point in daily" :key="point.day" class="flex w-12 flex-col items-center gap-1">
+            <div
+              v-for="point in daily"
+              :key="point.day"
+              class="flex w-12 flex-col items-center gap-1"
+            >
               <span class="text-[0.625rem] tabular-nums text-ink-500">
                 {{ Math.round(point.revenue / 100) }}
               </span>

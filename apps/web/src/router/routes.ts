@@ -18,7 +18,14 @@ export const routes: RouteRecordRaw[] = [
     component: AppLayout,
     children: [
       {
+        // Signing in lands on the assistant, not on a dashboard of figures:
+        // the first thing Hadiya should offer is a question box. The dashboard
+        // is still here, one level in, for somebody who wants the numbers raw.
         path: '',
+        redirect: { name: 'assistant' },
+      },
+      {
+        path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/pages/DashboardPage.vue'),
         meta: { title: 'Dashboard', requiresAuth: true },
@@ -42,7 +49,10 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Receipt',
           requiresAuth: true,
-          breadcrumb: [{ label: 'Sales', to: { name: 'sales' } }],
+          breadcrumb: [
+            { label: 'Settings', to: { name: 'settings' } },
+            { label: 'Sales', to: { name: 'sales' } },
+          ],
         },
       },
       {
@@ -76,7 +86,10 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Customer',
           requiresAuth: true,
-          breadcrumb: [{ label: 'Customers', to: { name: 'customers' } }],
+          breadcrumb: [
+            { label: 'Settings', to: { name: 'settings' } },
+            { label: 'Customers', to: { name: 'customers' } },
+          ],
         },
       },
       {
@@ -105,7 +118,10 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Content plan',
           requiresAuth: true,
-          breadcrumb: [{ label: 'Content', to: { name: 'content-plans' } }],
+          breadcrumb: [
+            { label: 'Settings', to: { name: 'settings' } },
+            { label: 'Content', to: { name: 'content-plans' } },
+          ],
         },
       },
       {
@@ -127,18 +143,36 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Notifications', requiresAuth: true },
       },
       {
-        path: 'assistant',
-        name: 'assistant',
-        component: () => import('@/pages/AssistantPage.vue'),
-        meta: { title: 'Assistant', requiresAuth: true },
-      },
-      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/pages/SettingsPage.vue'),
         meta: { title: 'Settings', requiresAuth: true },
       },
     ],
+  },
+  /**
+   * The assistant sits outside `AppLayout`.
+   *
+   * Not an oversight: a conversation needs the whole viewport, with only the
+   * transcript scrolling and the composer pinned to the bottom. `AppLayout`'s
+   * main area scrolls the page instead, and nesting the two gives the double
+   * scrollbar every chat-in-a-dashboard has. `ChatLayout` provides its own
+   * sidebar and top bar, so nothing from the shell is lost.
+   *
+   * Both routes render the same page: `/assistant` is a thread that has not
+   * been created yet, and the id appears once the first turn has been sent.
+   */
+  {
+    path: '/assistant',
+    name: 'assistant',
+    component: () => import('@/pages/AssistantPage.vue'),
+    meta: { title: 'Assistant', requiresAuth: true },
+  },
+  {
+    path: '/assistant/:id',
+    name: 'assistant-conversation',
+    component: () => import('@/pages/AssistantPage.vue'),
+    meta: { title: 'Assistant', requiresAuth: true },
   },
   {
     path: '/auth',

@@ -22,7 +22,10 @@ const search = useDebouncedRef('', 300);
 
 const categories = usePaginatedResource<Category>(
   (params, signal) =>
-    categoryService.list({ ...params, ...(search.value ? { search: search.value } : {}) }, { signal }),
+    categoryService.list(
+      { ...params, ...(search.value ? { search: search.value } : {}) },
+      { signal },
+    ),
   { watchSources: [() => search.value] },
 );
 
@@ -119,7 +122,13 @@ const confirmRemove = async (): Promise<void> => {
       <BaseButton v-if="canManageCatalogue" @click="openForm(null)">New category</BaseButton>
     </div>
 
-    <BaseInput v-model="search" label="Search" type="search" placeholder="Category name" autocomplete="off" />
+    <BaseInput
+      v-model="search"
+      label="Search"
+      type="search"
+      placeholder="Category name"
+      autocomplete="off"
+    />
 
     <DataTable
       :columns="columns"
@@ -165,7 +174,12 @@ const confirmRemove = async (): Promise<void> => {
     >
       <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
         <BaseInput v-model="form.name" label="Name" required :error="nameError" :maxlength="120" />
-        <BaseInput v-model="form.description" label="Description" placeholder="Optional" :maxlength="500" />
+        <BaseInput
+          v-model="form.description"
+          label="Description"
+          placeholder="Optional"
+          :maxlength="500"
+        />
         <p v-if="formError" class="text-sm text-danger-600" role="alert">{{ formError }}</p>
       </form>
 

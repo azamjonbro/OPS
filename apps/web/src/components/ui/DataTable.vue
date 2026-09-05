@@ -52,6 +52,15 @@ withDefaults(
 );
 
 const emit = defineEmits<{ retry: []; page: [page: number]; select: [row: TRow] }>();
+
+/**
+ * The default cell, when a caller has not supplied a slot for the column.
+ *
+ * The cast lives here rather than in the template on purpose: the angle
+ * brackets of a generic inside `{{ }}` are read as markup by an HTML parser,
+ * and one of them — Prettier's — refuses the whole file over it.
+ */
+const cellOf = (row: TRow, key: string): unknown => (row as Record<string, unknown>)[key];
 </script>
 
 <template>
@@ -72,7 +81,9 @@ const emit = defineEmits<{ retry: []; page: [page: number]; select: [row: TRow] 
       <div class="overflow-x-auto">
         <table class="w-full min-w-full border-collapse text-sm">
           <caption v-if="caption" class="sr-only">
-            {{ caption }}
+            {{
+              caption
+            }}
           </caption>
           <thead>
             <tr class="border-b border-border-subtle bg-surface-muted/60">
@@ -112,9 +123,7 @@ const emit = defineEmits<{ retry: []; page: [page: number]; select: [row: TRow] 
                   column.hideOnMobile ? 'hidden sm:table-cell' : '',
                 ]"
               >
-                <slot :name="`cell-${column.key}`" :row="row">
-                  {{ (row as Record<string, unknown>)[column.key] }}
-                </slot>
+                <slot :name="`cell-${column.key}`" :row="row">{{ cellOf(row, column.key) }}</slot>
               </td>
             </tr>
           </tbody>

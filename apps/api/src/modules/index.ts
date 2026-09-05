@@ -1,25 +1,32 @@
 import { aiRouter } from './ai/index.js';
 import { billzRouter } from './billz/index.js';
 import { branchRouter } from './branches/index.js';
-import { categoryRouter } from './categories/index.js';
 import { contentRouter } from './content/index.js';
 import { conversationRouter } from './conversations/index.js';
-import { customerRouter } from './customers/index.js';
-import { expenseRouter } from './expenses/index.js';
 import { imageRouter } from './images/index.js';
-import { inventoryRouter } from './inventory/index.js';
 import { memoryRouter } from './memory/index.js';
 import { notificationRouter } from './notifications/index.js';
-import { paymentRouter } from './payments/index.js';
-import { productRouter } from './products/index.js';
 import { reminderRouter } from './reminders/index.js';
-import { saleRouter } from './sales/index.js';
 import { userRouter } from './users/index.js';
 import type { ApiModule } from './module.types.js';
 
 /**
  * Versioned feature modules, mounted under `<basePath>/v1` in registration
  * order. Adding a module here is the only wiring a new capability needs.
+ *
+ * What is *not* here is as deliberate as what is. Hadiya used to keep its own
+ * products, categories, customers, sales, payments, inventory and expenses,
+ * mirrored out of Billz by a sync job. All of it is gone.
+ *
+ * Billz is the system of record for the shop, and a mirror of a system of
+ * record is a second version of the truth: it is stale the moment the till
+ * rings, and a shopkeeper asking "hozir nechta qoldi?" means *now*. The
+ * assistant reads Billz live through that module's capability layer instead, so
+ * there is nothing left for a local copy to be for.
+ *
+ * What remains is what Billz does not do: the conversation, what the assistant
+ * remembers, the reminders it sets, the content it writes, the images it draws,
+ * and the accounts and branches that say who is asking.
  *
  * Authentication is applied to the whole tree in `routes/index.ts`; a module
  * that needs more than a signed-in user enforces that in its service, where the
@@ -28,13 +35,6 @@ import type { ApiModule } from './module.types.js';
 export const apiModules: ApiModule[] = [
   { name: 'branches', basePath: '/branches', router: branchRouter },
   { name: 'employees', basePath: '/users', router: userRouter },
-  { name: 'categories', basePath: '/categories', router: categoryRouter },
-  { name: 'products', basePath: '/products', router: productRouter },
-  { name: 'customers', basePath: '/customers', router: customerRouter },
-  { name: 'inventory', basePath: '/inventory', router: inventoryRouter },
-  { name: 'sales', basePath: '/sales', router: saleRouter },
-  { name: 'payments', basePath: '/payments', router: paymentRouter },
-  { name: 'expenses', basePath: '/expenses', router: expenseRouter },
   { name: 'conversations', basePath: '/conversations', router: conversationRouter },
   { name: 'content', basePath: '/content', router: contentRouter },
   { name: 'images', basePath: '/images', router: imageRouter },

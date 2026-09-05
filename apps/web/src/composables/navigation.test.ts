@@ -45,13 +45,20 @@ describe('permission-based navigation', () => {
     expect(labels()).toContain('Employees');
   });
 
-  it('drops a section once nothing in it is permitted', () => {
+  it('keeps a section that still has something in it, and drops the rest', () => {
     signIn('cashier');
 
-    // Finance holds Expenses and Reports; a cashier keeps Expenses, so the
-    // section survives — the empty-section rule is exercised by the titles.
-    const titles = useNavigation().sections.value.map((section) => section.title);
-    expect(titles).not.toContain('Administration');
+    const sections = useNavigation().sections.value;
+    const finance = sections.find((section) => section.title === 'Finance');
+    const account = sections.find((section) => section.title === 'Account');
+
+    // Finance keeps Expenses and loses Reports.
+    expect(finance?.items.map((item) => item.label)).toEqual(['Expenses']);
+    // Account keeps Preferences, which everybody may reach, and loses
+    // Employees. A heading over an empty list would advertise an area the
+    // person cannot get to.
+    expect(account?.items.map((item) => item.label)).toEqual(['Preferences']);
+    expect(sections.every((section) => section.items.length > 0)).toBe(true);
   });
 
   it('derives capability flags from the role', () => {
@@ -67,5 +74,15 @@ describe('permission-based navigation', () => {
 
     expect(manager.canManageCatalogue.value).toBe(true);
     expect(manager.canManageStaff.value).toBe(false);
+  });
+});
+
+describe('the assistant is the product', () => {
+  it('is not one of the back-office sections', () => {
+    signIn('manager');
+
+    // The chat has a sidebar of its own, full of conversations. Listing it
+    // here as a peer of Products would say it is one screen among twenty.
+    expect(labels()).not.toContain('Assistant');
   });
 });

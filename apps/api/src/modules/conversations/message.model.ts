@@ -14,6 +14,8 @@ export interface MessageToolCallSubdocument {
   arguments: Record<string, unknown>;
   status: ToolCallStatus;
   result: string | null;
+  /** The tool's structured result, kept so a client can render it later. */
+  data: unknown;
   durationMs: number | null;
 }
 
@@ -44,6 +46,10 @@ const toolCallSchema = new Schema<MessageToolCallSubdocument>(
     arguments: { type: Schema.Types.Mixed, required: true, default: {} },
     status: { type: String, required: true, enum: TOOL_CALL_STATUSES },
     result: { type: String, default: null, maxlength: 4_000 },
+    // Free-form for the same reason `arguments` is: the shape belongs to the
+    // tool. It is stored rather than recomputed because a transcript read a
+    // month later must show the image that was drawn then, not one drawn now.
+    data: { type: Schema.Types.Mixed, default: null },
     durationMs: { type: Number, default: null },
   },
   { _id: false },

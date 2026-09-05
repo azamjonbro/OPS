@@ -66,7 +66,9 @@ const submit = async (): Promise<void> => {
   }
 
   errors.fullName = form.fullName.trim().length < 2 ? 'At least 2 characters' : null;
-  errors.phone = /^\+?[0-9\s-]{7,20}$/.test(form.phone.trim()) ? null : 'Enter a valid phone number';
+  errors.phone = /^\+?[0-9\s-]{7,20}$/.test(form.phone.trim())
+    ? null
+    : 'Enter a valid phone number';
 
   if (errors.fullName || errors.phone) {
     return;
@@ -164,7 +166,13 @@ const submit = async (): Promise<void> => {
 
     <BaseModal v-model:open="isFormOpen" title="New customer" size="sm">
       <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
-        <BaseInput v-model="form.fullName" label="Full name" required :error="errors.fullName" :maxlength="160" />
+        <BaseInput
+          v-model="form.fullName"
+          label="Full name"
+          required
+          :error="errors.fullName"
+          :maxlength="160"
+        />
         <BaseInput
           v-model="form.phone"
           label="Phone"

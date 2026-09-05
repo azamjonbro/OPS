@@ -28,7 +28,11 @@ const crumbs = computed<Crumb[]>(() => {
 <template>
   <nav v-if="crumbs.length > 1" aria-label="Breadcrumb" class="min-w-0">
     <ol class="flex min-w-0 items-center gap-1.5 text-xs text-ink-500">
-      <li v-for="(crumb, index) in crumbs" :key="`${crumb.label}-${index}`" class="flex items-center gap-1.5">
+      <li
+        v-for="(crumb, index) in crumbs"
+        :key="`${crumb.label}-${index}`"
+        class="flex items-center gap-1.5"
+      >
         <svg
           v-if="index > 0"
           class="size-3 shrink-0 text-ink-400"
@@ -48,7 +52,11 @@ const crumbs = computed<Crumb[]>(() => {
         >
           {{ crumb.label }}
         </RouterLink>
-        <span v-else class="truncate" :aria-current="index === crumbs.length - 1 ? 'page' : undefined">
+        <span
+          v-else
+          class="truncate"
+          :aria-current="index === crumbs.length - 1 ? 'page' : undefined"
+        >
           {{ crumb.label }}
         </span>
       </li>

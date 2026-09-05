@@ -1,8 +1,13 @@
 import type {
   Category,
+  ChatResponse,
+  Conversation,
   Customer,
   Expense,
   InventoryItem,
+  Memory,
+  Message,
+  MessageToolCall,
   PaginatedResult,
   Product,
   Reminder,
@@ -138,6 +143,7 @@ export const makeSale = (overrides: Partial<Sale> = {}): Sale => ({
   note: null,
   soldAt: '2026-09-05T09:00:00.000Z',
   cancelledAt: null,
+  ...timestamps(),
   ...overrides,
 });
 
@@ -181,5 +187,76 @@ export const makeReminder = (overrides: Partial<Reminder> = {}): Reminder => ({
   failureReason: null,
   cancelledAt: null,
   ...timestamps(),
+  ...overrides,
+});
+
+/* -------------------------------------------------------------------------- */
+/* The assistant                                                              */
+/* -------------------------------------------------------------------------- */
+
+export const makeConversation = (overrides: Partial<Conversation> = {}): Conversation => ({
+  id: objectId(),
+  user: objectId(),
+  title: 'Bugungi savdo',
+  status: 'active',
+  lastMessageAt: '2026-09-05T10:00:00.000Z',
+  messageCount: 2,
+  ...timestamps(),
+  ...overrides,
+});
+
+/**
+ * A tool call as the API stores it, `data` included.
+ *
+ * `data` is what the chat renders — the image, the plan, the figures — so a
+ * fixture that left it out would let a renderer test pass against a shape the
+ * real API never sends.
+ */
+export const makeToolCall = (overrides: Partial<MessageToolCall> = {}): MessageToolCall => ({
+  callId: 'call-1',
+  name: 'get_sales_summary',
+  arguments: {},
+  status: 'succeeded',
+  result: 'Read the figures.',
+  data: null,
+  durationMs: 120,
+  ...overrides,
+});
+
+export const makeMessage = (overrides: Partial<Message> = {}): Message => ({
+  id: objectId(),
+  conversation: objectId(),
+  user: objectId(),
+  role: 'assistant',
+  content: 'Bugun 12 ta savdo bo‘ldi.',
+  toolCalls: [],
+  toolCallId: null,
+  model: 'claude-opus-5',
+  usage: null,
+  ...timestamps(),
+  ...overrides,
+});
+
+export const makeMemory = (overrides: Partial<Memory> = {}): Memory => ({
+  id: objectId(),
+  user: objectId(),
+  type: 'preference',
+  key: 'content_language',
+  value: 'uzbek',
+  source: 'assistant',
+  status: 'pending',
+  confidence: 0.6,
+  conversation: null,
+  lastUsedAt: null,
+  deletedAt: null,
+  ...timestamps(),
+  ...overrides,
+});
+
+export const makeChatResponse = (overrides: Partial<ChatResponse> = {}): ChatResponse => ({
+  conversationId: objectId(),
+  message: makeMessage(),
+  usedMemories: [],
+  pendingMemories: [],
   ...overrides,
 });

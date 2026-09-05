@@ -26,7 +26,10 @@ const branches = useBranchesStore();
 const dashboard = useDashboard(() => branches.scopeBranchId);
 
 onMounted(() => void dashboard.load());
-watch(() => branches.scopeBranchId, () => void dashboard.load());
+watch(
+  () => branches.scopeBranchId,
+  () => void dashboard.load(),
+);
 </script>
 
 <template>
@@ -40,12 +43,21 @@ watch(() => branches.scopeBranchId, () => void dashboard.load());
           }}.
         </p>
       </div>
-      <BaseButton variant="secondary" size="sm" :loading="dashboard.isLoading.value" @click="dashboard.load()">
+      <BaseButton
+        variant="secondary"
+        size="sm"
+        :loading="dashboard.isLoading.value"
+        @click="dashboard.load()"
+      >
         Refresh
       </BaseButton>
     </div>
 
-    <LoadingSkeleton v-if="dashboard.isLoading.value && !dashboard.hasData.value" variant="card" :rows="2" />
+    <LoadingSkeleton
+      v-if="dashboard.isLoading.value && !dashboard.hasData.value"
+      variant="card"
+      :rows="2"
+    />
 
     <ErrorState
       v-else-if="dashboard.error.value"
