@@ -55,6 +55,16 @@ const transcriptionFailed = (error: unknown): ApiError => {
       });
     }
 
+    if (error.kind === 'quota_exhausted') {
+      // Deliberately not "try again shortly": the balance is empty, so trying
+      // again tomorrow fails identically. Somebody has to top the account up,
+      // and saying so is the only thing that gets dictation working.
+      return ApiError.dependencyUnavailable(
+        'Voice input is unavailable: the AI account has run out of credit.',
+        { cause: error, details: { integration: 'speech', kind: error.kind } },
+      );
+    }
+
     if (error.kind === 'timeout') {
       return ApiError.dependencyUnavailable(
         'That recording took too long to transcribe. Try a shorter one.',

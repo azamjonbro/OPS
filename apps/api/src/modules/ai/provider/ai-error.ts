@@ -11,6 +11,7 @@ export const AI_ERROR_KINDS = [
   'invalid_credentials',
   'model_unavailable',
   'rate_limited',
+  'quota_exhausted',
   'timeout',
   'network',
   'malformed_response',
@@ -19,6 +20,28 @@ export const AI_ERROR_KINDS = [
 ] as const;
 
 export type AiErrorKind = (typeof AI_ERROR_KINDS)[number];
+
+/**
+ * Provider error codes that mean "this account has run out", not "you are going
+ * too fast".
+ *
+ * Both arrive as `429`, and telling them apart matters more than the shared
+ * status suggests. A rate limit clears on its own and a retry is the right
+ * answer; an exhausted balance never clears, so retrying wastes the request and
+ * — worse — tells the person to "try again shortly" about something that will
+ * still be broken tomorrow. The only useful answer is to say what is actually
+ * wrong.
+ */
+const QUOTA_CODES = new Set([
+  'insufficient_quota',
+  'credit_balance_exhausted',
+  'billing_hard_limit_reached',
+  'quota_exceeded',
+]);
+
+/** Reads a `429` correctly: out of credit, or genuinely too fast. */
+export const classifyRateLimit = (providerCode: string | undefined): AiErrorKind =>
+  providerCode && QUOTA_CODES.has(providerCode) ? 'quota_exhausted' : 'rate_limited';
 
 export interface AiErrorContext {
   status?: number;
@@ -50,7 +73,13 @@ export class AiProviderError extends Error {
     this.providerCode = context.providerCode;
   }
 
-  /** True when the same request could plausibly succeed on a retry. */
+  /**
+   * True when the same request could plausibly succeed on a retry.
+   *
+   * `quota_exhausted` is deliberately absent: an empty balance is not a
+   * transient condition, and retrying it three times only makes the person wait
+   * longer for the same answer.
+   */
   get isRetryable(): boolean {
     return (
       this.kind === 'rate_limited' ||
@@ -72,6 +101,16 @@ export class AiProviderError extends Error {
 
     if (this.kind === 'rate_limited') {
       return ApiError.rateLimited('The AI assistant is busy, please try again shortly', options);
+    }
+
+    if (this.kind === 'quota_exhausted') {
+      // Named plainly. Whoever sees this cannot fix it from inside Hadiya, and
+      // a vague "unavailable" would send them looking for a fault that is not
+      // there — the account simply needs topping up.
+      return ApiError.dependencyUnavailable(
+        'The AI account has run out of credit. Top it up to keep using the assistant.',
+        options,
+      );
     }
 
     if (this.kind === 'content_filtered') {

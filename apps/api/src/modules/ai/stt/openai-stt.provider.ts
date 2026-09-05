@@ -2,7 +2,7 @@ import { SPEECH_TRANSCRIPT_MAX_LENGTH } from '@hadiya/shared';
 import type { Logger } from 'pino';
 
 import { createLogger } from '../../../core/logger/logger.js';
-import { AiProviderError } from '../provider/ai-error.js';
+import { AiProviderError, classifyRateLimit } from '../provider/ai-error.js';
 import type { FetchLike } from '../provider/ai-http.js';
 import type { SpeechProvider, TranscriptionOutcome, TranscriptionRequest } from './stt-provider.js';
 
@@ -50,7 +50,18 @@ const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
 /** Enough of an error body to diagnose from; short enough not to be a payload. */
 const LOGGED_BODY_LIMIT = 300;
 
-const classify = (status: number): AiProviderError => {
+/** The provider's own error code, which is safe to keep; the message is not. */
+const readProviderCode = (body: string): string | undefined => {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: string; type?: string } };
+
+    return parsed.error?.code ?? parsed.error?.type;
+  } catch {
+    return undefined;
+  }
+};
+
+const classify = (status: number, providerCode: string | undefined): AiProviderError => {
   if (status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) {
     return new AiProviderError('invalid_credentials', 'the configured API key was rejected', {
       status,
@@ -64,9 +75,18 @@ const classify = (status: number): AiProviderError => {
   }
 
   if (status === HTTP_TOO_MANY_REQUESTS) {
-    return new AiProviderError('rate_limited', 'the provider is rate limiting this key', {
-      status,
-    });
+    // Transcription is where an empty balance is usually noticed first, because
+    // dictation is the cheapest thing to try. A `429` here is far more often
+    // "no credit" than "too fast", and the two need opposite answers.
+    const kind = classifyRateLimit(providerCode);
+
+    return new AiProviderError(
+      kind,
+      kind === 'quota_exhausted'
+        ? 'the account has no credit remaining'
+        : 'the provider is rate limiting this key',
+      { status, ...(providerCode ? { providerCode } : {}) },
+    );
   }
 
   if (status === HTTP_PAYLOAD_TOO_LARGE) {
@@ -165,14 +185,26 @@ export class OpenAiSpeechProvider implements SpeechProvider {
         );
 
         if (!response.ok) {
-          const error = classify(response.status);
+          const providerCode = readProviderCode(text);
+          const error = classify(response.status, providerCode);
 
           this.log.warn(
-            { status: response.status, body: text.slice(0, LOGGED_BODY_LIMIT) },
+            {
+              status: response.status,
+              ...(providerCode ? { providerCode } : {}),
+              body: text.slice(0, LOGGED_BODY_LIMIT),
+            },
             'transcription request failed',
           );
 
-          if (!RETRYABLE.has(response.status) || attempt === this.options.maxRetries) {
+          // The status alone is not enough to decide: a `429` for an exhausted
+          // balance is in `RETRYABLE`, and retrying it would only make the
+          // person wait three times as long for the same answer.
+          if (
+            !RETRYABLE.has(response.status) ||
+            !error.isRetryable ||
+            attempt === this.options.maxRetries
+          ) {
             throw error;
           }
 

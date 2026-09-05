@@ -75,15 +75,28 @@ const generationFailed = (error: unknown): ApiError => {
   if (isAiProviderError(error)) {
     // The provider's own message is safe — it is written by us, never copied
     // from an upstream body that could echo a credential back.
-    return error.kind === 'rate_limited'
-      ? ApiError.rateLimited('Image generation is busy, please try again shortly', {
-          cause: error,
-          details: { integration: 'images', kind: error.kind },
-        })
-      : ApiError.dependencyUnavailable(`Image generation failed: ${error.message}`, {
-          cause: error,
-          details: { integration: 'images', kind: error.kind },
-        });
+    const details = { integration: 'images', kind: error.kind };
+
+    if (error.kind === 'rate_limited') {
+      return ApiError.rateLimited('Image generation is busy, please try again shortly', {
+        cause: error,
+        details,
+      });
+    }
+
+    if (error.kind === 'quota_exhausted') {
+      // Not "try again shortly": an empty balance does not refill on its own,
+      // and the person needs to know it is the account rather than the picture.
+      return ApiError.dependencyUnavailable(
+        'Image generation is unavailable: the AI account has run out of credit.',
+        { cause: error, details },
+      );
+    }
+
+    return ApiError.dependencyUnavailable(`Image generation failed: ${error.message}`, {
+      cause: error,
+      details,
+    });
   }
 
   return ApiError.dependencyUnavailable('Image generation failed', { cause: error });
