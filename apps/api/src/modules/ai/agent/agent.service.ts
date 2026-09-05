@@ -12,6 +12,7 @@ import {
 } from '@hadiya/shared';
 
 import { config } from '../../../config/index.js';
+import { ApiError } from '../../../core/http/api-error.js';
 import { createLogger } from '../../../core/logger/logger.js';
 import * as conversationService from '../../conversations/conversation.service.js';
 import type {
@@ -32,6 +33,7 @@ import {
 import { buildActorToolRegistry, type ToolRegistry } from '../tools/index.js';
 import { NATIVE_PROVENANCE } from '../tools/tool-registry.js';
 import { registerRun, releaseRun } from './agent-cancellation.js';
+import * as runRegistry from './agent-run-registry.js';
 import { createEventSink, type AgentEventSink } from './agent-events.js';
 import { screenConfirmation } from './confirmation-gate.js';
 import * as pendingActions from './pending-action.service.js';
@@ -65,6 +67,27 @@ export type AgentLimitOverrides = Partial<{
 export interface AgentDependencies {
   provider?: AiProvider;
   registry?: ToolRegistry;
+  /**
+   * The id this run will be known by.
+   *
+   * Supplied by a caller that has to be watching before the run exists — the
+   * streaming endpoint opens its socket and starts listening for this id
+   * *before* the first event, which is the only way the opening events of a
+   * run cannot be lost to a race. Omitted everywhere else, and then it is a
+   * fresh UUID as it always was.
+   */
+  runId?: string;
+  /**
+   * Whether to ask the provider for the answer as it is written.
+   *
+   * Off unless somebody is actually watching. Token deltas exist to be
+   * rendered; asking for them when nothing is subscribed buys a second
+   * transport path and a different set of provider behaviours in exchange for
+   * text that is assembled and discarded. The streaming endpoint turns it on,
+   * and everything else — a scheduled turn, a script, a test — takes the plain
+   * path it always did.
+   */
+  streamDeltas?: boolean;
   /** Narrows the run's budget. Anything omitted comes from configuration. */
   limits?: AgentLimitOverrides;
   /** Ties tool calls and log lines back to the HTTP request that caused them. */
@@ -91,8 +114,22 @@ export interface SendMessageInput {
 const complete = async (
   provider: AiProvider,
   request: AiCompletionRequest,
+  onDelta?: (delta: string) => void,
 ): Promise<AiCompletion> => {
   try {
+    // Streamed when the provider can and somebody is listening, and identical
+    // in every other respect: the same request, the same completion back. A
+    // provider that cannot stream is not worked around and its text is not
+    // chopped up to look as though it were — the words simply arrive at the
+    // end, which is what actually happened.
+    if (onDelta && provider.supportsStreaming && provider.stream) {
+      return await provider.stream(request, (chunk) => {
+        if (chunk.delta.length > 0) {
+          onDelta(chunk.delta);
+        }
+      });
+    }
+
     return await provider.complete(request);
   } catch (error) {
     if (isAiProviderError(error)) {
@@ -349,7 +386,7 @@ export const sendMessage = async (
     usedMemories.map((memory) => String(memory._id)),
   );
 
-  const workflowId = randomUUID();
+  const workflowId = dependencies.runId ?? randomUUID();
   const requestId = dependencies.requestId ?? workflowId;
   const runSignal = registerRun({ workflowId, conversationId, userId: actor.id });
   // A caller may bring its own reason to stop — a closed HTTP connection, a
@@ -357,6 +394,10 @@ export const sendMessage = async (
   const signal = dependencies.signal
     ? AbortSignal.any([runSignal, dependencies.signal])
     : runSignal;
+
+  // Opened before the first event, so nothing a watcher needs is emitted into
+  // a run the registry has not heard of yet.
+  runRegistry.openRun({ runId: workflowId, conversationId, userId: actor.id });
 
   const events = createEventSink({ workflowId, conversationId, userId: actor.id });
   const steps: AgentStep[] = [];
@@ -424,7 +465,26 @@ export const sendMessage = async (
         tools: withholdTools ? [] : registry.definitions(),
       };
 
-      const completion = await complete(provider, request);
+      // One id per completion. The browser appends deltas to the message it
+      // names and closes that one, so a round that produced text before asking
+      // for a tool cannot bleed into the round after it.
+      const messageId = `${workflowId}:${round}`;
+      let streamedAnything = false;
+
+      const completion = await complete(
+        provider,
+        request,
+        dependencies.streamDeltas
+          ? (delta) => {
+              streamedAnything = true;
+              events.emit('assistant.delta', { messageId, delta });
+            }
+          : undefined,
+      );
+
+      if (streamedAnything) {
+        events.emit('assistant.completed', { messageId });
+      }
 
       modelCalls += 1;
       tokensSpent += tokensOf(completion);
@@ -494,7 +554,7 @@ export const sendMessage = async (
         if (outcome.confirmation) {
           const plan = outcome.plan;
 
-          await pendingActions.recordPendingAction(actor, {
+          const proposal = await pendingActions.recordPendingAction(actor, {
             conversationId,
             workflowId,
             requestedCallId: outcome.callId,
@@ -503,6 +563,26 @@ export const sendMessage = async (
             description: outcome.confirmation.description,
             integrationId: plan?.provenance.integrationId ?? null,
             integrationName: plan?.provenance.integrationName ?? null,
+          });
+
+          // Emitted here rather than in the scheduler, because only here does
+          // the proposal have an id and an expiry — and a confirmation card
+          // without those is one a person could answer after it had lapsed.
+          // The description is the tool's own words about the real target; the
+          // arguments behind it stay on the server.
+          events.emit('confirmation.required', {
+            callId: outcome.callId,
+            pendingActionId: String(proposal._id),
+            tool: outcome.name,
+            displayName: plan?.display.displayName ?? outcome.name,
+            runningLabel: plan?.display.runningLabel ?? outcome.name,
+            doneLabel: plan?.display.doneLabel ?? outcome.name,
+            category: plan?.category ?? 'other',
+            risk: plan?.risk ?? 'write',
+            integration: plan?.provenance.integrationName ?? null,
+            title: plan?.display.displayName ?? outcome.name,
+            description: outcome.confirmation.description,
+            expiresAt: proposal.expiresAt.toISOString(),
           });
         }
       }
@@ -568,10 +648,22 @@ export const sendMessage = async (
       throw new Error('The assistant produced no reply');
     }
   } catch (error) {
+    // `ApiError` messages are written for a person and carry no upstream body;
+    // anything else is reported in general terms rather than by leaking the
+    // text of a bug.
+    const message =
+      error instanceof ApiError ? error.message : 'The assistant could not finish that.';
+
     events.emit('agent.failed', {
       rounds,
       modelCalls,
       reason: error instanceof Error ? error.name : 'unknown',
+      message,
+    });
+
+    runRegistry.failRun(workflowId, {
+      code: error instanceof ApiError ? error.code : 'INTERNAL_ERROR',
+      message,
     });
 
     log.warn({ user: actor.id, workflow: workflowId, err: error }, 'agent run failed');
@@ -644,11 +736,18 @@ export const sendMessage = async (
     'agent run finished',
   );
 
-  return {
+  const response: ChatResponse = {
     conversationId,
     message: assistantMessage as unknown as ChatResponse['message'],
     usedMemories: usedMemories.map(toMemorySummary),
     pendingMemories: pending.map(toMemorySummary),
     agent: summary,
   };
+
+  // The same object the caller is about to receive. A client that watched the
+  // run and one that waited for the POST therefore end up holding exactly the
+  // same turn, rather than a thin streamed version and a full one.
+  runRegistry.closeRun(workflowId, { response, summary });
+
+  return response;
 };

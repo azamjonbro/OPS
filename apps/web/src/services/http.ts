@@ -115,6 +115,30 @@ const refreshTokens = async (): Promise<AuthTokens | null> => {
   }
 };
 
+/**
+ * Refreshes the session, sharing whatever refresh is already in flight.
+ *
+ * Exported for the transports that cannot go through the interceptor below —
+ * the event stream is a bare `fetch`, because a browser cannot stream an
+ * `XMLHttpRequest` body and `EventSource` cannot carry an `Authorization`
+ * header. It still has to renew a token the same way, and doing it through
+ * this function means one refresh across the whole application rather than a
+ * second one racing the first and rotating the token out from under it.
+ */
+export const refreshSession = async (): Promise<AuthTokens | null> => {
+  refreshInFlight ??= refreshTokens().finally(() => {
+    refreshInFlight = null;
+  });
+
+  const tokens = await refreshInFlight;
+
+  if (!tokens) {
+    onSessionExpired?.();
+  }
+
+  return tokens;
+};
+
 const HTTP_UNAUTHORIZED = 401;
 
 interface RetriableConfig extends AxiosRequestConfig {

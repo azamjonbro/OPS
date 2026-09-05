@@ -225,3 +225,140 @@ export const postJson = async <TResponse>(
 
   throw lastError ?? new AiProviderError('upstream_error', 'the provider request failed');
 };
+
+
+/**
+ * One streaming call to a model API.
+ *
+ * The same request shape and the same failure classification as `postJson` —
+ * an error before the stream opens is indistinguishable from an error on an
+ * ordinary call, and is reported as one. What differs is what happens after the
+ * first byte of content: retrying then would replay text the caller has already
+ * been handed, so the attempt loop stops the moment anything has been
+ * delivered. A stream that breaks mid-answer fails, honestly, rather than
+ * silently repeating half a sentence.
+ *
+ * `onLine` receives the payload of each `data:` line, in order, with the
+ * terminal `[DONE]` sentinel already filtered out.
+ */
+export const postSse = async (
+  request: AiHttpRequest,
+  options: AiHttpOptions & { onLine: (payload: string) => void },
+): Promise<void> => {
+  const fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init));
+  const sleep = options.sleep ?? defaultSleep;
+  let lastError: AiProviderError | null = null;
+  let delivered = false;
+
+  for (let attempt = 0; attempt <= options.maxRetries; attempt += 1) {
+    if (attempt > 0) {
+      await sleep(Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS));
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+
+    try {
+      const response = await fetchImpl(request.url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'text/event-stream',
+          ...request.headers,
+        },
+        body: JSON.stringify({ ...(request.body as Record<string, unknown>), stream: true }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        const providerCode = readProviderCode(text);
+        const error = classify(response.status, providerCode);
+
+        options.logger?.warn(
+          {
+            endpoint: request.endpoint,
+            status: response.status,
+            providerCode,
+            body: text.slice(0, LOGGED_BODY_LIMIT),
+          },
+          'ai provider stream failed',
+        );
+
+        if (!RETRYABLE_STATUSES.has(response.status) || attempt === options.maxRetries) {
+          throw error;
+        }
+
+        lastError = error;
+        continue;
+      }
+
+      if (!response.body) {
+        throw new AiProviderError('malformed_response', 'the provider returned no stream body');
+      }
+
+      const decoder = new TextDecoder();
+      const reader = response.body.getReader();
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Frames are separated by a blank line; a partial one stays in the
+        // buffer until the rest of it arrives.
+        let boundary = buffer.indexOf('\n\n');
+
+        while (boundary !== -1) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          boundary = buffer.indexOf('\n\n');
+
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data:')) {
+              continue;
+            }
+
+            const payload = line.slice(5).trim();
+
+            if (payload.length === 0 || payload === '[DONE]') {
+              continue;
+            }
+
+            delivered = true;
+            options.onLine(payload);
+          }
+        }
+      }
+
+      return;
+    } catch (error) {
+      const wrapped =
+        error instanceof AiProviderError
+          ? error
+          : error instanceof Error && error.name === 'AbortError'
+            ? new AiProviderError(
+                'timeout',
+                `the provider did not respond within ${options.timeoutMs}ms`,
+                { cause: error },
+              )
+            : new AiProviderError('network', 'the provider could not be reached', { cause: error });
+
+      // Once anything has been handed to the caller, a retry would repeat it.
+      if (delivered || !wrapped.isRetryable || attempt === options.maxRetries) {
+        throw wrapped;
+      }
+
+      lastError = wrapped;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  throw lastError ?? new AiProviderError('upstream_error', 'the provider stream failed');
+};

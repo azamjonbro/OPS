@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as agentStream from '@/services/agent-stream';
 import { ApiClientError } from '@/services/api-error';
 import { chatService } from '@/services/chat.service';
 import { conversationService } from '@/services/conversation.service';
@@ -8,11 +9,14 @@ import { memoryService } from '@/services/memory.service';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
 import {
+  makeAgentEvent,
   makeChatResponse,
   makeConversation,
   makeMemory,
   makeMessage,
+  makeToolEvent,
   paginated,
+  resetAgentEventSequence,
 } from '@/test/factories';
 
 /**
@@ -25,6 +29,19 @@ import {
  */
 beforeEach(() => {
   setActivePinia(createPinia());
+
+  // A turn is streamed now. The stub delivers the run through whatever
+  // `chatService.send` a test has mocked, so every assertion below is still
+  // about the store's behaviour rather than about a socket.
+  vi.spyOn(agentStream, 'streamChat').mockImplementation(async (input, handlers) => {
+    handlers.onReady?.({ runId: 'run-1', conversationId: input.conversationId ?? '' });
+
+    try {
+      handlers.onResult(await chatService.send(input.message, input.conversationId));
+    } catch (caught) {
+      handlers.onFailure(caught as ApiClientError);
+    }
+  });
 });
 
 const stubConversationReads = (conversation = makeConversation(), messages = [makeMessage()]) => {
@@ -309,34 +326,156 @@ describe('memory', () => {
   });
 });
 
-describe('the streaming seam', () => {
-  it('accumulates text and tracks which tools are running', () => {
+describe('watching a run', () => {
+  it('folds the server’s events into a timeline', () => {
+    resetAgentEventSequence();
     const chat = useChatStore();
 
-    chat.applyStreamEvent({ type: 'text', delta: 'Bugun ' });
-    chat.applyStreamEvent({ type: 'text', delta: '12 ta savdo' });
-    chat.applyStreamEvent({
-      type: 'tool-started',
-      call: { callId: 'c1', name: 'get_sales_summary' },
+    chat.applyStreamEvent(makeAgentEvent('agent.started', { tools: 12 }));
+    chat.applyStreamEvent(makeToolEvent('tool.started', { attempt: 1 }));
+
+    expect(chat.run.state).toBe('running');
+    expect(chat.run.steps).toHaveLength(1);
+    expect(chat.run.steps[0]).toMatchObject({
+      status: 'running',
+      displayName: 'Sales figures',
+      integration: 'Billz',
     });
 
-    expect(chat.streamingText).toBe('Bugun 12 ta savdo');
-    expect(chat.runningTools).toHaveLength(1);
+    chat.applyStreamEvent(makeToolEvent('tool.completed', { durationMs: 120, attempts: 1 }));
 
-    chat.applyStreamEvent({
-      type: 'tool-finished',
-      call: {
-        callId: 'c1',
-        name: 'get_sales_summary',
-        arguments: {},
-        status: 'succeeded',
-        result: 'done',
-        data: null,
-        durationMs: 10,
-      },
+    // The same call id updates the step it belongs to rather than adding a
+    // second row beside it.
+    expect(chat.run.steps).toHaveLength(1);
+    expect(chat.run.steps[0]?.status).toBe('completed');
+
+    chat.applyStreamEvent(makeAgentEvent('agent.completed', { state: 'completed' }));
+    expect(chat.run.state).toBe('completed');
+  });
+
+  it('accumulates the answer as it is written', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    chat.applyStreamEvent(makeAgentEvent('assistant.delta', { messageId: 'm-1', delta: 'Bugun ' }));
+    chat.applyStreamEvent(
+      makeAgentEvent('assistant.delta', { messageId: 'm-1', delta: '12 ta savdo' }),
+    );
+
+    expect(chat.run.streamingText).toBe('Bugun 12 ta savdo');
+  });
+
+  it('ignores an event it has already applied', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    const started = makeToolEvent('tool.started');
+    chat.applyStreamEvent(started);
+    // Exactly what a reconnection would deliver if the server replayed too far.
+    chat.applyStreamEvent(started);
+
+    expect(chat.run.steps).toHaveLength(1);
+  });
+
+  it('shows a failed step as failed, in the server’s words', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    chat.applyStreamEvent(makeToolEvent('tool.started'));
+    chat.applyStreamEvent(
+      makeToolEvent('tool.failed', { attempts: 1, message: 'Notion is unreachable' }),
+    );
+
+    expect(chat.run.steps[0]).toMatchObject({
+      status: 'failed',
+      message: 'Notion is unreachable',
+    });
+    expect(chat.partialFailure).toContain('Sales figures');
+  });
+
+  it('holds a confirmation until it is answered', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    chat.applyStreamEvent(
+      makeAgentEvent('confirmation.required', {
+        callId: 'call-1',
+        pendingActionId: 'pa-1',
+        tool: 'crm_invoice',
+        displayName: 'Invoice',
+        title: 'Invoice',
+        description: 'create an invoice for 1 200 000 UZS',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        integration: 'My CRM',
+      }),
+    );
+
+    expect(chat.run.state).toBe('waiting_confirmation');
+    expect(chat.confirmation).toMatchObject({ pendingActionId: 'pa-1', title: 'Invoice' });
+    expect(chat.isConfirmationExpired).toBe(false);
+  });
+
+  it('treats a lapsed confirmation as no longer answerable', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    chat.applyStreamEvent(
+      makeAgentEvent('confirmation.required', {
+        callId: 'call-1',
+        pendingActionId: 'pa-1',
+        tool: 'crm_invoice',
+        title: 'Invoice',
+        description: 'create an invoice',
+        expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      }),
+    );
+
+    expect(chat.isConfirmationExpired).toBe(true);
+  });
+
+  it('stops presenting the run as active once it is cancelled', () => {
+    resetAgentEventSequence();
+    const chat = useChatStore();
+
+    chat.applyStreamEvent(makeAgentEvent('agent.started', {}));
+    expect(chat.isRunning).toBe(true);
+
+    chat.applyStreamEvent(makeAgentEvent('agent.cancelled', {}));
+
+    expect(chat.run.state).toBe('cancelled');
+    expect(chat.isRunning).toBe(false);
+  });
+});
+
+describe('cancelling a run', () => {
+  it('asks the server once, however many times the button is pressed', async () => {
+    resetAgentEventSequence();
+    const conversation = stubConversationReads();
+    const cancel = vi.spyOn(chatService, 'cancel').mockResolvedValue({
+      conversationId: conversation.id,
+      cancelledRuns: 1,
+      cancelledActions: 0,
     });
 
-    expect(chat.runningTools).toHaveLength(0);
+    const chat = useChatStore();
+    await chat.open(conversation.id);
+    chat.applyStreamEvent(makeAgentEvent('agent.started', {}));
+
+    await Promise.all([chat.cancel(), chat.cancel()]);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(chat.isCancelling).toBe(true);
+  });
+
+  it('does nothing when there is no run to stop', async () => {
+    const conversation = stubConversationReads();
+    const cancel = vi.spyOn(chatService, 'cancel');
+
+    const chat = useChatStore();
+    await chat.open(conversation.id);
+    await chat.cancel();
+
+    expect(cancel).not.toHaveBeenCalled();
   });
 });
 

@@ -5,11 +5,28 @@ import { uploadAudio } from '../../core/http/upload.js';
 import { validated } from '../../core/middleware/validate.js';
 import { chatSchema } from '../conversations/conversation.validators.js';
 import * as aiController from './ai.controller.js';
-import { cancelRunSchema, conversationParamSchema } from './ai.validators.js';
+import {
+  cancelRunSchema,
+  chatStreamQuerySchema,
+  conversationParamSchema,
+  runParamSchema,
+} from './ai.validators.js';
 
 export const aiRouter: Router = Router();
 
-aiRouter.post('/chat', ...validated({ body: chatSchema }, aiController.chat));
+/**
+ * The assistant, in one endpoint.
+ *
+ * `?stream=1` or `Accept: text/event-stream` asks for the turn as it happens;
+ * anything else gets the JSON reply it always did. Same handler, same agent,
+ * same run — a second endpoint would have meant a second execution path, and
+ * two paths through an agent is how the streaming one quietly stops matching
+ * the one that is tested.
+ */
+aiRouter.post(
+  '/chat',
+  ...validated({ body: chatSchema, query: chatStreamQuerySchema }, aiController.chat),
+);
 
 /**
  * Stopping a run, and seeing what one is waiting for.
@@ -23,6 +40,24 @@ aiRouter.get(
   '/chat/:conversationId/pending-actions',
   ...validated({ params: conversationParamSchema }, aiController.pendingActions),
 );
+/**
+ * Watching a run that is already going.
+ *
+ * `stream` is the reconnection path — a socket that dropped, or a browser that
+ * reloaded — and replays from `Last-Event-ID` so nothing is drawn twice. The
+ * other two are reads: one run by id, and the newest run in a conversation,
+ * which is how a reloaded browser finds its way back to a turn in progress.
+ */
+aiRouter.get(
+  '/runs/:runId/stream',
+  ...validated({ params: runParamSchema }, aiController.streamRun),
+);
+aiRouter.get('/runs/:runId', ...validated({ params: runParamSchema }, aiController.runState));
+aiRouter.get(
+  '/chat/:conversationId/run',
+  ...validated({ params: conversationParamSchema }, aiController.conversationRun),
+);
+
 aiRouter.get('/status', aiController.status);
 aiRouter.get('/usage', asyncHandler(aiController.usage));
 

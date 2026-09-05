@@ -43,6 +43,12 @@ export interface ToolDescriptor {
   /** Whether this tool may run beside another in the same round. */
   parallelSafe: boolean;
   provenance: ToolProvenance;
+  /**
+   * What to call it on a screen. Decided server-side so a client does not need
+   * a phrase of its own for every tool — including the ones on somebody's own
+   * MCP server, which it has never heard of.
+   */
+  display: { displayName: string; runningLabel: string; doneLabel: string };
 }
 
 /** One tool call inside a run, as it actually went. */

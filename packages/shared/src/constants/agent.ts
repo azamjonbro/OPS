@@ -55,6 +55,11 @@ export const AGENT_EVENT_TYPES = [
   'tool.retrying',
   'tool.skipped',
   'confirmation.required',
+  // The assistant's own words as they arrive, when the provider can send them
+  // that way. `assistant.completed` closes the message whether or not any delta
+  // preceded it, so a client has one place to stop showing a partial answer.
+  'assistant.delta',
+  'assistant.completed',
   'agent.completed',
   'agent.failed',
   'agent.cancelled',
