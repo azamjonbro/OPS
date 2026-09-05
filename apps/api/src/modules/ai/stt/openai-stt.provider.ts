@@ -4,11 +4,7 @@ import type { Logger } from 'pino';
 import { createLogger } from '../../../core/logger/logger.js';
 import { AiProviderError } from '../provider/ai-error.js';
 import type { FetchLike } from '../provider/ai-http.js';
-import type {
-  SpeechProvider,
-  TranscriptionOutcome,
-  TranscriptionRequest,
-} from './stt-provider.js';
+import type { SpeechProvider, TranscriptionOutcome, TranscriptionRequest } from './stt-provider.js';
 
 /** OpenAI's transcription response, only as far as this provider uses it. */
 interface OpenAiTranscription {
@@ -197,11 +193,9 @@ export class OpenAiSpeechProvider implements SpeechProvider {
         }
 
         if (typeof parsed.text !== 'string') {
-          throw new AiProviderError(
-            'malformed_response',
-            'the provider returned no transcript',
-            { status: response.status },
-          );
+          throw new AiProviderError('malformed_response', 'the provider returned no transcript', {
+            status: response.status,
+          });
         }
 
         return {

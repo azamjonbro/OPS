@@ -1,4 +1,8 @@
-import { SPEECH_MAX_DURATION_SECONDS, SPEECH_MAX_UPLOAD_BYTES, type SpeechStatus } from '@hadiya/shared';
+import {
+  SPEECH_MAX_DURATION_SECONDS,
+  SPEECH_MAX_UPLOAD_BYTES,
+  type SpeechStatus,
+} from '@hadiya/shared';
 
 import { config } from '../../../config/index.js';
 import { ApiError } from '../../../core/http/api-error.js';

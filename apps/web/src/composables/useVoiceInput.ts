@@ -19,12 +19,7 @@ import { useVoiceRecorder, type RecorderError } from './useVoiceRecorder';
  * assistant would turn a misheard word into a message nobody chose to send.
  */
 export type VoiceInputPhase =
-  | 'idle'
-  | 'requesting'
-  | 'recording'
-  | 'uploading'
-  | 'transcribing'
-  | 'error';
+  'idle' | 'requesting' | 'recording' | 'uploading' | 'transcribing' | 'error';
 
 export interface VoiceInput {
   phase: ComputedRef<VoiceInputPhase>;
@@ -99,7 +94,9 @@ export const useVoiceInput = (options: VoiceInputOptions): VoiceInput => {
   const isActive = computed(() => phase.value !== 'idle' && phase.value !== 'error');
 
   const isNearLimit = computed(
-    () => recorder.isRecording.value && recorder.remainingSeconds.value <= SPEECH_DURATION_WARNING_SECONDS,
+    () =>
+      recorder.isRecording.value &&
+      recorder.remainingSeconds.value <= SPEECH_DURATION_WARNING_SECONDS,
   );
 
   const transcribe = async (audio: Blob): Promise<void> => {
@@ -174,8 +171,16 @@ export const useVoiceInput = (options: VoiceInputOptions): VoiceInput => {
     networkError.value = null;
   };
 
+  /**
+   * Clears whichever message is on screen.
+   *
+   * Both sources are cleared, not just the network one: a person pressing
+   * "Dismiss" means the message they can see, and clearing only one of two
+   * would replace it with an older one that had been hidden behind it.
+   */
   const dismissError = (): void => {
     networkError.value = null;
+    recorder.clearError();
   };
 
   return {

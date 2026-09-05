@@ -62,10 +62,10 @@ const transcriptionFailed = (error: unknown): ApiError => {
       );
     }
 
-    return ApiError.dependencyUnavailable(
-      'Voice transcription failed. Please try again.',
-      { cause: error, details: { integration: 'speech', kind: error.kind } },
-    );
+    return ApiError.dependencyUnavailable('Voice transcription failed. Please try again.', {
+      cause: error,
+      details: { integration: 'speech', kind: error.kind },
+    });
   }
 
   return ApiError.dependencyUnavailable('Voice transcription failed. Please try again.', {

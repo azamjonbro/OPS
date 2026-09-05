@@ -17,11 +17,7 @@ import { computed, onBeforeUnmount, readonly, ref, type ComputedRef, type Ref } 
 export type RecorderState = 'idle' | 'requesting' | 'recording' | 'stopping';
 
 export type RecorderErrorKind =
-  | 'unsupported'
-  | 'permission-denied'
-  | 'no-microphone'
-  | 'empty'
-  | 'failed';
+  'unsupported' | 'permission-denied' | 'no-microphone' | 'empty' | 'failed';
 
 export interface RecorderError {
   kind: RecorderErrorKind;
@@ -94,6 +90,8 @@ export interface VoiceRecorder {
   stop: () => Promise<Blob | null>;
   /** Throws the recording away without producing anything. */
   cancel: () => void;
+  /** Clears a message the person has read, so "Dismiss" clears all of them. */
+  clearError: () => void;
 }
 
 export interface VoiceRecorderOptions {
@@ -290,6 +288,10 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
     elapsedSeconds.value = 0;
   };
 
+  const clearError = (): void => {
+    error.value = null;
+  };
+
   // Navigating away mid-recording must not leave the microphone open.
   onBeforeUnmount(() => {
     discarding = true;
@@ -313,5 +315,6 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
     start,
     stop,
     cancel,
+    clearError,
   };
 };

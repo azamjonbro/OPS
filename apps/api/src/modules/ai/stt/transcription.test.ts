@@ -4,11 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createApp } from '../../../app.js';
 import { HTTP_STATUS } from '../../../core/http/http-status.js';
-import {
-  clearTestDatabase,
-  startTestDatabase,
-  stopTestDatabase,
-} from '../../../test/database.js';
+import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../../test/database.js';
 import { createTestBranch, signInAs } from '../../../test/factories.js';
 import { AiProviderError } from '../provider/ai-error.js';
 import type { FetchLike } from '../provider/ai-http.js';
@@ -315,7 +311,10 @@ describe('when the provider fails', () => {
 describe('the OpenAI provider, driven by scripted HTTP', () => {
   const createFetch = (
     script: Array<{ status?: number; body?: unknown; raw?: string }>,
-  ): { fetchImpl: FetchLike; calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }> } => {
+  ): {
+    fetchImpl: FetchLike;
+    calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }>;
+  } => {
     const calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }> = [];
     let index = 0;
 
