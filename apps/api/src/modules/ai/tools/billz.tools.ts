@@ -40,6 +40,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
+ * One product in a line the model can actually use: what it is, what it costs
+ * and how many are left. The Billz id is included because other tools take one.
+ */
+const describeProduct = (product: Record<string, unknown>): string => {
+  const price = typeof product.retailPrice === 'number' ? money(product.retailPrice) : 'no price';
+  const stock = typeof product.totalStock === 'number' ? `${product.totalStock} in stock` : 'stock unknown';
+
+  return `${String(product.name)} — ${price}, ${stock} [sku ${String(product.sku)}, id ${String(product.externalId)}]`;
+};
+
+/**
  * What the *model* reads back from a call.
  *
  * Written per capability because a good summary is the difference between an
@@ -143,9 +154,44 @@ const summarise = (name: BillzCapabilityName, result: unknown): string => {
         .join('; ')}.`;
     }
 
-    case 'getProduct':
+    case 'getProducts':
+    case 'searchProducts': {
+      const page = result as { items: Array<Record<string, unknown>>; total: number };
+
+      if (page.items.length === 0) {
+        return 'No product matched that.';
+      }
+
+      // A line per product rather than the raw objects. Those carry a price
+      // array and a stock array per shop, which is a great deal of context
+      // spent on a question that was usually "do we sell this, and how many?".
+      return `${page.total} product(s). ${page.items.map(describeProduct).join('; ')}.`;
+    }
+
+    case 'getProduct': {
+      return describeProduct(result as Record<string, unknown>);
+    }
+
+    case 'getCustomers':
+    case 'searchCustomers': {
+      const page = result as {
+        items: Array<{ fullName: string; phone: string | null }>;
+        total: number;
+      };
+
+      if (page.items.length === 0) {
+        return 'No customer matched that.';
+      }
+
+      return `${page.total} customer(s). ${page.items
+        .map((customer) => `${customer.fullName}${customer.phone ? ` (${customer.phone})` : ''}`)
+        .join('; ')}.`;
+    }
+
     case 'getCustomerByPhone': {
-      return JSON.stringify(result);
+      const customer = result as { fullName: string; phone: string | null };
+
+      return `${customer.fullName}${customer.phone ? ` (${customer.phone})` : ''}.`;
     }
 
     case 'getSale': {

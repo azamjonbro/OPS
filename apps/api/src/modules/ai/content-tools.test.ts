@@ -545,14 +545,16 @@ describe('through /ai/chat', () => {
 
     setAiProvider(provider);
 
-    await sendMessage(actor, {
-      message: 'Eng ko‘p sotilayotgan mahsulotlar asosida 3 kunlik plan tuz.',
-    });
+    await sendMessage(
+      actor,
+      { message: 'Eng ko‘p sotilayotgan mahsulotlar asosida 3 kunlik plan tuz.' },
+      { registry },
+    );
 
-    // The real product reached the generator's brief — it was never read by the
-    // content engine itself.
+    // The product Billz returned reached the generator's brief — it was never
+    // read by the content engine itself, and was never invented by the model.
     const briefs = provider.requests.map((entry) => JSON.stringify(entry.messages));
-    expect(briefs.some((brief) => /Cola 1L — 12 000 UZS/.test(brief))).toBe(true);
+    expect(briefs.some((brief) => brief.includes('Cola 1L'))).toBe(true);
     expect(await ContentPlanModel.countDocuments().exec()).toBe(1);
   });
 
