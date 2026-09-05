@@ -67,6 +67,5 @@ const onSubmit = async (): Promise<void> => {
 
       <BaseButton type="submit" block :loading="isSubmitting">Sign in</BaseButton>
     </div>
-
   </form>
 </template>
