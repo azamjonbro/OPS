@@ -175,6 +175,28 @@ const outcomeLedgerNote = (steps: AgentStep[]): string => {
   ].join('\n');
 };
 
+/**
+ * The longest tool result the transcript will hold.
+ *
+ * Matches the message schema's own limit, and is applied here rather than left
+ * to Mongoose because the alternative is a validation error that fails the
+ * whole turn: a tool that answered with sixty thousand characters would take
+ * down the reply, the question and every other step with it. Cutting it short
+ * loses the tail of one result; not cutting it loses everything.
+ *
+ * The same text goes to the model, so what a person sees in the transcript is
+ * exactly what the model was working from.
+ */
+const TOOL_RESULT_LIMIT = 4_000;
+
+const TRUNCATION_NOTICE =
+  '\n[... the result was longer than Hadiya passes on and was cut short here. Ask a narrower question if you need the rest.]';
+
+const clampResult = (summary: string): string =>
+  summary.length <= TOOL_RESULT_LIMIT
+    ? summary
+    : `${summary.slice(0, TOOL_RESULT_LIMIT - TRUNCATION_NOTICE.length)}${TRUNCATION_NOTICE}`;
+
 const toStep = (outcome: ToolOutcome, round: number): AgentStep => ({
   callId: outcome.callId,
   tool: outcome.name,
@@ -316,6 +338,17 @@ export const sendMessage = async (
     content: input.message,
   });
 
+  // Built before the run is registered, so a context that cannot be assembled
+  // does not leave a cancellation handle behind with nothing to cancel.
+  const context = await buildContext(actor, { conversationId, userMessage: input.message });
+  const usedMemories = context.memories;
+
+  // Reading a memory counts as using it, which later feeds relevance ordering.
+  await memoryService.markMemoriesUsed(
+    actor,
+    usedMemories.map((memory) => String(memory._id)),
+  );
+
   const workflowId = randomUUID();
   const requestId = dependencies.requestId ?? workflowId;
   const runSignal = registerRun({ workflowId, conversationId, userId: actor.id });
@@ -331,7 +364,6 @@ export const sendMessage = async (
 
   let state: AgentState = 'planning';
   let assistantMessage: MessageDocument | null = null;
-  let usedMemories: MemoryDocument[] = [];
   let modelCalls = 0;
   let rounds = 0;
   let tokensSpent = 0;
@@ -344,28 +376,17 @@ export const sendMessage = async (
   });
 
   try {
-    const context = await buildContext(actor, { conversationId, userMessage: input.message });
-
-    usedMemories = context.memories;
-
-    // Reading a memory counts as using it, which later feeds relevance ordering.
-    await memoryService.markMemoriesUsed(
-      actor,
-      context.memories.map((memory) => String(memory._id)),
-    );
-
     const promptMessages: AiPromptMessage[] = [...context.messages];
 
     // Anything this conversation is already waiting on is named for the model
     // before it plans, so an answer of "ha" resumes that action rather than
     // starting a new one.
-    const outstanding = await pendingActions.listPendingActions(actor, conversationId);
+    const alreadyWaiting = await pendingActions.listPendingActions(actor, conversationId);
 
-    if (outstanding.length > 0) {
-      state = 'waiting_for_confirmation';
+    if (alreadyWaiting.length > 0) {
       promptMessages.push({
         role: 'system',
-        content: pendingActionsNote(outstanding.map(pendingActions.toPendingActionSummary)),
+        content: pendingActionsNote(alreadyWaiting.map(pendingActions.toPendingActionSummary)),
       });
     }
 
@@ -382,7 +403,7 @@ export const sendMessage = async (
         modelCalls + 1 >= limits.maxModelCalls ||
         tokensSpent >= limits.tokenBudget;
 
-      state = withholdTools ? state : 'planning';
+      state = 'planning';
       events.emit('agent.thinking', {
         round,
         toolsOffered: withholdTools ? 0 : registry.list().length,
@@ -390,9 +411,14 @@ export const sendMessage = async (
       });
 
       const request: AiCompletionRequest = {
-        messages: withholdTools && steps.length > 0
-          ? [...promptMessages, { role: 'system', content: outcomeLedgerNote(steps) }]
-          : promptMessages,
+        // Once anything has run, every subsequent call carries Hadiya's own
+        // account of it. Not only the closing one: the model may answer at any
+        // round, and the round it chooses is not something the loop gets to
+        // know in advance.
+        messages:
+          steps.length > 0
+            ? [...promptMessages, { role: 'system', content: outcomeLedgerNote(steps) }]
+            : promptMessages,
         // On the closing round the tools are withheld, which forces a written
         // answer instead of another request Hadiya would only have to refuse.
         tools: withholdTools ? [] : registry.definitions(),
@@ -418,9 +444,7 @@ export const sendMessage = async (
           usage: completion.usage,
         });
 
-        if (state !== 'waiting_for_confirmation') {
-          state = 'completed';
-        }
+        state = 'completed';
 
         break;
       }
@@ -454,7 +478,7 @@ export const sendMessage = async (
         name: outcome.name,
         arguments: outcome.arguments,
         status: outcome.status,
-        result: outcome.result.summary,
+        result: clampResult(outcome.result.summary),
         // Only the summary goes back to the model; the structured payload is
         // stored alongside it so the chat can render what the tool produced.
         data: outcome.result.data ?? null,
@@ -480,15 +504,10 @@ export const sendMessage = async (
             integrationId: plan?.provenance.integrationId ?? null,
             integrationName: plan?.provenance.integrationName ?? null,
           });
-
-          state = 'waiting_for_confirmation';
         }
       }
 
-      if (
-        state !== 'waiting_for_confirmation' &&
-        outcomes.some((outcome) => outcome.status === 'failed')
-      ) {
+      if (outcomes.some((outcome) => outcome.status === 'failed')) {
         // Something went wrong and the run is carrying on with what did work.
         state = 'recovering';
       }
@@ -547,15 +566,6 @@ export const sendMessage = async (
       events.emit('agent.cancelled', { rounds, steps: steps.length });
     } else if (!assistantMessage) {
       throw new Error('The assistant produced no reply');
-    } else {
-      events.emit('agent.completed', {
-        state,
-        rounds,
-        modelCalls,
-        steps: steps.length,
-        tokensSpent,
-        limitReached,
-      });
     }
   } catch (error) {
     events.emit('agent.failed', {
@@ -571,6 +581,29 @@ export const sendMessage = async (
     releaseRun(workflowId);
   }
 
+  // What the conversation is still waiting on decides the state, rather than
+  // whatever the last round happened to set. A turn that proposed something and
+  // was answered ends `completed`; one that proposed something and is still
+  // waiting says so — read from the stored proposals rather than inferred from
+  // the model's behaviour.
+  const outstanding =
+    state === 'cancelled' ? [] : await pendingActions.listPendingActions(actor, conversationId);
+
+  if (outstanding.length > 0) {
+    state = 'waiting_for_confirmation';
+  }
+
+  if (state !== 'cancelled') {
+    events.emit('agent.completed', {
+      state,
+      rounds,
+      modelCalls,
+      steps: steps.length,
+      tokensSpent,
+      limitReached,
+    });
+  }
+
   // Anything the assistant wanted to remember but was not sure enough about is
   // surfaced so the client can ask, rather than being kept silently.
   const { items: pending } = await memoryService.listMemories(actor, {
@@ -578,8 +611,6 @@ export const sendMessage = async (
     pageSize: 10,
     status: 'pending',
   });
-
-  const outstanding = await pendingActions.listPendingActions(actor, conversationId);
 
   const summary: AgentRunSummary = {
     workflowId,

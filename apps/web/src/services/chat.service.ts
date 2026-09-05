@@ -18,6 +18,17 @@ export interface AssistantTool {
   description: string;
   mutates: boolean;
   requiresConfirmation: boolean;
+  /**
+   * How much damage it could do, and whether it may run beside another.
+   *
+   * Optional because this type is a client's reading of the endpoint rather
+   * than a mirror of it: a build of the web app that predates the agent's
+   * classification still works, and a component that does not care about risk
+   * does not have to narrow it.
+   */
+  risk?: ToolRisk;
+  category?: ToolCategory;
+  parallelSafe?: boolean;
 }
 
 export interface AssistantStatus {
@@ -27,6 +38,15 @@ export interface AssistantStatus {
   /** Why it cannot answer, when it cannot. Never a credential or a stack. */
   reason: string | null;
   tools: AssistantTool[];
+  /** The budget one turn is held to. Numbers only; never a credential. */
+  limits?: {
+    maxToolRounds: number;
+    maxModelCalls: number;
+    maxParallelTools: number;
+    toolTimeoutMs: number;
+    maxToolRetries: number;
+    confirmationTtlMs: number;
+  };
 }
 
 /**
