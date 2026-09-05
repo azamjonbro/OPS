@@ -4,11 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createApp } from '../../../app.js';
 import { HTTP_STATUS } from '../../../core/http/http-status.js';
-import {
-  clearTestDatabase,
-  startTestDatabase,
-  stopTestDatabase,
-} from '../../../test/database.js';
+import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../../test/database.js';
 import { createTestBranch, signInAs } from '../../../test/factories.js';
 import { AiProviderError } from '../provider/ai-error.js';
 import type { FetchLike } from '../provider/ai-http.js';
@@ -298,6 +294,21 @@ describe('when the provider fails', () => {
     expect(response.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
   });
 
+  it('says the account is out of credit rather than telling the caller to wait', async () => {
+    setSpeechProvider(scripted({}, new AiProviderError('quota_exhausted', 'no credit remaining')));
+    const { authorization } = await signIn();
+
+    const response = await request(app)
+      .post(url)
+      .set('Authorization', authorization)
+      .attach('audio', recording(), { filename: 'take.webm', contentType: 'audio/webm' });
+
+    // Not a 429. An empty balance does not clear on its own, and "try again
+    // shortly" would be advice that never comes true.
+    expect(response.status).toBe(HTTP_STATUS.SERVICE_UNAVAILABLE);
+    expect(response.body.error.message).toContain('run out of credit');
+  });
+
   it('refuses clearly when no transcription model is configured', async () => {
     setSpeechProvider(createUnconfiguredSpeechProvider('set OPENAI_API_KEY'));
     const { authorization } = await signIn();
@@ -315,8 +326,11 @@ describe('when the provider fails', () => {
 describe('the OpenAI provider, driven by scripted HTTP', () => {
   const createFetch = (
     script: Array<{ status?: number; body?: unknown; raw?: string }>,
-  ): { fetchImpl: FetchLike; calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }> } => {
-    const calls: Array<{ url: string; headers: HeadersInit | undefined; body: FormData }> = [];
+  ): {
+    fetchImpl: FetchLike;
+    calls: Array<{ url: string; headers: unknown; body: FormData }>;
+  } => {
+    const calls: Array<{ url: string; headers: unknown; body: FormData }> = [];
     let index = 0;
 
     const fetchImpl: FetchLike = async (url, init) => {
@@ -351,6 +365,64 @@ describe('the OpenAI provider, driven by scripted HTTP', () => {
       }),
     };
   };
+
+  it('reads an exhausted balance out of a 429 and does not retry it', async () => {
+    const { fetchImpl, calls } = createFetch([
+      {
+        status: 429,
+        body: {
+          error: {
+            message: 'You have no credits remaining.',
+            type: 'insufficient_quota',
+            code: 'credit_balance_exhausted',
+          },
+        },
+      },
+    ]);
+
+    const provider = new OpenAiSpeechProvider({
+      apiKey: 'sk-test-key',
+      model: 'whisper-1',
+      baseUrl: 'https://stt.test/v1',
+      timeoutMs: 2_000,
+      // Retries allowed, precisely so the test can prove none are spent.
+      maxRetries: 2,
+      language: null,
+      fetchImpl,
+      sleep: async () => undefined,
+    });
+
+    await expect(
+      provider.transcribe({ audio: recording(), contentType: 'audio/webm' }),
+    ).rejects.toMatchObject({ kind: 'quota_exhausted' });
+
+    // Retrying an empty balance only makes the person wait three times as long
+    // for the same answer.
+    expect(calls).toHaveLength(1);
+  });
+
+  it('still treats an ordinary 429 as a rate limit worth retrying', async () => {
+    const { fetchImpl, calls } = createFetch([
+      { status: 429, body: { error: { code: 'rate_limit_exceeded' } } },
+      { body: { text: 'Salom' } },
+    ]);
+
+    const provider = new OpenAiSpeechProvider({
+      apiKey: 'sk-test-key',
+      model: 'whisper-1',
+      baseUrl: 'https://stt.test/v1',
+      timeoutMs: 2_000,
+      maxRetries: 2,
+      language: null,
+      fetchImpl,
+      sleep: async () => undefined,
+    });
+
+    const outcome = await provider.transcribe({ audio: recording(), contentType: 'audio/webm' });
+
+    expect(outcome.text).toBe('Salom');
+    expect(calls).toHaveLength(2);
+  });
 
   it('posts the audio as multipart and reads the transcript back', async () => {
     const { provider, calls } = build([

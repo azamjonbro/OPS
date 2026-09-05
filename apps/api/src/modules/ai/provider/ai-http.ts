@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 
-import { AiProviderError } from './ai-error.js';
+import { AiProviderError, classifyRateLimit } from './ai-error.js';
 
 /** Injected in tests; production uses the platform `fetch`. */
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -85,7 +85,17 @@ const classify = (status: number, providerCode: string | undefined): AiProviderE
   }
 
   if (status === HTTP_TOO_MANY_REQUESTS) {
-    return new AiProviderError('rate_limited', 'the provider is rate limiting this key', context);
+    // A `429` is two different problems wearing the same status: a rate limit,
+    // which clears, and an exhausted balance, which does not.
+    const kind = classifyRateLimit(providerCode);
+
+    return new AiProviderError(
+      kind,
+      kind === 'quota_exhausted'
+        ? 'the account has no credit remaining'
+        : 'the provider is rate limiting this key',
+      context,
+    );
   }
 
   if (status === HTTP_UNPROCESSABLE) {

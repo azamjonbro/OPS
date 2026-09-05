@@ -54,10 +54,21 @@ export const settingsSections: NavigationSection[] = [
     title: 'Connections',
     items: [
       {
+        // The hub: Billz, Notion and the person's own MCP servers, with the
+        // tool permissions that decide what the assistant may do with them.
         label: 'Integrations',
-        module: 'billz',
-        to: { name: 'integrations' },
+        module: 'integrations',
+        to: { name: 'integration-hub' },
         icon: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+      },
+      {
+        // A different question, despite the similar name: how the model and
+        // image providers configured in the environment are behaving, and what
+        // they have cost.
+        label: 'Providers & usage',
+        module: 'assistant',
+        to: { name: 'provider-usage' },
+        icon: 'M3 3v18h18M7 15l4-6 3 4 4-7',
       },
     ],
   },

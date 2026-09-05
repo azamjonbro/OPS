@@ -66,7 +66,12 @@ credentialSchema.index({ integration: 1, purpose: 1 }, { unique: true });
  * not depend on anyone remembering.
  */
 credentialSchema.set('toJSON', {
-  transform: (_document, record: Record<string, unknown>) => ({ id: String(record._id) }),
+  // Both parameters are `unknown` for the same reason as in `create-schema.ts`:
+  // Mongoose types a transform's arguments with conditional types over the
+  // document, and nothing narrower is assignable while those stay unresolved.
+  transform: (_document: unknown, record: unknown) => ({
+    id: String((record as { _id?: unknown })._id),
+  }),
 });
 
 export const IntegrationCredentialModel: Model<IntegrationCredentialDocument> =

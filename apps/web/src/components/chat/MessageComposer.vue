@@ -217,7 +217,11 @@ defineExpose({ focus, setText });
 
         <TranscriptionStatus :phase="voice.phase.value" @cancel="voice.cancel" />
 
-        <p v-if="voice.error.value" class="flex items-center gap-2 text-[11px] text-danger-600" role="alert">
+        <p
+          v-if="voice.error.value"
+          class="flex items-center gap-2 text-[11px] text-danger-600"
+          role="alert"
+        >
           {{ voice.error.value }}
           <button
             type="button"

@@ -24,7 +24,10 @@ class FakeMediaRecorder {
   state: 'inactive' | 'recording' = 'inactive';
   mimeType = 'audio/webm;codecs=opus';
 
-  private readonly listeners = new Map<string, Array<(event: unknown) => void>>();
+  private readonly listeners = new Map<
+    string,
+    Array<{ handler: (event: unknown) => void; once: boolean }>
+  >();
 
   constructor(
     public stream: MediaStream,
@@ -37,13 +40,32 @@ class FakeMediaRecorder {
     }
   }
 
-  addEventListener(type: string, handler: (event: unknown) => void): void {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), handler]);
+  addEventListener(
+    type: string,
+    handler: (event: unknown) => void,
+    options?: { once?: boolean },
+  ): void {
+    this.listeners.set(type, [
+      ...(this.listeners.get(type) ?? []),
+      { handler, once: options?.once ?? false },
+    ]);
   }
 
+  /**
+   * `once` is honoured, as the real `MediaRecorder` honours it. Without that a
+   * second `stop()` re-runs the handler against an already-drained buffer, and
+   * the test invents a failure the browser would never produce.
+   */
   private emit(type: string, event: unknown): void {
-    for (const handler of this.listeners.get(type) ?? []) {
-      handler(event);
+    const registered = this.listeners.get(type) ?? [];
+
+    this.listeners.set(
+      type,
+      registered.filter((entry) => !entry.once),
+    );
+
+    for (const entry of registered) {
+      entry.handler(event);
     }
   }
 
@@ -53,7 +75,9 @@ class FakeMediaRecorder {
 
   /** Emits a chunk of the given size, the way a real recorder would. */
   emitAudio(bytes = 4_096): void {
-    this.emit('dataavailable', { data: new Blob([new Uint8Array(bytes)], { type: this.mimeType }) });
+    this.emit('dataavailable', {
+      data: new Blob([new Uint8Array(bytes)], { type: this.mimeType }),
+    });
   }
 
   stop(): void {
@@ -128,7 +152,9 @@ describe('the microphone button', () => {
     vi.stubGlobal('MediaRecorder', undefined);
     const wrapper = mountComposer();
 
-    const button = wrapper.find('button[aria-label="Voice input is not available in this browser"]');
+    const button = wrapper.find(
+      'button[aria-label="Voice input is not available in this browser"]',
+    );
     expect(button.exists()).toBe(true);
     expect(button.attributes('disabled')).toBeDefined();
   });
@@ -339,7 +365,9 @@ describe('the transcript is a draft, never a message', () => {
 
 describe('when transcription races the typist', () => {
   it('keeps what was typed while the model was listening', async () => {
-    let resolve: ((value: { text: string; durationSeconds: null; language: null; model: string }) => void) | undefined;
+    let resolve:
+      | ((value: { text: string; durationSeconds: null; language: null; model: string }) => void)
+      | undefined;
 
     vi.spyOn(speechService, 'transcribe').mockReturnValue(
       new Promise((settle) => {
@@ -365,7 +393,9 @@ describe('when transcription races the typist', () => {
   });
 
   it('drops a transcript the person cancelled before it arrived', async () => {
-    let resolve: ((value: { text: string; durationSeconds: null; language: null; model: string }) => void) | undefined;
+    let resolve:
+      | ((value: { text: string; durationSeconds: null; language: null; model: string }) => void)
+      | undefined;
 
     vi.spyOn(speechService, 'transcribe').mockReturnValue(
       new Promise((settle) => {
@@ -416,7 +446,9 @@ describe('when the service fails', () => {
   });
 
   it('lets the person dismiss the message and try again', async () => {
-    vi.spyOn(speechService, 'transcribe').mockRejectedValue(new Error('Voice transcription failed.'));
+    vi.spyOn(speechService, 'transcribe').mockRejectedValue(
+      new Error('Voice transcription failed.'),
+    );
 
     const wrapper = mountComposer();
     const recorder = await startRecording(wrapper);

@@ -17,7 +17,7 @@ import {
   type AiPromptMessage,
   type AiProvider,
 } from '../provider/index.js';
-import { getToolRegistry, type ToolRegistry } from '../tools/index.js';
+import { buildActorToolRegistry, type ToolRegistry } from '../tools/index.js';
 
 const log = createLogger('ai-agent');
 
@@ -88,7 +88,10 @@ export const sendMessage = async (
   dependencies: AgentDependencies = {},
 ): Promise<ChatResponse> => {
   const provider = dependencies.provider ?? getAiProvider();
-  const registry = dependencies.registry ?? getToolRegistry();
+  // Built per turn rather than taken from a singleton: the built-in tools are
+  // everyone's, but the connected integrations are this account's alone, and a
+  // shared registry would hand one person's MCP servers to the next caller.
+  const registry = dependencies.registry ?? (await buildActorToolRegistry(actor));
 
   const conversation = input.conversationId
     ? await conversationService.getConversation(actor, input.conversationId)

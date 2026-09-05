@@ -180,6 +180,29 @@ describe('sending a message', () => {
 });
 
 describe('when a turn fails', () => {
+  it('names an exhausted account instead of telling the person to wait', async () => {
+    vi.spyOn(chatService, 'send').mockRejectedValue(
+      new ApiClientError('The AI account has run out of credit.', {
+        code: 'DEPENDENCY_UNAVAILABLE',
+        status: 503,
+        // The API classifies the failure more precisely than its status can.
+        details: { integration: 'ai', kind: 'quota_exhausted' },
+      }),
+    );
+
+    const chat = useChatStore();
+    await chat.send('Savdo?');
+
+    // "Not responding, try again in a moment" would be advice that is just as
+    // wrong tomorrow: the balance is empty, not busy.
+    expect(chat.error).toBe(
+      'The AI account has run out of credit. Top it up to keep using Hadiya.',
+    );
+    expect(chat.error).not.toContain('try again');
+    // And no retry is offered, because retrying cannot work.
+    expect(chat.canRetry).toBe(false);
+  });
+
   it('explains an unavailable AI provider without leaking the server’s wording', async () => {
     vi.spyOn(chatService, 'send').mockRejectedValue(
       new ApiClientError('anthropic rejected key sk-ant-123', {

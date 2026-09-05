@@ -109,11 +109,12 @@ const summarise = (name: BillzCapabilityName, result: unknown): string => {
         .join('; ');
 
       return [
-        rows || 'No receipts matched a payment method.',
-        // Billz records no per-method split on a mixed receipt, and saying so is
-        // more useful than a total that quietly under-reports every method.
+        rows ? `${rows}.` : 'No receipts matched a payment method.',
+        // The money for a split receipt is already in the rows above, method by
+        // method. This is only how many receipts took more than one — a fact
+        // about how people pay, not a caveat about missing data.
         breakdown.mixedReceiptCount > 0
-          ? `${breakdown.mixedReceiptCount} receipt(s) totalling ${money(breakdown.mixedTotal)} used more than one method, which Billz does not split.`
+          ? `${breakdown.mixedReceiptCount} of those receipt(s), worth ${money(breakdown.mixedTotal)} in total, were settled with more than one method.`
           : '',
         breakdown.creditReceiptCount > 0
           ? `${breakdown.creditReceiptCount} receipt(s) totalling ${money(breakdown.creditTotal)} were sold on credit.`

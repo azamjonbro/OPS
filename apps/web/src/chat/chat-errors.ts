@@ -11,6 +11,11 @@ import { isApiClientError } from '@/services/api-error';
  *
  * Nothing in this file can emit a status code, a request id, a stack or a
  * credential, because none of them is ever read.
+ *
+ * The one thing read besides the code is `details.kind`, which the API sets to
+ * its own classification of the failure. A code alone is too coarse in one
+ * case that matters: an exhausted account and an unreachable model are both
+ * `DEPENDENCY_UNAVAILABLE`, and only one of them is worth waiting out.
  */
 export interface ChatError {
   message: string;
@@ -57,6 +62,34 @@ const MESSAGES: Record<string, ChatError> = {
   },
 };
 
+/**
+ * Failures the API classifies more precisely than its status code can.
+ *
+ * `quota_exhausted` is the reason this exists. It arrives as
+ * `DEPENDENCY_UNAVAILABLE`, which would otherwise read as "the service is not
+ * responding, try again in a moment" — advice that will be just as wrong
+ * tomorrow, because the account is empty rather than busy. Somebody has to top
+ * it up, and nothing happens until they know that.
+ */
+const KINDS: Record<string, ChatError> = {
+  quota_exhausted: {
+    message: 'The AI account has run out of credit. Top it up to keep using Hadiya.',
+    // Not retriable: an empty balance does not refill while you wait.
+    retriable: false,
+  },
+};
+
+/** The API's own classification, when it sent one. */
+const readKind = (details: unknown): string | undefined => {
+  if (typeof details !== 'object' || details === null) {
+    return undefined;
+  }
+
+  const kind = (details as { kind?: unknown }).kind;
+
+  return typeof kind === 'string' ? kind : undefined;
+};
+
 const TIMEOUT: ChatError = {
   message: 'Hadiya took too long to answer. Please try again.',
   retriable: true,
@@ -87,6 +120,13 @@ export const toChatError = (error: unknown): ChatError => {
 
   if (error.code === 'NETWORK_ERROR' && isTimeout(error)) {
     return TIMEOUT;
+  }
+
+  // Checked before the code, because it is the more specific of the two.
+  const kind = readKind(error.details);
+
+  if (kind && KINDS[kind]) {
+    return KINDS[kind];
   }
 
   return MESSAGES[error.code] ?? FALLBACK;

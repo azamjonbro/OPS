@@ -83,7 +83,10 @@ export class BillzSalesService {
     );
 
     const items = page.items
-      .filter((order) => order.is_deleted !== true)
+      // Billz reports deletion as `deleted`. The previous name did not exist on
+      // the payload, so this filter matched everything and voided receipts were
+      // being counted as trade.
+      .filter((order) => order.deleted !== true)
       .map((order) => mapSale(order));
 
     return { items, total: page.total || items.length };
@@ -118,24 +121,5 @@ export class BillzSalesService {
       }),
       { netTotal: 0, saleCount: 0, returnCount: 0, outstandingDebt: 0 },
     );
-  }
-
-  /**
-   * Which receipts were settled with which payment method.
-   *
-   * A Billz order carries no payment method of its own — verified field by
-   * field against both `/v3/order-search` and `/v2/order/{id}` — and the report
-   * endpoints that would answer this are refused to an API-key role. Order
-   * search does accept a `company_payment_type_ids` filter, so asking once per
-   * method and collecting the ids reconstructs the split from data Billz
-   * actually gives us. Receipts that match no method are credit sales.
-   */
-  async listSaleIdsByPaymentType(
-    query: Omit<SalesQuery, 'paymentTypeIds'>,
-    paymentTypeId: string,
-  ): Promise<Set<string>> {
-    const { items } = await this.listSales({ ...query, paymentTypeIds: [paymentTypeId] });
-
-    return new Set(items.map((sale) => sale.externalId));
   }
 }

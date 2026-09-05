@@ -111,7 +111,10 @@ export const storeSecret = async (input: StoreSecretInput): Promise<void> => {
 };
 
 /** Whether a secret is on file, which is all any read path needs to know. */
-export const hasSecret = async (integrationId: string, purpose: CredentialPurpose): Promise<boolean> =>
+export const hasSecret = async (
+  integrationId: string,
+  purpose: CredentialPurpose,
+): Promise<boolean> =>
   (await IntegrationCredentialModel.exists({
     integration: toObjectId(integrationId),
     purpose,

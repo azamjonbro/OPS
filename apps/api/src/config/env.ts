@@ -185,7 +185,7 @@ const envSchema = z
         code: 'custom',
         path: ['MCP_ALLOW_PRIVATE_HOSTS'],
         message:
-          'MCP_ALLOW_PRIVATE_HOSTS must stay off in production: it lets a user-supplied server URL reach the deployment\'s own network',
+          "MCP_ALLOW_PRIVATE_HOSTS must stay off in production: it lets a user-supplied server URL reach the deployment's own network",
       });
     }
 

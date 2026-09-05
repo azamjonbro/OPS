@@ -170,21 +170,48 @@ export interface BillzRawOrderItem {
   is_returned?: boolean;
 }
 
+export interface BillzRawOrderPayment {
+  /** Id of the company payment type, e.g. the company's own "Naqd". */
+  company_payment_type_id?: string;
+  company_payment_type?: { id?: string; name?: string; payment_type_id?: string };
+  /** What this method actually covered, in so'm. */
+  paid_amount?: number;
+  returned_amount?: number;
+}
+
+/**
+ * One receipt from `/v3/order-search`.
+ *
+ * The shape is worth stating carefully, because it is not the obvious one and
+ * getting it wrong is silent: almost everything that matters — the total, the
+ * shop, the customer, the lines, the payments — lives under `order_detail`,
+ * while the envelope carries identifiers and timestamps. Reading `total_price`
+ * off the envelope returns `undefined`, which becomes a confident zero rather
+ * than an error, and a day of real trade reports as no money at all.
+ */
 export interface BillzRawOrder {
   id?: string;
   /** `SALE` or `RETURN`; a return carries a negative total and a `parent_id`. */
   order_type?: string;
-  total_price?: number;
+  order_number?: string;
   parent_id?: string;
-  shop_id?: string;
-  shop_name?: string;
   customer_id?: string;
-  customer?: { id?: string; first_name?: string; last_name?: string; phone_number?: string };
   created_at?: string;
-  finished_date?: string;
-  is_deleted?: boolean;
+  /** Local wall clock. `sold_at` and `finished_at` are the UTC pair. */
+  display_sold_at?: string;
+  sold_at?: string;
+  finished_at?: string;
+  /** Billz reports deletion as a boolean here, not as `is_deleted`. */
+  deleted?: boolean;
   debt?: { amount?: number } | null;
-  order_detail?: { order_items?: BillzRawOrderItem[] };
+  order_detail?: {
+    total_price?: number;
+    shop_id?: string;
+    shop?: { id?: string; name?: string };
+    customer?: { id?: string; first_name?: string; last_name?: string; phone_number?: string };
+    order_items?: BillzRawOrderItem[];
+    order_payments?: BillzRawOrderPayment[];
+  };
 }
 
 /**

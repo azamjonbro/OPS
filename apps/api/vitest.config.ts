@@ -45,6 +45,19 @@ export default defineConfig({
       BILLZ_SHOP_IDS: '',
       BILLZ_TIMEOUT_MS: '5000',
       BILLZ_MAX_RETRIES: '0',
+      // A fixed, obviously-fake key. Credential tests need encryption to work;
+      // they must never depend on a developer's real one, and a committed key
+      // guarantees a test can never decrypt anything but its own fixtures.
+      CREDENTIALS_ENCRYPTION_KEY: 'aGFkaXlhLXRlc3Qtb25seS1rZXktMzItYnl0ZXMhISE=',
+      // MCP tests inject a scripted client, so nothing here dials out. Private
+      // hosts stay refused so the URL guard is exercised as it ships.
+      MCP_ALLOW_PRIVATE_HOSTS: 'false',
+      MCP_CONNECT_TIMEOUT_MS: '2000',
+      MCP_TOOL_TIMEOUT_MS: '2000',
+      // Pointed at a domain that does not resolve, so a Notion test that forgot
+      // to stub `fetch` fails loudly instead of reaching Notion.
+      NOTION_BASE_URL: 'https://api.notion.test',
+      NOTION_TIMEOUT_MS: '2000',
     },
   },
 });

@@ -158,10 +158,28 @@ httpClient.interceptors.response.use(
   },
 );
 
-/** Unwraps the API envelope so callers work with the payload directly. */
+const HTTP_NO_CONTENT = 204;
+
+/**
+ * Unwraps the API envelope so callers work with the payload directly.
+ *
+ * A `204` is the exception and has to be handled before anything is unwrapped.
+ * It carries no body at all, so `response.data` is an empty string — reading
+ * `.success` on it yields `undefined`, the envelope check treats that as a
+ * failure, and reading `.error.message` then throws a `TypeError`. The result
+ * was a successful delete reported to the person as an error, which is the
+ * worst possible way to be wrong: the thing is gone *and* the screen says it
+ * failed.
+ */
 const request = async <TData>(config: AxiosRequestConfig): Promise<TData> => {
   try {
     const response = await httpClient.request<ApiResponse<TData>>(config);
+
+    if (response.status === HTTP_NO_CONTENT) {
+      // Nothing to unwrap. Callers of a `204` endpoint type it as `void` and
+      // read nothing back.
+      return undefined as TData;
+    }
 
     if (!response.data.success) {
       throw new ApiClientError(response.data.error.message, {

@@ -9,7 +9,11 @@ import { computed } from 'vue';
  * the running clock, and a visible way out that is not the same button that
  * started it.
  */
-const props = defineProps<{ elapsedSeconds: number; remainingSeconds: number; nearLimit: boolean }>();
+const props = defineProps<{
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  nearLimit: boolean;
+}>();
 
 const emit = defineEmits<{ stop: []; cancel: [] }>();
 
@@ -28,7 +32,9 @@ const clock = computed(() => {
     aria-live="polite"
   >
     <span class="relative flex size-2 shrink-0" aria-hidden="true">
-      <span class="absolute inline-flex size-full animate-ping rounded-full bg-danger-600 opacity-60" />
+      <span
+        class="absolute inline-flex size-full animate-ping rounded-full bg-danger-600 opacity-60"
+      />
       <span class="relative inline-flex size-2 rounded-full bg-danger-600" />
     </span>
 
@@ -37,9 +43,7 @@ const clock = computed(() => {
       <span class="sr-only">recording</span>
     </span>
 
-    <span v-if="nearLimit" class="text-[11px] text-danger-700">
-      {{ remainingSeconds }}s left
-    </span>
+    <span v-if="nearLimit" class="text-[11px] text-danger-700"> {{ remainingSeconds }}s left </span>
 
     <button
       type="button"
