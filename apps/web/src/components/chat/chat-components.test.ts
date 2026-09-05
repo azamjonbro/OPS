@@ -266,7 +266,7 @@ describe('the composer', () => {
     await textarea.setValue('Bugungi savdo?');
     await textarea.trigger('keydown', { key: 'Enter' });
 
-    expect(wrapper.emitted('send')?.[0]).toEqual(['Bugungi savdo?']);
+    expect(wrapper.emitted('send')?.[0]).toEqual(['Bugungi savdo?', []]);
     expect((textarea.element as HTMLTextAreaElement).value).toBe('');
   });
 

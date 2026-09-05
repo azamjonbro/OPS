@@ -54,6 +54,10 @@ export default defineConfig({
       MCP_ALLOW_PRIVATE_HOSTS: 'false',
       MCP_CONNECT_TIMEOUT_MS: '2000',
       MCP_TOOL_TIMEOUT_MS: '2000',
+      // Dictation's per-account limit is a billing control, and a suite that
+      // uploads a burst of scripted recordings should not be racing it. The
+      // limiter itself is tested directly, with a ceiling it sets.
+      STT_RATE_LIMIT_MAX: '1000',
       // Pointed at a domain that does not resolve, so a Notion test that forgot
       // to stub `fetch` fails loudly instead of reaching Notion.
       NOTION_BASE_URL: 'https://api.notion.test',

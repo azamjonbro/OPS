@@ -254,11 +254,17 @@ describe('tool registry', () => {
       'generate_image',
       // Then every Billz capability, generated from that module's own registry
       // rather than listed again here — which is why this asserts the prefix
-      // and not a copy of the list that would rot the moment one is added.
+      // and not a copy of the list that would rot the moment one is added. The
+      // analytics tools follow on the same terms.
       ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('billz_')),
+      ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('analytics_')),
+      ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('alerts_')),
     ]);
     expect(definitions.map((tool) => tool.name)).toContain('billz_get_sales_summary');
     expect(definitions.map((tool) => tool.name)).toContain('billz_search_products');
+    expect(definitions.map((tool) => tool.name)).toContain('analytics_get_summary');
+    expect(definitions.map((tool) => tool.name)).toContain('analytics_get_insights');
+    expect(definitions.map((tool) => tool.name)).toContain('alerts_list');
     expect(definitions[0]?.parameters).toMatchObject({ type: 'object' });
   });
 });

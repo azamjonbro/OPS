@@ -223,7 +223,13 @@ to is written down server-side before the person is asked — validated argument
 an expiry — so a later "ha" is checked against what Hadiya actually proposed rather than taken on
 the model's word. A run can be cancelled (`POST /api/v1/ai/chat/cancel`), and the closing summary is
 written from Hadiya's own record of what the tools returned, so a step that failed is never reported
-as done. See [docs/agent.md](docs/agent.md).
+as done.
+
+The turn is **streamed**. `POST /api/v1/ai/chat` still answers with JSON for any
+client that wants one; ask for `?stream=1` (or send `Accept: text/event-stream`) and the same run
+comes back as server-sent events instead — the steps as they start and finish, the answer as it is
+written, and a confirmation card the moment one is needed. The chat shows them as a ledger of what
+was actually done, with a Stop button while it runs. See [docs/agent.md](docs/agent.md).
 
 **A model client is not wired up yet** — that is the assistant phase's job. Until one is registered,
 `/ai/chat` answers `503` rather than inventing a reply; everything below it is complete and tested

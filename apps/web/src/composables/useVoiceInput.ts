@@ -3,7 +3,7 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue';
 
 import { isCancelled, toErrorMessage } from '@/services/api-error';
 import { speechService } from '@/services/speech.service';
-import { useVoiceRecorder, type RecorderError } from './useVoiceRecorder';
+import { useVoiceRecorder, type RecorderError, type VoiceRecording } from './useVoiceRecorder';
 
 /**
  * Recording, uploading and transcribing — as one thing the composer can drive.
@@ -99,7 +99,7 @@ export const useVoiceInput = (options: VoiceInputOptions): VoiceInput => {
       recorder.remainingSeconds.value <= SPEECH_DURATION_WARNING_SECONDS,
   );
 
-  const transcribe = async (audio: Blob): Promise<void> => {
+  const transcribe = async (recording: VoiceRecording): Promise<void> => {
     requestId += 1;
     const current = requestId;
 
@@ -113,7 +113,11 @@ export const useVoiceInput = (options: VoiceInputOptions): VoiceInput => {
       // Upload and transcription are one request to the server; the split here
       // is honest about what the person is waiting for, which is the part they
       // can feel — bytes going up, then a model listening.
-      const promise = speechService.transcribe(audio, { signal: controller.signal });
+      const promise = speechService.transcribe(recording.blob, {
+        // Lets the server refuse an over-long take before paying to hear it.
+        durationMs: recording.durationMs,
+        signal: controller.signal,
+      });
 
       networkPhase.value = 'transcribing';
 
@@ -143,10 +147,10 @@ export const useVoiceInput = (options: VoiceInputOptions): VoiceInput => {
     networkError.value = null;
 
     if (recorder.isRecording.value) {
-      const audio = await recorder.stop();
+      const recording = await recorder.stop();
 
-      if (audio) {
-        await transcribe(audio);
+      if (recording) {
+        await transcribe(recording);
       }
 
       return;

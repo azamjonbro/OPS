@@ -1,4 +1,4 @@
-import { AGENT_LIMITS, PENDING_ACTION_TTL_MS } from '@hadiya/shared';
+import { AGENT_LIMITS, PENDING_ACTION_TTL_MS, SPEECH_RATE_LIMIT } from '@hadiya/shared';
 import { z } from 'zod';
 
 import { loadEnvFiles } from './load-env.js';
@@ -192,6 +192,16 @@ const envSchema = z
     /** Transcription is slower than a sentence and faster than an image. */
     STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
     STT_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
+    /**
+     * Recordings one account may transcribe per minute.
+     *
+     * A cost control rather than an abuse control: transcription is billed per
+     * second of audio, and the microphone is the one button in the interface a
+     * pocket can press. Configurable because the right number depends on how a
+     * shop actually dictates, and because a test suite making a burst of
+     * uploads should not be racing a production billing limit.
+     */
+    STT_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(SPEECH_RATE_LIMIT.max),
 
     TELEGRAM_BOT_TOKEN: optionalSecret,
 

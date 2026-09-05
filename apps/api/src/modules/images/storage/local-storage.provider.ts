@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { IMAGE_CONTENT_TYPES, type ImageContentType } from '@hadiya/shared';
+import { IMAGE_CONTENT_TYPES } from '@hadiya/shared';
 
 import { createLogger } from '../../../core/logger/logger.js';
 import {
@@ -33,9 +33,19 @@ export class LocalStorageProvider implements StorageProvider {
   readonly name = 'local';
 
   private readonly root: string;
+  private readonly allowedContentTypes: readonly string[];
+  private readonly fallbackContentType: string;
 
-  constructor(root: string) {
+  /**
+   * The allow-list is a constructor argument rather than a hard-coded list
+   * because two stores now share this class: images accept PNG and friends,
+   * documents accept PDF and the Office types. Making it a parameter keeps one
+   * implementation of the path defences instead of two that could drift.
+   */
+  constructor(root: string, allowedContentTypes: readonly string[] = IMAGE_CONTENT_TYPES) {
     this.root = path.resolve(root);
+    this.allowedContentTypes = allowedContentTypes;
+    this.fallbackContentType = allowedContentTypes[0] ?? 'application/octet-stream';
   }
 
   /**
@@ -64,7 +74,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async put(key: string, data: Buffer, contentType: string): Promise<StoredObject> {
-    if (!(IMAGE_CONTENT_TYPES as readonly string[]).includes(contentType)) {
+    if (!this.allowedContentTypes.includes(contentType)) {
       throw new StorageError(`"${contentType}" is not a content type this store accepts`);
     }
 
@@ -108,24 +118,21 @@ export class LocalStorageProvider implements StorageProvider {
     };
   }
 
-  private async readContentType(absolute: string): Promise<ImageContentType> {
+  private async readContentType(absolute: string): Promise<string> {
     try {
       const raw: unknown = JSON.parse(await readFile(this.metaPath(absolute), 'utf8'));
       const contentType = (raw as { contentType?: unknown }).contentType;
 
-      if (
-        typeof contentType === 'string' &&
-        (IMAGE_CONTENT_TYPES as readonly string[]).includes(contentType)
-      ) {
-        return contentType as ImageContentType;
+      if (typeof contentType === 'string' && this.allowedContentTypes.includes(contentType)) {
+        return contentType;
       }
     } catch {
       // A missing or unreadable sidecar must not make the file unreadable.
     }
 
-    // Never guessed from the extension: PNG is the format everything here is
-    // written as, and a wrong guess would serve a file as something it is not.
-    return 'image/png';
+    // Never guessed from the extension: a wrong guess would serve a file as
+    // something it is not, which is how a stored document becomes a script.
+    return this.fallbackContentType;
   }
 
   async delete(key: string): Promise<boolean> {

@@ -1,6 +1,7 @@
 import {
   isSupportedAudioMimeType,
   normaliseAudioMimeType,
+  SPEECH_MAX_DECLARED_DURATION_MS,
   SPEECH_MAX_UPLOAD_BYTES,
   SPEECH_MIN_UPLOAD_BYTES,
   type AuthenticatedUser,
@@ -33,11 +34,40 @@ export interface TranscribeInput {
   mimeType: string;
   /** ISO-639-1 hint. Absent means let the provider detect the language. */
   language?: string | null;
+  /**
+   * How long the browser says the recording is.
+   *
+   * A courtesy, not a control: it comes from the client and could say anything,
+   * which is why the size ceiling is what actually bounds an upload. What it
+   * buys is a refusal that arrives in milliseconds instead of after a minute of
+   * transcription somebody has already been billed for.
+   */
+  declaredDurationMs?: number | null;
+  /** Correlates the log line with the HTTP request that caused it. */
+  requestId?: string | undefined;
 }
 
 export interface TranscriptionDependencies {
   provider?: SpeechProvider | undefined;
 }
+
+/**
+ * What kind of failure it was, in one word, for a log line.
+ *
+ * Enough to answer "is dictation broken, and whose fault is it" from a
+ * dashboard without reading a single transcript or upstream body.
+ */
+const failureCategory = (error: unknown): string => {
+  if (isAiProviderError(error)) {
+    return error.kind;
+  }
+
+  if (error instanceof ApiError) {
+    return error.code;
+  }
+
+  return 'unknown';
+};
 
 /** Turns a provider failure into the one error shape the client handles. */
 const transcriptionFailed = (error: unknown): ApiError => {
@@ -105,6 +135,13 @@ export const transcribe = async (
     throw ApiError.badRequest('That recording is too short to make out.');
   }
 
+  if (
+    typeof input.declaredDurationMs === 'number' &&
+    input.declaredDurationMs > SPEECH_MAX_DECLARED_DURATION_MS
+  ) {
+    throw ApiError.badRequest('That recording is longer than voice input accepts.');
+  }
+
   if (!provider.isConfigured) {
     // The provider raises its own refusal, so the reason is the provider's
     // rather than a guess made here.
@@ -136,13 +173,19 @@ export const transcribe = async (
 
     log.info(
       {
+        requestId: input.requestId,
         userId: actor.id,
+        provider: provider.name,
         model: outcome.model,
         bytes: input.audio.byteLength,
+        contentType,
+        audioSeconds: outcome.durationSeconds,
+        language: outcome.language,
         // The transcript itself is never logged: it is the person's words, and
-        // a log is the wrong place for them.
+        // a log is the wrong place for them. Its length is not.
         characters: text.length,
-        durationMs: Date.now() - startedAt,
+        latencyMs: Date.now() - startedAt,
+        outcome: 'succeeded',
       },
       'audio transcribed',
     );
@@ -154,6 +197,20 @@ export const transcribe = async (
       model: outcome.model,
     };
   } catch (error) {
+    log.warn(
+      {
+        requestId: input.requestId,
+        userId: actor.id,
+        provider: provider.name,
+        bytes: input.audio.byteLength,
+        contentType,
+        latencyMs: Date.now() - startedAt,
+        outcome: 'failed',
+        category: failureCategory(error),
+      },
+      'transcription failed',
+    );
+
     throw transcriptionFailed(error);
   }
 };

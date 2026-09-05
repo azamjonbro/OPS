@@ -226,7 +226,6 @@ export const postJson = async <TResponse>(
   throw lastError ?? new AiProviderError('upstream_error', 'the provider request failed');
 };
 
-
 /**
  * One streaming call to a model API.
  *

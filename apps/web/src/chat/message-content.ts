@@ -1,4 +1,12 @@
-import type { Message, MessageToolCall } from '@hadiya/shared';
+import type {
+  AnalyticsDailyPoint,
+  AnalyticsInsight,
+  AnalyticsRecommendation,
+  AnalyticsSummary,
+  Message,
+  MessageToolCall,
+  MetricComparison,
+} from '@hadiya/shared';
 
 import { toolLabel } from './tool-labels';
 
@@ -22,6 +30,8 @@ export type MessageBlock =
   | { kind: 'content-plan'; plan: ContentPlanBlock; call: MessageToolCall }
   | { kind: 'reminder'; reminder: ReminderBlock; call: MessageToolCall }
   | { kind: 'metrics'; metrics: MetricsBlock; call: MessageToolCall }
+  | { kind: 'analytics-summary'; summary: AnalyticsSummaryBlock; call: MessageToolCall }
+  | { kind: 'analytics-insights'; report: AnalyticsInsightsBlock; call: MessageToolCall }
   | { kind: 'table'; table: TableBlock; call: MessageToolCall }
   | { kind: 'confirmation'; call: MessageToolCall; question: string }
   | { kind: 'error'; call: MessageToolCall; message: string; detail: string | null };
@@ -83,6 +93,31 @@ export interface MetricsBlock {
   columns: TableBlock['columns'];
 }
 
+/**
+ * A period's figures, as the card draws them.
+ *
+ * Every number here was computed on the server. The card formats and arranges
+ * them and calculates nothing of its own — a percentage worked out in the
+ * browser is a second implementation of the arithmetic, and the two will
+ * disagree the first time either changes.
+ */
+export interface AnalyticsSummaryBlock {
+  periodLabel: string;
+  figures: MetricsFigure[];
+  changes: MetricComparison[];
+  comparisonLabel: string | null;
+  daily: AnalyticsDailyPoint[];
+  /** Present only when the figures are partial; shown, never hidden. */
+  incompleteNotes: string[];
+}
+
+export interface AnalyticsInsightsBlock {
+  periodLabel: string;
+  insights: AnalyticsInsight[];
+  recommendations: AnalyticsRecommendation[];
+  incompleteNotes: string[];
+}
+
 export interface TableBlock {
   columns: Array<{ key: string; label: string; money: boolean }>;
   rows: Array<Record<string, string | number | null>>;
@@ -107,6 +142,8 @@ const REMINDER_TOOLS = new Set([
   'cancel_reminder',
 ]);
 const METRIC_TOOLS = new Set(['get_sales_summary']);
+const ANALYTICS_SUMMARY_TOOLS = new Set(['analytics_get_summary']);
+const ANALYTICS_INSIGHT_TOOLS = new Set(['analytics_get_insights']);
 
 /** Keys that are money in minor units wherever a tool returns them. */
 const MONEY_KEYS = new Set([
@@ -331,6 +368,80 @@ export const readMetrics = (call: MessageToolCall): MetricsBlock | null => {
   };
 };
 
+/**
+ * The headline figures a summary tool returned.
+ *
+ * Reads defensively: every field is checked rather than trusted, so a tool
+ * whose payload changes shape degrades to the generic renderer instead of
+ * throwing inside a message bubble.
+ */
+export const readAnalyticsSummary = (call: MessageToolCall): AnalyticsSummaryBlock | null => {
+  const data = dataOf(call) as unknown as AnalyticsSummary | null;
+  const metrics = asRecord(data?.metrics);
+  const period = asRecord(data?.period);
+
+  if (!metrics || !period) {
+    return null;
+  }
+
+  const figures: MetricsFigure[] = [
+    { key: 'netSales', label: 'Net sales', money: true },
+    { key: 'saleCount', label: 'Sales', money: false },
+    { key: 'averageOrderValue', label: 'Average basket', money: true },
+    { key: 'unitsSold', label: 'Units', money: false },
+  ].flatMap((figure) => {
+    const value = asNumber(metrics[figure.key]);
+
+    return value === null ? [] : [{ label: figure.label, value, money: figure.money }];
+  });
+
+  if (figures.length === 0) {
+    return null;
+  }
+
+  const daily = Array.isArray(data?.daily)
+    ? data.daily.filter(
+        (point): point is AnalyticsDailyPoint =>
+          asRecord(point) !== null && typeof (point as AnalyticsDailyPoint).date === 'string',
+      )
+    : [];
+
+  return {
+    periodLabel: asString(period.label) ?? '',
+    figures,
+    changes: Array.isArray(data?.comparison?.changes) ? data.comparison.changes : [],
+    comparisonLabel: asString(asRecord(data?.comparison?.period)?.label),
+    daily,
+    // Surfaced rather than swallowed: a partial figure that looks complete is
+    // the one analytics failure a person cannot detect for themselves.
+    incompleteNotes: data?.dataQuality?.complete === false ? (data.dataQuality.notes ?? []) : [],
+  };
+};
+
+/** Findings and suggestions, already ranked and scored by the server. */
+export const readAnalyticsInsights = (call: MessageToolCall): AnalyticsInsightsBlock | null => {
+  const data = dataOf(call);
+  const insights = Array.isArray(data?.insights) ? (data.insights as AnalyticsInsight[]) : [];
+
+  if (insights.length === 0) {
+    return null;
+  }
+
+  const quality = asRecord(data?.dataQuality);
+
+  return {
+    periodLabel: asString(asRecord(data?.period)?.label) ?? '',
+    insights: insights.filter((insight) => typeof insight?.headline === 'string'),
+    recommendations: Array.isArray(data?.recommendations)
+      ? (data.recommendations as AnalyticsRecommendation[])
+      : [],
+    incompleteNotes:
+      quality?.complete === false && Array.isArray(quality.notes)
+        ? (quality.notes as string[])
+        : [],
+  };
+};
+
 /** One tool call, as the block that best explains what it did. */
 export const toolToBlock = (call: MessageToolCall): MessageBlock => {
   if (call.status === 'needs_confirmation') {
@@ -384,6 +495,22 @@ export const toolToBlock = (call: MessageToolCall): MessageBlock => {
 
     if (reminder) {
       return { kind: 'reminder', reminder, call };
+    }
+  }
+
+  if (ANALYTICS_SUMMARY_TOOLS.has(call.name)) {
+    const summary = readAnalyticsSummary(call);
+
+    if (summary) {
+      return { kind: 'analytics-summary', summary, call };
+    }
+  }
+
+  if (ANALYTICS_INSIGHT_TOOLS.has(call.name)) {
+    const report = readAnalyticsInsights(call);
+
+    if (report) {
+      return { kind: 'analytics-insights', report, call };
     }
   }
 

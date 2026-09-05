@@ -18,12 +18,7 @@ import { toStreamEvent, type AgentEvent, type ToolCategory, type ToolRisk } from
 
 /** Where the run is, as the interface needs to think about it. */
 export type AgentRunState =
-  | 'idle'
-  | 'running'
-  | 'waiting_confirmation'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+  'idle' | 'running' | 'waiting_confirmation' | 'completed' | 'failed' | 'cancelled';
 
 /** How one step of the timeline is drawn. */
 export type ActivityStatus = 'running' | 'completed' | 'failed' | 'skipped';
@@ -40,6 +35,16 @@ export interface ActivityStep {
   /** The connected service it came from, when there is one. */
   integration: string | null;
   status: ActivityStatus;
+  /**
+   * Steps that were in flight together share a number.
+   *
+   * Derived from the events themselves rather than declared: a step that starts
+   * while another is still running genuinely ran beside it, and that is exactly
+   * what the server's own waves look like from here. It is what lets the
+   * timeline show three reads happening at once instead of implying an order
+   * the backend never had.
+   */
+  wave: number;
   /** Above one means it was retried, which is worth showing. */
   attempts: number;
   durationMs: number | null;
@@ -89,6 +94,17 @@ export const emptyRun = (): AgentRun => ({
 
 const stepFor = (run: AgentRun, callId: string): ActivityStep | undefined =>
   run.steps.find((step) => step.callId === callId);
+
+/** The wave a step starting now belongs to. */
+const waveForNewStep = (run: AgentRun): number => {
+  const inFlight = run.steps.find((step) => step.status === 'running');
+
+  if (inFlight) {
+    return inFlight.wave;
+  }
+
+  return run.steps.reduce((highest, step) => Math.max(highest, step.wave), 0) + 1;
+};
 
 /**
  * Applies one event.
@@ -151,6 +167,7 @@ export const applyAgentEvent = (run: AgentRun, event: AgentEvent): boolean => {
         risk: typed.risk,
         integration: typed.integration,
         status: 'running',
+        wave: waveForNewStep(run),
         attempts: typed.attempt,
         durationMs: null,
         message: null,
@@ -205,6 +222,7 @@ export const applyAgentEvent = (run: AgentRun, event: AgentEvent): boolean => {
         risk: typed.risk,
         integration: typed.integration,
         status: 'failed',
+        wave: waveForNewStep(run),
         attempts: typed.attempts,
         durationMs: null,
         message: typed.message,

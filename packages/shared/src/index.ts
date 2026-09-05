@@ -1,5 +1,7 @@
 export * from './types/agent-stream.js';
+export * from './types/analytics.js';
 export * from './types/agent.js';
+export * from './types/alert.js';
 export * from './types/ai.js';
 export * from './types/api.js';
 export * from './types/auth.js';
@@ -7,6 +9,7 @@ export * from './types/branch.js';
 export * from './types/content.js';
 export * from './types/conversation.js';
 export * from './types/entity.js';
+export * from './types/file.js';
 export * from './types/health.js';
 export * from './types/image.js';
 export * from './types/integration.js';
@@ -19,7 +22,10 @@ export * from './types/speech.js';
 export * from './types/user.js';
 
 export * from './constants/agent.js';
+export * from './constants/alerts.js';
+export * from './constants/analytics.js';
 export * from './constants/content.js';
+export * from './constants/files.js';
 export * from './constants/conversations.js';
 export * from './constants/images.js';
 export * from './constants/integrations.js';

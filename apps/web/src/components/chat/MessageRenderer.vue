@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { MessageBlock } from '@/chat/message-content';
+import AnalyticsInsightsCard from './AnalyticsInsightsCard.vue';
+import AnalyticsSummaryCard from './AnalyticsSummaryCard.vue';
 import ContentPlanCard from './ContentPlanCard.vue';
 import ConfirmationCard from './ConfirmationCard.vue';
 import GeneratedImageCard from './GeneratedImageCard.vue';
@@ -38,6 +40,16 @@ const emit = defineEmits<{ reply: [text: string] }>();
       <ContentPlanCard v-else-if="block.kind === 'content-plan'" :plan="block.plan" />
 
       <ReminderCard v-else-if="block.kind === 'reminder'" :reminder="block.reminder" />
+
+      <AnalyticsSummaryCard
+        v-else-if="block.kind === 'analytics-summary'"
+        :summary="block.summary"
+      />
+
+      <AnalyticsInsightsCard
+        v-else-if="block.kind === 'analytics-insights'"
+        :report="block.report"
+      />
 
       <MetricsCard v-else-if="block.kind === 'metrics'" :metrics="block.metrics" />
 

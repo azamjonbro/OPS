@@ -36,6 +36,41 @@ export interface ToolDisplayLabels {
  * — a legible step rather than nothing at all.
  */
 const LABELS: Record<string, ToolDisplayLabels> = {
+  analytics_get_summary: {
+    displayName: 'Business summary',
+    runningLabel: 'Working out the figures',
+    doneLabel: 'Worked out the figures',
+  },
+  analytics_compare_periods: {
+    displayName: 'Period comparison',
+    runningLabel: 'Comparing the two periods',
+    doneLabel: 'Compared the two periods',
+  },
+  analytics_get_top_products: {
+    displayName: 'Best sellers',
+    runningLabel: 'Ranking the products',
+    doneLabel: 'Ranked the products',
+  },
+  analytics_get_branch_performance: {
+    displayName: 'Branch performance',
+    runningLabel: 'Comparing the branches',
+    doneLabel: 'Compared the branches',
+  },
+  analytics_detect_anomalies: {
+    displayName: 'Unusual days',
+    runningLabel: 'Looking for unusual days',
+    doneLabel: 'Looked for unusual days',
+  },
+  analytics_get_insights: {
+    displayName: 'Business insights',
+    runningLabel: 'Analysing what changed',
+    doneLabel: 'Analysed what changed',
+  },
+  analytics_get_inventory_analysis: {
+    displayName: 'Stock analysis',
+    runningLabel: 'Checking what is low and what is not moving',
+    doneLabel: 'Checked stock movement',
+  },
   billz_get_sales_summary: {
     displayName: 'Sales figures',
     runningLabel: 'Reading the sales figures',
@@ -235,7 +270,10 @@ const LABELS: Record<string, ToolDisplayLabels> = {
 
 /** `search_customers` becomes `Search customers`. */
 const humanise = (value: string): string => {
-  const words = value.replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = value
+    .replace(/[_.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return words.length === 0 ? 'Step' : words.charAt(0).toUpperCase() + words.slice(1);
 };

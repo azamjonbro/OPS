@@ -7,6 +7,8 @@ import { probeTransactionSupport } from './core/db/transaction.js';
 import { createShutdownManager, registerProcessSignalHandlers } from './core/lifecycle/shutdown.js';
 import { logger } from './core/logger/logger.js';
 import { registeredJobTypes, startScheduler, stopScheduler } from './core/scheduler/index.js';
+import { registerAlertJobs, scheduleAlertEvaluations } from './modules/alerts/index.js';
+import { registerFileStorage } from './modules/files/index.js';
 import { registerImageStorage } from './modules/images/index.js';
 import { registerDefaultNotificationProviders } from './modules/notifications/index.js';
 import { recoverPendingReminders, registerReminderJobs } from './modules/reminders/index.js';
@@ -99,8 +101,14 @@ const bootstrap = async (): Promise<void> => {
   // Storage is installed before the port opens, so a misconfigured image
   // directory fails at boot rather than at the first image somebody paid for.
   registerImageStorage();
+  registerFileStorage();
   registerReminderJobs();
+  registerAlertJobs();
   await recoverPendingReminders();
+  // Puts every active account's first alert evaluation on the queue. Idempotent
+  // by job key, so a restart or a second instance schedules nothing twice, and
+  // each run enqueues its own successor from then on.
+  await scheduleAlertEvaluations();
   startScheduler();
   shutdownManager.register({ name: 'scheduler', run: stopScheduler });
 

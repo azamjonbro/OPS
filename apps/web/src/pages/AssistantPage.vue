@@ -3,6 +3,7 @@ import type { Conversation } from '@hadiya/shared';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import AgentActivity from '@/components/chat/AgentActivity.vue';
 import ChatError from '@/components/chat/ChatError.vue';
 import ChatHeader from '@/components/chat/ChatHeader.vue';
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue';
@@ -11,6 +12,8 @@ import EmptyChat from '@/components/chat/EmptyChat.vue';
 import MemoryNotice from '@/components/chat/MemoryNotice.vue';
 import MessageComposer from '@/components/chat/MessageComposer.vue';
 import MessageList from '@/components/chat/MessageList.vue';
+import PendingActionCard from '@/components/chat/PendingActionCard.vue';
+import StreamingAnswer from '@/components/chat/StreamingAnswer.vue';
 import ChatLayout from '@/layouts/ChatLayout.vue';
 import { useToast } from '@/composables/useToast';
 import { toErrorMessage } from '@/services/api-error';
@@ -68,6 +71,10 @@ const openRouteConversation = async (id: string | null): Promise<void> => {
   }
 
   await chat.open(id);
+  // A turn may still be running from before this page was loaded — another tab,
+  // or this one before a refresh. The server is asked rather than guessed at,
+  // and a run that has already finished is simply not there to rejoin.
+  void chat.resumeActiveRun(id);
 };
 
 watch(routeId, (id) => void openRouteConversation(id));
@@ -93,10 +100,24 @@ onMounted(async () => {
  * `push`, so the back button does not walk into the empty screen the person
  * just left.
  */
-const send = async (text: string): Promise<void> => {
+/**
+ * Sends a turn, naming any attached documents.
+ *
+ * The reference is a short line, never the document itself: the assistant has
+ * tools that can inspect and query a file by id, and putting a spreadsheet into
+ * a message would be slower, dearer and — past a few hundred rows — impossible.
+ *
+ * The person's own words are left exactly as they wrote them and the reference
+ * is appended after them, so nothing they typed is rewritten.
+ */
+const send = async (text: string, fileIds: string[] = []): Promise<void> => {
   const wasNew = chat.conversationId === null;
+  const message =
+    fileIds.length > 0
+      ? [text, `[Biriktirilgan fayl(lar): ${fileIds.join(', ')}]`].filter(Boolean).join('\n\n')
+      : text;
 
-  await chat.send(text);
+  await chat.send(message);
 
   if (wasNew && chat.conversationId) {
     await router.replace({ name: 'assistant-conversation', params: { id: chat.conversationId } });
@@ -121,6 +142,16 @@ const openConversation = async (id: string): Promise<void> => {
     await router.push({ name: 'assistant-conversation', params: { id } });
   }
 };
+
+/**
+ * Whether the live area has anything in it.
+ *
+ * Passed down so the transcript can drop the "thinking" dots the moment there
+ * is something real to show instead.
+ */
+const hasLiveContent = computed(
+  () => chat.run.steps.length > 0 || chat.streamingText.length > 0 || chat.confirmation !== null,
+);
 
 /** Puts a suggestion in the composer rather than sending it, so it can be edited. */
 const useSuggestion = (text: string): void => {
@@ -200,12 +231,35 @@ const decideMemory = async (id: string, keep: boolean): Promise<void> => {
       :is-loading="chat.isLoadingMessages"
       :is-loading-older="chat.isLoadingOlder"
       :has-older="chat.hasOlderMessages"
+      :has-live-content="hasLiveContent"
       @load-older="chat.loadOlder()"
       @regenerate="chat.regenerate()"
       @reply="send"
     >
       <template #empty>
         <EmptyChat @pick="useSuggestion" />
+      </template>
+
+      <template #live>
+        <AgentActivity
+          v-if="chat.run.steps.length > 0"
+          :steps="chat.run.steps"
+          :active="chat.isRunning"
+          :reconnecting="chat.run.reconnecting"
+        />
+
+        <PendingActionCard
+          v-if="chat.confirmation"
+          :confirmation="chat.confirmation"
+          :disabled="chat.isSending"
+          @reply="send"
+        />
+
+        <StreamingAnswer v-if="chat.streamingText" :text="chat.streamingText" />
+
+        <p v-if="chat.run.state === 'cancelled'" class="text-[13px] text-ink-500" role="status">
+          Stopped. Nothing further was run.
+        </p>
       </template>
 
       <template #footer>
@@ -228,7 +282,14 @@ const decideMemory = async (id: string, keep: boolean): Promise<void> => {
     </MessageList>
 
     <template #composer>
-      <MessageComposer ref="composer" :busy="chat.isSending" @send="send" />
+      <MessageComposer
+        ref="composer"
+        :busy="chat.isSending"
+        :stoppable="chat.isRunning"
+        :stopping="chat.isCancelling"
+        @send="send"
+        @stop="chat.cancel()"
+      />
     </template>
   </ChatLayout>
 

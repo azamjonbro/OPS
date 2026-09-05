@@ -1,4 +1,6 @@
 import {
+  FILE_LIMITS,
+  FILE_UPLOAD_FIELD,
   isSupportedAudioMimeType,
   SPEECH_MAX_UPLOAD_BYTES,
   SPEECH_UPLOAD_FIELD,
@@ -83,6 +85,58 @@ export const uploadAudio = (): RequestHandler => {
       }
 
       next(ApiError.badRequest('The upload could not be read.'));
+    });
+  };
+};
+
+/**
+ * Receiving an uploaded document, in memory.
+ *
+ * Memory storage for the same reason audio uses it: nothing reaches disk here,
+ * so there is no temporary file to clean up and nothing left behind when a
+ * request dies halfway. The bytes are written to the document store only once
+ * they have been validated, under a key this server chose.
+ *
+ * No `fileFilter` runs here. Deciding what a document *is* needs the bytes as
+ * well as the name and the declared type, and multer's filter sees only the
+ * latter two — so the decision is made in the files module, where all three are
+ * available, rather than half-made twice.
+ */
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: FILE_LIMITS.maxBytes, files: 1, fields: 4 },
+});
+
+const DOCUMENT_MESSAGES: Record<string, string> = {
+  LIMIT_FILE_SIZE: 'Fayl hajmi ruxsat etilgan limitdan katta.',
+  LIMIT_FILE_COUNT: 'Bir vaqtda bitta fayl yuboring.',
+  LIMIT_UNEXPECTED_FILE: 'Fayl kutilmagan maydonda yuborildi.',
+};
+
+export const uploadDocument = (): RequestHandler => {
+  const handler = documentUpload.single(FILE_UPLOAD_FIELD);
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    handler(req, res, (error: unknown) => {
+      if (!error) {
+        next();
+
+        return;
+      }
+
+      if (error instanceof ApiError) {
+        next(error);
+
+        return;
+      }
+
+      if (error instanceof multer.MulterError) {
+        next(ApiError.badRequest(DOCUMENT_MESSAGES[error.code] ?? 'Faylni o‘qib bo‘lmadi.'));
+
+        return;
+      }
+
+      next(ApiError.badRequest('Faylni o‘qib bo‘lmadi.'));
     });
   };
 };
