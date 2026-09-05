@@ -21,11 +21,14 @@ beforeEach(() => {
 describe('tool execution', () => {
   it('says what happened in the person’s terms, never the tool’s name', () => {
     const wrapper = mount(ToolExecutionCard, {
-      props: { call: makeToolCall({ name: 'get_sales_summary' }) },
+      props: { call: makeToolCall({ name: 'billz_get_sales_summary' }) },
     });
 
+    // "Billz get sales summary" is the developer's name for it; the person
+    // asked about savdo and should be told what was read, not which system.
     expect(wrapper.text()).toContain('Read the sales figures');
-    expect(wrapper.text()).not.toContain('get_sales_summary');
+    expect(wrapper.text()).not.toContain('billz_get_sales_summary');
+    expect(wrapper.text()).not.toContain('Billz get');
   });
 
   it('shows the present tense while a step is still running', () => {
