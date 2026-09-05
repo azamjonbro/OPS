@@ -1,4 +1,4 @@
-import { mcpToolRegistryName, type AuthenticatedUser } from '@hadiya/shared';
+import { mcpToolRegistryName, type AuthenticatedUser, type ToolProvenance } from '@hadiya/shared';
 import { z } from 'zod';
 
 import { createLogger } from '../../../core/logger/logger.js';
@@ -87,6 +87,16 @@ const defineTool = <TSchema extends z.ZodType>(tool: RegisteredTool<TSchema>): R
 const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
   const integrationId = String(integration._id);
 
+  // Provenance travels with the tool rather than being reconstructed from its
+  // name later. A figure that came out of somebody's Notion has to stay
+  // attributable to it once the result has been flattened into a tool message.
+  const provenanceFor = (externalName: string): ToolProvenance => ({
+    source: 'notion',
+    integrationId,
+    integrationName: integration.name,
+    externalName,
+  });
+
   const useToken = <TResult>(
     actor: AuthenticatedUser,
     run: (token: string) => Promise<TResult>,
@@ -103,6 +113,9 @@ const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
         limit: z.number().int().min(1).max(20).default(5),
       }),
       mutates: false,
+      category: 'integration',
+      risk: 'read',
+      provenance: provenanceFor('search'),
       execute: async (args, context) => {
         const hits = await useToken(context.actor, (token) =>
           searchNotion(token, { query: args.query, limit: args.limit }),
@@ -128,6 +141,12 @@ const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
         pageId: z.string().trim().min(8).max(64).describe('The page id from notion.search'),
       }),
       mutates: false,
+      category: 'integration',
+      risk: 'read',
+      // The id comes from a search. If both are asked for in one round and the
+      // search failed, there is no id to read with, and none is invented.
+      dependsOn: ['notion.search'],
+      provenance: provenanceFor('read_page'),
       execute: async (args, context) => {
         const page = await useToken(context.actor, (token) => readNotionPage(token, args.pageId));
 
@@ -204,6 +223,21 @@ const toRegisteredMcpTool = (
     // Anything not classified as a read is assumed to change something.
     mutates: tool.risk !== 'read',
     requiresConfirmation,
+    category: 'integration',
+    // `unknown` is the server declining to say, and the conservative reading of
+    // that is `write`: never `read`, which would make it parallel-safe and
+    // retryable on the strength of a classification nobody stands behind.
+    risk: tool.risk === 'read' ? 'read' : tool.risk === 'destructive' ? 'destructive' : 'write',
+    // Two calls to the same server share its rate limit and its concurrency
+    // budget, so they are serialised against each other rather than against
+    // every other integration.
+    resource: `mcp:${integrationId}`,
+    provenance: {
+      source: 'mcp',
+      integrationId,
+      integrationName: integration.name,
+      externalName: tool.name,
+    },
     describeConfirmation: () => `run "${tool.name}" on your "${integration.name}" integration`,
     execute: async (args, context) => {
       // `confirm` is Hadiya's field, not the server's, and must not be sent on.

@@ -171,7 +171,8 @@ export interface ToolPlan {
 
 export const resolveToolPlan = (tool: RegisteredTool): ToolPlan => {
   const requiresConfirmation = tool.requiresConfirmation ?? false;
-  const risk = tool.risk ?? (requiresConfirmation ? 'destructive' : tool.mutates ? 'write' : 'read');
+  const risk =
+    tool.risk ?? (requiresConfirmation ? 'destructive' : tool.mutates ? 'write' : 'read');
 
   return {
     name: tool.name,
@@ -205,6 +206,8 @@ export const isConfirmed = (args: unknown): boolean =>
 export type ToolPreflight =
   | { kind: 'unknown_tool'; message: string }
   | { kind: 'invalid_arguments'; message: string }
+  /** The call cannot proceed, and the message is the reason a tool would give. */
+  | { kind: 'refused'; message: string }
   | { kind: 'needs_confirmation'; description: string; args: unknown; plan: ToolPlan }
   | { kind: 'ready'; args: unknown; plan: ToolPlan; tool: RegisteredTool };
 
@@ -291,9 +294,7 @@ export class ToolRegistry {
       }
 
       if (plan.requiresConfirmation) {
-        notes.push(
-          'Ask the user first and call again with confirm: true only after they agree.',
-        );
+        notes.push('Ask the user first and call again with confirm: true only after they agree.');
       }
 
       return {
@@ -347,7 +348,16 @@ export class ToolRegistry {
         try {
           description = await tool.describeConfirmation(parsed.data, context);
         } catch (error) {
+          // Describing the target reads it, scoped to the actor like every
+          // other read, so this is where a call aimed at somebody else's record
+          // ends: as an ordinary refusal carrying the tool's own "not found".
+          // Proposing a generic action instead would confirm the record exists.
           log.warn({ tool: name, err: error }, 'confirmation target could not be described');
+
+          return {
+            kind: 'refused',
+            message: error instanceof Error ? error.message : `The tool "${name}" failed.`,
+          };
         }
       }
 
@@ -364,11 +374,7 @@ export class ToolRegistry {
    * error to decide whether it looks transient enough to retry, and flattening
    * it into a string here would throw that decision away.
    */
-  static async run(
-    tool: RegisteredTool,
-    args: unknown,
-    context: ToolContext,
-  ): Promise<ToolResult> {
+  static async run(tool: RegisteredTool, args: unknown, context: ToolContext): Promise<ToolResult> {
     return tool.execute(args, context);
   }
 
@@ -385,7 +391,11 @@ export class ToolRegistry {
     const startedAt = Date.now();
     const preflight = await this.preflight(name, rawArguments, context);
 
-    if (preflight.kind === 'unknown_tool' || preflight.kind === 'invalid_arguments') {
+    if (
+      preflight.kind === 'unknown_tool' ||
+      preflight.kind === 'invalid_arguments' ||
+      preflight.kind === 'refused'
+    ) {
       return {
         status: 'failed',
         durationMs: Date.now() - startedAt,

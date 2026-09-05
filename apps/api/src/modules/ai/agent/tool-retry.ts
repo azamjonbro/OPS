@@ -103,7 +103,7 @@ export const classifyFailure = (error: unknown): FailureKind => {
       return 'rate_limited';
     }
 
-    if (error.statusCode === 503 || error.statusCode === 502 || error.statusCode === 504) {
+    if (error.statusCode === 503) {
       return 'unavailable';
     }
 

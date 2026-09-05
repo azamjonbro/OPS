@@ -78,12 +78,12 @@ export const hashArguments = (args: Record<string, unknown>): string => {
     return value;
   };
 
-  return createHash('sha256').update(JSON.stringify(canonical(args) ?? null)).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(canonical(args) ?? null))
+    .digest('hex');
 };
 
-export const toPendingActionSummary = (
-  document: PendingActionDocument,
-): PendingActionSummary => ({
+export const toPendingActionSummary = (document: PendingActionDocument): PendingActionSummary => ({
   id: String(document._id),
   conversationId: String(document.conversation),
   workflowId: document.workflowId,

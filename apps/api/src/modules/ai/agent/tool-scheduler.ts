@@ -284,7 +284,11 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
 
   const preflight = await options.registry.preflight(call.name, call.arguments, baseContext);
 
-  if (preflight.kind === 'unknown_tool' || preflight.kind === 'invalid_arguments') {
+  if (
+    preflight.kind === 'unknown_tool' ||
+    preflight.kind === 'invalid_arguments' ||
+    preflight.kind === 'refused'
+  ) {
     options.events.emit('tool.failed', {
       tool: call.name,
       round: options.round,
@@ -418,7 +422,8 @@ const runOne = async (call: ScheduledCall, options: SchedulerOptions): Promise<T
 
   const kind = classifyFailure(lastError);
   const cancelled = lastError instanceof ToolCancelledError || options.signal.aborted;
-  const message = lastError instanceof Error ? lastError.message : `The "${call.name}" tool failed.`;
+  const message =
+    lastError instanceof Error ? lastError.message : `The "${call.name}" tool failed.`;
 
   options.events.emit('tool.failed', {
     tool: call.name,

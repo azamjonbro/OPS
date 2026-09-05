@@ -111,6 +111,7 @@ const summarise = (reminder: ReminderDocument) => ({
 
 export const createReminderTool: RegisteredTool = {
   name: 'create_reminder',
+  category: 'reminder',
   description:
     'Schedule a reminder for the user. Use it whenever they ask to be reminded of something at a time, after a delay, or on a repeating schedule. Give the time as the user\'s own local wall clock — today\'s date and the user\'s time zone are in your instructions. If the time is vague ("this evening", "later"), still call this with partOfDay: the tool answers with a question when it cannot resolve it safely, and you should then ask the user rather than picking an hour yourself.',
   mutates: true,
@@ -188,6 +189,7 @@ export const createReminderTool: RegisteredTool = {
 
 export const listRemindersTool: RegisteredTool = {
   name: 'list_reminders',
+  category: 'reminder',
   description:
     "The user's own reminders, soonest first. Use it when they ask what they have coming up, or to find the reminder they want changed or cancelled.",
   mutates: false,
@@ -228,6 +230,7 @@ export const listRemindersTool: RegisteredTool = {
 
 export const getReminderTool: RegisteredTool = {
   name: 'get_reminder',
+  category: 'reminder',
   description:
     'Look up one reminder by its id, for when you need its full detail before changing or confirming it.',
   mutates: false,
@@ -244,6 +247,7 @@ export const getReminderTool: RegisteredTool = {
 
 export const updateReminderTool: RegisteredTool = {
   name: 'update_reminder',
+  category: 'reminder',
   description:
     'Change an existing reminder: its wording, its time, or how often it repeats. Only send the fields that change. Moving the time reschedules it, so the old time will not also fire.',
   mutates: true,
@@ -304,6 +308,7 @@ export const updateReminderTool: RegisteredTool = {
 
 export const cancelReminderTool: RegisteredTool = {
   name: 'cancel_reminder',
+  category: 'reminder',
   description:
     'Cancel a reminder so it never fires. Use it when the user says they no longer need one. It stops immediately, including any future repeats.',
   mutates: true,

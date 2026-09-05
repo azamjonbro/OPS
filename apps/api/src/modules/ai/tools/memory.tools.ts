@@ -23,6 +23,7 @@ const keySchema = z
 
 export const rememberInformationTool: RegisteredTool = {
   name: 'remember_information',
+  category: 'memory',
   description:
     'Save a durable preference, fact or standing instruction about this user so later conversations can use it. Only call this for information that is stable and useful later — never for one-off details, and never for passwords, keys, card or account numbers.',
   mutates: true,
@@ -69,6 +70,7 @@ export const rememberInformationTool: RegisteredTool = {
 
 export const getMemoryTool: RegisteredTool = {
   name: 'get_memory',
+  category: 'memory',
   description:
     'Look up what you already remember about this user. Use it before answering when a stored preference could change the answer.',
   mutates: false,
@@ -112,6 +114,7 @@ export const getMemoryTool: RegisteredTool = {
 
 export const forgetInformationTool: RegisteredTool = {
   name: 'forget_information',
+  category: 'memory',
   description:
     'Forget something you remember about this user. Call it when they ask you to stop remembering something. The memory stops being used immediately.',
   mutates: true,
