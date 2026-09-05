@@ -71,7 +71,7 @@ const archive = (id: string): void => {
     <!-- Header -->
     <div class="flex h-[72px] shrink-0 items-center justify-between px-4">
       <RouterLink
-        :to="{ name: 'dashboard' }"
+        :to="{ name: 'assistant' }"
         class="flex items-center gap-3 transition-opacity hover:opacity-80"
         @click="emit('navigate')"
       >
