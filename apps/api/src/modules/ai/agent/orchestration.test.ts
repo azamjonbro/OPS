@@ -31,6 +31,7 @@ import { createBillzTools } from '../tools/billz.tools.js';
 import { buildActorToolRegistry } from '../tools/index.js';
 import { sendMessage } from './agent.service.js';
 import { cancelConversationRuns, resetAgentRuns } from './agent-cancellation.js';
+import { onAgentEvent } from './agent-events.js';
 import { PendingActionModel } from './pending-action.model.js';
 import * as pendingActions from './pending-action.service.js';
 import { planWaves } from './tool-scheduler.js';
@@ -670,14 +671,25 @@ describe('cancellation', () => {
       { content: 'Tugadi.' },
     ]);
 
+    const firstCall = new Promise<void>((resolve) => {
+      const stop = onAgentEvent((event) => {
+        if (event.type === 'tool.started') {
+          stop();
+          resolve();
+        }
+      });
+    });
+
     const running = sendMessage(
       actor,
       { conversationId, message: 'Uzoq ish boshla.' },
       { provider, registry: createProbeRegistry([first.tool, second.tool]), limits },
     );
 
-    // Cancelled while the first tool is still in flight.
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    // Cancelled the moment the first tool is genuinely in flight, rather than
+    // after a sleep long enough to *probably* be: asking the run itself is what
+    // keeps this from turning flaky on a loaded machine.
+    await firstCall;
     expect(cancelConversationRuns(actor.id, conversationId)).toBe(1);
 
     const result = await running;

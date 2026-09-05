@@ -1,4 +1,9 @@
-import { SPEECH_MAX_UPLOAD_BYTES, SPEECH_MIN_UPLOAD_BYTES } from '@hadiya/shared';
+import {
+  SPEECH_DURATION_FIELD,
+  SPEECH_MAX_DECLARED_DURATION_MS,
+  SPEECH_MAX_UPLOAD_BYTES,
+  SPEECH_MIN_UPLOAD_BYTES,
+} from '@hadiya/shared';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -234,6 +239,78 @@ describe('what is refused', () => {
     // An empty success would silently clear the composer.
     expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
     expect(response.body.error.message).toMatch(/could not make out/i);
+  });
+
+  it('refuses a recording the browser declares as longer than the limit', async () => {
+    const provider = scripted();
+    setSpeechProvider(provider);
+    const { authorization } = await signIn();
+
+    const response = await request(app)
+      .post(url)
+      .set('Authorization', authorization)
+      // Attached before the field, which is the order the browser sends them
+      // in: the recording is the first part, its declared length the second.
+      .attach('audio', recording(), { filename: 'long.webm', contentType: 'audio/webm' })
+      .field(SPEECH_DURATION_FIELD, String(SPEECH_MAX_DECLARED_DURATION_MS + 1_000));
+
+    expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(response.body.error.message).toMatch(/longer than/i);
+    // The whole point of the declared figure: refused in milliseconds rather
+    // than after a minute of transcription somebody has been billed for.
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it('transcribes anyway when the declared length is unreadable', async () => {
+    const provider = scripted();
+    setSpeechProvider(provider);
+    const { authorization } = await signIn();
+
+    const response = await request(app)
+      .post(url)
+      .set('Authorization', authorization)
+      .field(SPEECH_DURATION_FIELD, 'not-a-number')
+      .attach('audio', recording(), { filename: 'take.webm', contentType: 'audio/webm' });
+
+    // The figure is a courtesy, not a control. A client that garbles it — or
+    // omits it — is not doing anything wrong, and the size ceiling is what
+    // actually bounds the upload.
+    expect(response.status).toBe(HTTP_STATUS.OK);
+    expect(provider.calls).toHaveLength(1);
+  });
+
+  it('refuses a recording sent on a field nobody is listening to', async () => {
+    const provider = scripted();
+    setSpeechProvider(provider);
+    const { authorization } = await signIn();
+
+    const response = await request(app)
+      .post(url)
+      .set('Authorization', authorization)
+      .attach('recording', recording(), { filename: 'take.webm', contentType: 'audio/webm' });
+
+    // Multer signals this with its own error type, which would otherwise
+    // surface as an unexplained 500.
+    expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it('refuses a body that is not multipart at all', async () => {
+    const provider = scripted();
+    setSpeechProvider(provider);
+    const { authorization } = await signIn();
+
+    const response = await request(app)
+      .post(url)
+      .set('Authorization', authorization)
+      .set('Content-Type', 'multipart/form-data; boundary=----nonsense')
+      .send('this is not a multipart body');
+
+    expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(response.body.success).toBe(false);
+    // Nothing about the parser reaches the caller.
+    expect(response.body.error.message).not.toMatch(/multer|boundary/i);
+    expect(provider.calls).toHaveLength(0);
   });
 });
 

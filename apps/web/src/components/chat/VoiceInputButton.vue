@@ -13,6 +13,12 @@ import type { VoiceInputPhase } from '@/composables/useVoiceInput';
  *
  * Disabled while a transcription is in flight: starting a second recording on
  * top of one being transcribed is not a thing anybody means to do.
+ *
+ * The drawn button matches the send button beside it, but its *touch* target is
+ * grown past the composer's visual grid with a transparent overlay. On a phone
+ * the microphone is reached with a thumb, at arm's length, often one-handed —
+ * and a 34px target is comfortably below what that wants. Growing the hit area
+ * rather than the button keeps the row looking as it did.
  */
 const props = defineProps<{ phase: VoiceInputPhase; supported: boolean }>();
 
@@ -40,7 +46,7 @@ const label = computed(() => {
 <template>
   <button
     type="button"
-    class="mb-1.5 grid size-[34px] shrink-0 place-items-center rounded-[12px] text-ink-500 transition-all duration-200 hover:bg-border-subtle/60 hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+    class="relative mb-1.5 grid size-[34px] shrink-0 touch-manipulation place-items-center rounded-[12px] text-ink-500 transition-all duration-200 after:absolute after:-inset-[5px] after:content-[''] hover:bg-border-subtle/60 hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
     :class="phase === 'recording' ? 'bg-danger-50 text-danger-600 hover:bg-danger-50' : ''"
     :disabled="!supported || isBusy"
     :aria-label="label"

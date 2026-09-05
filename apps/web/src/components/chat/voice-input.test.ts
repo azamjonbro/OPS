@@ -276,6 +276,54 @@ describe('stopping', () => {
     );
   });
 
+  it('tells the server how long the recording ran', async () => {
+    const transcribe = vi.spyOn(speechService, 'transcribe').mockResolvedValue({
+      text: 'salom',
+      durationSeconds: 1,
+      language: 'uz',
+      model: 'whisper-1',
+    });
+
+    const wrapper = mountComposer();
+    const recorder = await startRecording(wrapper);
+
+    await stopButton(wrapper).trigger('click');
+    recorder.stop();
+    await flushPromises();
+
+    // Sent so an over-long take is refused before it is paid for. Measured
+    // from a clock rather than read off the once-a-second display, so a short
+    // recording reports a real figure rather than zero.
+    const [, options] = transcribe.mock.calls[0] ?? [];
+
+    expect(typeof options?.durationMs).toBe('number');
+    expect(Number.isInteger(options?.durationMs)).toBe(true);
+    expect(options?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('announces the finished transcript, not just the waiting', async () => {
+    vi.spyOn(speechService, 'transcribe').mockResolvedValue({
+      text: 'Bugungi savdoni tahlil qil',
+      durationSeconds: 2,
+      language: 'uz',
+      model: 'whisper-1',
+    });
+
+    const wrapper = mountComposer();
+    const recorder = await startRecording(wrapper);
+
+    await stopButton(wrapper).trigger('click');
+    recorder.stop();
+    await flushPromises();
+
+    // Otherwise the spinner just disappears: somebody using a screen reader
+    // cannot tell a finished transcription from one still running.
+    const live = wrapper.findAll('[aria-live="polite"]').find((node) => node.text().length > 0);
+
+    expect(live?.text()).toContain('Transcript added to your message');
+    expect(live?.text()).toContain('Bugungi savdoni tahlil qil');
+  });
+
   it('says so when nothing usable was captured, and leaves the field alone', async () => {
     const transcribe = vi.spyOn(speechService, 'transcribe');
 
@@ -360,6 +408,58 @@ describe('the transcript is a draft, never a message', () => {
     expect(wrapper.emitted('send')?.[0]).toEqual([
       'Bugungi savdoni tahlil qilib ber, kecha bilan ham solishtir.',
     ]);
+  });
+});
+
+describe('only one recording at a time', () => {
+  it('offers no second start while the microphone is live', async () => {
+    // Stubbed so stopping does not reach the network; this case is about the
+    // controls, not about what comes back.
+    vi.spyOn(speechService, 'transcribe').mockResolvedValue({
+      text: 'salom',
+      durationSeconds: 1,
+      language: 'uz',
+      model: 'whisper-1',
+    });
+
+    const wrapper = mountComposer();
+    const recorder = await startRecording(wrapper);
+
+    expect(FakeMediaRecorder.instances).toHaveLength(1);
+    // There is no "start" control to press: the one button has become Stop, so
+    // a second recording cannot be started on top of the first.
+    expect(micButton(wrapper).exists()).toBe(false);
+    expect(stopButton(wrapper).exists()).toBe(true);
+
+    // And pressing it stops the recording it is showing, rather than opening
+    // another microphone.
+    await stopButton(wrapper).trigger('click');
+    recorder.stop();
+    await flushPromises();
+
+    expect(FakeMediaRecorder.instances).toHaveLength(1);
+  });
+
+  it('will not record over a transcription that is still running', async () => {
+    vi.spyOn(speechService, 'transcribe').mockReturnValue(new Promise(() => {}));
+
+    const wrapper = mountComposer();
+    const recorder = await startRecording(wrapper);
+    await stopButton(wrapper).trigger('click');
+    recorder.stop();
+    await flushPromises();
+
+    // The one control is disabled while the model is listening, and says so
+    // rather than looking broken.
+    const button = wrapper.find('button[aria-label="Transcribing your recording"]');
+
+    expect(button.exists()).toBe(true);
+    expect(button.attributes('disabled')).toBeDefined();
+
+    await button.trigger('click');
+    await flushPromises();
+
+    expect(FakeMediaRecorder.instances).toHaveLength(1);
   });
 });
 

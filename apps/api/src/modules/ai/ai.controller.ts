@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { AgentStreamFrame } from '@hadiya/shared';
+import { SPEECH_DURATION_FIELD, type AgentStreamFrame } from '@hadiya/shared';
 import type { Request, Response } from 'express';
 
 import { config } from '../../config/index.js';
@@ -297,6 +297,21 @@ export const status = (req: Request, res: Response): void => {
 };
 
 /**
+ * How long the browser says the recording is.
+ *
+ * A text field beside the audio, so it arrives as a string that could be
+ * anything. Anything unreadable is treated as "not said" rather than as an
+ * error: the figure is a courtesy that saves a pointless minute of
+ * transcription, and a client that omits it is not doing anything wrong.
+ */
+const readDeclaredDuration = (req: Request): number | null => {
+  const raw = (req.body as Record<string, unknown> | undefined)?.[SPEECH_DURATION_FIELD];
+  const parsed = Number.parseInt(typeof raw === 'string' ? raw : '', 10);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+/**
  * Turns a recording into text, and nothing else.
  *
  * It deliberately does *not* answer the question the person asked: the
@@ -320,6 +335,8 @@ export const transcribe = async (req: Request, res: Response): Promise<void> => 
     // The declared content type, not the filename: a name from the browser is
     // untrusted text and has no bearing on what the bytes are.
     mimeType: file.mimetype,
+    declaredDurationMs: readDeclaredDuration(req),
+    requestId: req.id,
   });
 
   sendSuccess(req, res, result);

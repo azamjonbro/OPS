@@ -1,7 +1,11 @@
 import { Router } from 'express';
 
+import { SPEECH_RATE_LIMIT } from '@hadiya/shared';
+
+import { config } from '../../config/index.js';
 import { asyncHandler } from '../../core/http/async-handler.js';
 import { uploadAudio } from '../../core/http/upload.js';
+import { actorRateLimiter } from '../../core/middleware/rate-limit.js';
 import { validated } from '../../core/middleware/validate.js';
 import { chatSchema } from '../conversations/conversation.validators.js';
 import * as aiController from './ai.controller.js';
@@ -69,5 +73,18 @@ aiRouter.get('/usage', asyncHandler(aiController.usage));
  * The transcript is returned to the caller and goes nowhere near the agent —
  * sending is a decision the person makes afterwards, in the composer.
  */
-aiRouter.post('/transcribe', uploadAudio(), asyncHandler(aiController.transcribe));
+aiRouter.post(
+  '/transcribe',
+  // Counted before the upload is parsed, so a flood of recordings is refused
+  // without any of them being read into memory — and long before any of them
+  // is paid for. Per account rather than per address: a shop's staff share one
+  // connection, and one stuck button must not take everybody's microphone away.
+  actorRateLimiter({
+    windowMs: SPEECH_RATE_LIMIT.windowMs,
+    max: config.speech.rateLimitMax,
+    message: 'That is a lot of recordings at once. Wait a moment and try again.',
+  }),
+  uploadAudio(),
+  asyncHandler(aiController.transcribe),
+);
 aiRouter.get('/speech-status', aiController.speechStatus);

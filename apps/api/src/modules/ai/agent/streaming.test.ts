@@ -501,6 +501,18 @@ describe('the events a run emits', () => {
     const seen: AgentEvent[] = [];
     const stop = tapEvents(seen);
 
+    // Cancelled the moment the first tool is genuinely in flight, rather than
+    // after a sleep long enough to *probably* be in flight: a timing guess is
+    // how a suite becomes flaky under load, and this asks the run itself.
+    const firstCall = new Promise<void>((resolve) => {
+      const stop = onAgentEvent((event) => {
+        if (event.type === 'tool.started') {
+          stop();
+          resolve();
+        }
+      });
+    });
+
     const running = sendMessage(
       actor,
       { conversationId, message: 'Uzoq ish.' },
@@ -515,7 +527,7 @@ describe('the events a run emits', () => {
       },
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    await firstCall;
     cancelConversationRuns(actor.id, conversationId);
 
     await running;

@@ -66,3 +66,36 @@ export const SPEECH_TRANSCRIPT_MAX_LENGTH = 8_000;
  * server cannot disagree about it.
  */
 export const SPEECH_UPLOAD_FIELD = 'audio';
+
+/**
+ * What one account may spend on dictation.
+ *
+ * Transcription is billed per second of audio, and the microphone is the one
+ * control in the interface that a pocket can press. So this is a cost ceiling
+ * before it is an abuse ceiling: twenty recordings a minute is far more than
+ * anybody dictating a question will use, and far less than a phone face-down on
+ * a counter could run up.
+ *
+ * Keyed by account rather than by address, because a shop's staff share one
+ * connection and one person's stuck button must not silence everybody else's
+ * microphone.
+ */
+export const SPEECH_RATE_LIMIT = {
+  windowMs: 60_000,
+  /** Recordings per account per minute. */
+  max: 20,
+} as const;
+
+/**
+ * Longest recording the browser is allowed to declare.
+ *
+ * Checked before the audio is sent anywhere, so an over-long take is refused
+ * without being paid for. It is a *declared* figure and therefore not a
+ * security control — the size ceiling is what actually bounds an upload — but
+ * it turns "your recording was too long" into an answer that arrives in
+ * milliseconds rather than after a minute of transcription.
+ */
+export const SPEECH_MAX_DECLARED_DURATION_MS = SPEECH_MAX_DURATION_SECONDS * 1_000 + 5_000;
+
+/** The form field a client declares the recording's length on. */
+export const SPEECH_DURATION_FIELD = 'durationMs';

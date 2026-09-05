@@ -74,6 +74,20 @@ const toRecorderError = (error: unknown): RecorderError => {
   return { kind: 'failed', message: 'Recording could not be started. Please try again.' };
 };
 
+/**
+ * A finished recording: the audio, and how long it actually ran.
+ *
+ * The duration is measured from a clock rather than read off the displayed
+ * counter, which only ticks once a second and would round a four-and-a-half
+ * second take down to four. It travels with the blob because the server uses it
+ * to refuse an over-long recording in milliseconds instead of after a minute of
+ * transcription somebody has already been billed for.
+ */
+export interface VoiceRecording {
+  blob: Blob;
+  durationMs: number;
+}
+
 export interface VoiceRecorder {
   state: Readonly<Ref<RecorderState>>;
   /** Seconds captured so far. */
@@ -87,7 +101,7 @@ export interface VoiceRecorder {
   remainingSeconds: ComputedRef<number>;
   start: () => Promise<void>;
   /** Resolves with the recording, or `null` when there was nothing usable. */
-  stop: () => Promise<Blob | null>;
+  stop: () => Promise<VoiceRecording | null>;
   /** Throws the recording away without producing anything. */
   cancel: () => void;
   /** Clears a message the person has read, so "Dismiss" clears all of them. */
@@ -113,6 +127,8 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
   let ticker: ReturnType<typeof setInterval> | null = null;
   /** Set while cancelling, so the `stop` handler knows to discard. */
   let discarding = false;
+  /** When the recorder actually started, for a duration better than the counter. */
+  let startedAt = 0;
 
   const isRecording = computed(() => state.value === 'recording');
   const isBusy = computed(() => state.value !== 'idle');
@@ -205,6 +221,7 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
     recorder.start();
     state.value = 'recording';
     elapsedSeconds.value = 0;
+    startedAt = Date.now();
 
     ticker = setInterval(() => {
       elapsedSeconds.value += 1;
@@ -219,7 +236,7 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
     }, 1_000);
   };
 
-  const stop = (): Promise<Blob | null> => {
+  const stop = (): Promise<VoiceRecording | null> => {
     const active = recorder;
 
     if (!active || state.value !== 'recording') {
@@ -227,8 +244,11 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
     }
 
     state.value = 'stopping';
+    // Read before the handler runs, so the figure covers what was recorded
+    // rather than also counting however long the browser took to flush it.
+    const durationMs = Math.max(0, Date.now() - startedAt);
 
-    return new Promise<Blob | null>((resolve) => {
+    return new Promise<VoiceRecording | null>((resolve) => {
       active.addEventListener(
         'stop',
         () => {
@@ -257,7 +277,7 @@ export const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecor
             return;
           }
 
-          resolve(blob);
+          resolve({ blob, durationMs });
         },
         { once: true },
       );

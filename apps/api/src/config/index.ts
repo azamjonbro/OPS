@@ -78,6 +78,8 @@ export interface SpeechConfig {
   language: string | null;
   timeoutMs: number;
   maxRetries: number;
+  /** Recordings one account may transcribe per minute. */
+  rateLimitMax: number;
 }
 
 /** How Hadiya talks to a user's own MCP server, and how patiently. */
@@ -246,6 +248,7 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     language: env.STT_LANGUAGE ?? null,
     timeoutMs: env.STT_TIMEOUT_MS,
     maxRetries: env.STT_MAX_RETRIES,
+    rateLimitMax: env.STT_RATE_LIMIT_MAX,
   },
   storage: {
     driver: env.STORAGE_DRIVER,

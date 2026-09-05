@@ -95,6 +95,17 @@ const focus = (): void => {
 };
 
 /**
+ * What a screen reader is told when dictation finishes.
+ *
+ * Without this the transcript simply appears in a field nobody is looking at:
+ * the spinner vanishes and there is no announcement, so somebody using a screen
+ * reader cannot tell a finished transcription from one still running. The
+ * recording and transcribing states announce themselves; this is the ending
+ * they were missing.
+ */
+const voiceAnnouncement = ref('');
+
+/**
  * Where a transcript lands.
  *
  * Appended rather than assigned, and to whatever is in the field *now* rather
@@ -108,6 +119,9 @@ const insertTranscript = (transcript: string): void => {
   const separator = existing.length > 0 ? ' ' : '';
 
   text.value = `${existing}${separator}${transcript}`;
+  // The words are read back as well as announced, so somebody who cannot see
+  // the field hears what landed in it.
+  voiceAnnouncement.value = `Transcript added to your message: ${transcript}`;
 
   void nextTick(() => {
     resize();
@@ -120,6 +134,12 @@ const insertTranscript = (transcript: string): void => {
 };
 
 const voice = useVoiceInput({ onTranscript: insertTranscript });
+
+/** Starting again clears the last announcement, so it cannot be read as new. */
+const onVoiceActivate = (): void => {
+  voiceAnnouncement.value = '';
+  void voice.toggle();
+};
 
 const send = (): void => {
   if (!canSend.value || isOverLength.value) {
@@ -180,7 +200,7 @@ defineExpose({ focus, setText });
         <VoiceInputButton
           :phase="voice.phase.value"
           :supported="voice.isSupported.value"
-          @activate="voice.toggle"
+          @activate="onVoiceActivate"
         />
 
         <button
@@ -249,7 +269,7 @@ defineExpose({ focus, setText });
           :elapsed-seconds="voice.elapsedSeconds.value"
           :remaining-seconds="voice.remainingSeconds.value"
           :near-limit="voice.isNearLimit.value"
-          @stop="voice.toggle"
+          @stop="onVoiceActivate"
           @cancel="voice.cancel"
         />
 
@@ -270,6 +290,10 @@ defineExpose({ focus, setText });
           </button>
         </p>
       </div>
+
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {{ voiceAnnouncement }}
+      </p>
 
       <div class="mt-2 flex items-center justify-between gap-3 px-2">
         <p class="text-[11px] font-medium text-ink-400/80">
