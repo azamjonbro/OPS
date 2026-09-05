@@ -21,15 +21,15 @@ const emit = defineEmits<{ click: [] }>();
     <button
       v-if="visible"
       type="button"
-      class="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-medium text-ink-700 shadow-md ring-1 ring-border-subtle hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-600"
+      class="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-surface px-4 py-2 text-[13px] font-semibold text-ink-900 shadow-[0_4px_16px_rgba(0,0,0,0.1)] ring-1 ring-border-subtle hover:bg-surface-muted hover:shadow-[0_6px_24px_rgba(0,0,0,0.12)] transition-all focus:outline-none focus:ring-2 focus:ring-brand-500"
       @click="emit('click')"
     >
       <svg
-        class="size-3.5"
+        class="size-4 text-ink-500"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        stroke-width="2"
+        stroke-width="2.5"
         stroke-linecap="round"
         stroke-linejoin="round"
         aria-hidden="true"

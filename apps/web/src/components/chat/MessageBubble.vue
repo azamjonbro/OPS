@@ -25,23 +25,23 @@ const timestamp = computed(() => (props.createdAt ? formatDateTime(props.created
 
 <template>
   <article
-    class="group/message flex w-full gap-3"
+    class="group/message flex w-full gap-4 pb-2"
     :class="[isUser ? 'justify-end' : 'justify-start', pending ? 'opacity-70' : '']"
   >
     <span
       v-if="!isUser"
-      class="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-xs font-bold text-white"
+      class="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-brand-500 text-[12px] font-bold text-white shadow-sm ring-1 ring-brand-100 dark:ring-surface-raised"
       aria-hidden="true"
     >
       H
     </span>
 
-    <div class="flex min-w-0 flex-col gap-1" :class="isUser ? 'max-w-[85%] items-end' : 'flex-1'">
+    <div class="flex min-w-0 flex-col gap-1.5" :class="isUser ? 'max-w-[75%] md:max-w-[65%] items-end' : 'flex-1 max-w-[85%] md:max-w-[75%]' ">
       <p class="sr-only">{{ isUser ? 'You said' : 'Hadiya said' }}</p>
 
       <slot />
 
-      <div class="flex items-center gap-2 text-[0.6875rem] text-ink-400">
+      <div class="flex items-center gap-3 text-[11px] font-medium text-ink-400 mt-1.5">
         <time
           v-if="timestamp"
           class="opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100"

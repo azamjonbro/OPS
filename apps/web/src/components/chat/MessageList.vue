@@ -187,9 +187,9 @@ defineExpose({ scrollToBottom });
             pending
           />
 
-          <div v-if="thinking" class="flex gap-3">
+          <div v-if="thinking" class="group/message flex w-full gap-4 pb-2 justify-start">
             <span
-              class="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-xs font-bold text-white"
+              class="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-brand-500 text-[12px] font-bold text-white shadow-sm ring-1 ring-brand-100 dark:ring-surface-raised"
               aria-hidden="true"
             >
               H
