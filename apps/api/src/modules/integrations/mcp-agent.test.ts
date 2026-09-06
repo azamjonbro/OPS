@@ -167,12 +167,37 @@ describe('the assistant with a connected MCP server', () => {
     const integration = await aConnectedCrm(actor);
     const toolName = mcpToolRegistryName(String(integration._id), 'create_invoice');
 
-    const provider = createScriptedProvider([
+    // The turn that asks. It is what writes down the proposal the agreement is
+    // later checked against, so a run that skipped it has nothing to agree to.
+    const asking = createScriptedProvider([
       {
         content: '',
         toolCalls: [
           {
             callId: 'call-1',
+            name: toolName,
+            arguments: { customerId: 'c-1', amount: 250_000 },
+          },
+        ],
+      },
+      { content: 'Ruxsat berasizmi?' },
+    ]);
+
+    const proposed = await sendMessage(
+      actor,
+      { message: 'CRMdagi Azamjonga invoice yarat.' },
+      { provider: asking, registry: await buildActorToolRegistry(actor) },
+    );
+
+    expect(scripted.recorder.calls).toEqual([]);
+    expect(proposed.agent?.state).toBe('waiting_for_confirmation');
+
+    const provider = createScriptedProvider([
+      {
+        content: '',
+        toolCalls: [
+          {
+            callId: 'call-2',
             name: toolName,
             arguments: { customerId: 'c-1', amount: 250_000, confirm: true },
           },
@@ -183,7 +208,7 @@ describe('the assistant with a connected MCP server', () => {
 
     const result = await sendMessage(
       actor,
-      { message: 'Ha, yarat.' },
+      { conversationId: proposed.conversationId, message: 'Ha, yarat.' },
       { provider, registry: await buildActorToolRegistry(actor) },
     );
 

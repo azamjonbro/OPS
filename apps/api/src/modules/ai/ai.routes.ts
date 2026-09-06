@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { SPEECH_RATE_LIMIT } from '@hadiya/shared';
+import { CHAT_RATE_LIMIT, SPEECH_RATE_LIMIT } from '@hadiya/shared';
 
 import { config } from '../../config/index.js';
 import { asyncHandler } from '../../core/http/async-handler.js';
@@ -29,6 +29,16 @@ export const aiRouter: Router = Router();
  */
 aiRouter.post(
   '/chat',
+  // Counted per account, before the turn starts. A chat turn is the most
+  // expensive thing in Hadiya — several completions and a dozen outbound calls
+  // — and the global limiter is sized for requests that cost milliseconds. This
+  // is the ceiling that stops a stuck client, or somebody with a token, from
+  // spending a month's model budget in an afternoon.
+  actorRateLimiter({
+    windowMs: CHAT_RATE_LIMIT.windowMs,
+    max: config.http.endpointLimits.chatMax,
+    message: 'That is a lot of questions at once. Wait a moment and try again.',
+  }),
   ...validated({ body: chatSchema, query: chatStreamQuerySchema }, aiController.chat),
 );
 

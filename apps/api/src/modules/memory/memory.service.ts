@@ -3,6 +3,7 @@ import {
   isObjectIdString,
   MEMORY_CONFIRMATION_THRESHOLD,
   resolvePagination,
+  searchRegexFilter,
   type AuthenticatedUser,
   type MemorySource,
   type MemoryStatus,
@@ -146,11 +147,12 @@ export const listMemories = async (
     filter.type = query.type;
   }
 
-  if (query.search) {
-    filter.$or = [
-      { key: { $regex: query.search, $options: 'i' } },
-      { value: { $regex: query.search, $options: 'i' } },
-    ];
+  // Escaped, never interpolated: a search term is literal text, not a pattern
+  // the database is asked to run. See `searchRegexFilter`.
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.$or = [{ key: search }, { value: search }];
   }
 
   const { page, pageSize, skip, limit } = resolvePagination(query);
@@ -217,7 +219,15 @@ export const forget = async (
   });
 
   if (selector.id) {
-    filter._id = selector.id;
+    // The id may have come from the model, which invents them. Anything that is
+    // not an object id cannot match a row, and putting it in the filter anyway
+    // raises a cast error that reaches the caller as a server fault rather than
+    // as "there was nothing matching that".
+    if (!isObjectIdString(selector.id)) {
+      return { forgotten: 0 };
+    }
+
+    filter._id = toObjectId(selector.id);
   }
 
   if (selector.type) {

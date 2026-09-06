@@ -56,3 +56,61 @@ export const actorRateLimiter = (options: ActorRateLimitOptions): RequestHandler
       next(ApiError.rateLimited(options.message));
     },
   });
+
+/** Reads a short, safe identifier out of an unauthenticated request body. */
+const bodyIdentifier = (req: Request, field: string): string => {
+  const value = (req.body as Record<string, unknown> | undefined)?.[field];
+
+  return typeof value === 'string' ? value.trim().toLowerCase().slice(0, 64) : '';
+};
+
+export interface CredentialRateLimitOptions extends ActorRateLimitOptions {
+  /**
+   * A body field counted alongside the address, so one account cannot be ground
+   * down from many addresses and one address cannot work through many accounts.
+   * Omit to count by address alone.
+   */
+  identifierField?: string;
+  /**
+   * Whether a successful request is refunded.
+   *
+   * On for sign-in: the budget is for *failures*, so a person typing their own
+   * password correctly all day is never locked out by it, and the limit means
+   * exactly what it says — ten wrong guesses.
+   */
+  skipSuccessful?: boolean;
+}
+
+/**
+ * A limit on an endpoint that runs before anybody is authenticated.
+ *
+ * `actorRateLimiter` counts against `req.user`, which sign-in does not have and
+ * is the whole point of attacking. This counts against the address and, where
+ * one is given, the identifier in the body — so guessing one account's password
+ * from a botnet and guessing every account's password from one address are both
+ * bounded, and neither can be widened by rotating the other.
+ *
+ * State is per process, like every limiter here. Behind several instances the
+ * effective budget multiplies by the instance count, which is the honest
+ * limitation: a shared store on the sign-in path is the correct fix when there
+ * is more than one instance, and the account lockout a deployment really wants
+ * is a database decision rather than a middleware one.
+ */
+export const credentialRateLimiter = (options: CredentialRateLimitOptions): RequestHandler =>
+  rateLimit({
+    windowMs: options.windowMs,
+    limit: options.max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: options.skipSuccessful ?? false,
+    keyGenerator: (req: Request) => {
+      const address = ipKeyGenerator(req.ip ?? '');
+
+      return options.identifierField
+        ? `${address}|${bodyIdentifier(req, options.identifierField)}`
+        : address;
+    },
+    handler: (_req, _res, next) => {
+      next(ApiError.rateLimited(options.message));
+    },
+  });

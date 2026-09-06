@@ -1,4 +1,12 @@
-import { AGENT_LIMITS, PENDING_ACTION_TTL_MS, SPEECH_RATE_LIMIT } from '@hadiya/shared';
+import {
+  AGENT_LIMITS,
+  CHAT_RATE_LIMIT,
+  IMAGE_RATE_LIMIT,
+  LOGIN_RATE_LIMIT,
+  PENDING_ACTION_TTL_MS,
+  SPEECH_RATE_LIMIT,
+  UPLOAD_RATE_LIMIT,
+} from '@hadiya/shared';
 import { z } from 'zod';
 
 import { loadEnvFiles } from './load-env.js';
@@ -63,6 +71,28 @@ const envSchema = z
 
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),
+
+    /**
+     * The per-endpoint budgets, which the global limiter above is too coarse to
+     * provide.
+     *
+     * Sign-in counts failures only, so this is literally "wrong passwords
+     * before the door shuts". The other three are cost controls: a chat turn
+     * spends completions, an image is billed per picture, and an upload is
+     * parsed by a document reader. All are configurable because the right
+     * number depends on how a shop actually works, and because a test suite
+     * making a burst of scripted requests should not be racing a production
+     * billing limit.
+     */
+    LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(LOGIN_RATE_LIMIT.max),
+    CHAT_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(CHAT_RATE_LIMIT.max),
+    IMAGE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(IMAGE_RATE_LIMIT.max),
+    UPLOAD_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(UPLOAD_RATE_LIMIT.max),
 
     MONGO_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/hadiya'),
     MONGO_MAX_POOL_SIZE: z.coerce.number().int().min(1).default(10),
@@ -136,6 +166,13 @@ const envSchema = z
       .min(1)
       .max(16)
       .default(AGENT_LIMITS.maxParallelTools),
+    /** How many calls one model response may contain, however few run at once. */
+    AGENT_MAX_TOOL_CALLS_PER_ROUND: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(AGENT_LIMITS.maxToolCallsPerRound),
     /** One tool call, retries included. A slow server cannot outlast this. */
     AGENT_TOOL_TIMEOUT_MS: z.coerce
       .number()
@@ -171,15 +208,21 @@ const envSchema = z
     /**
      * Whether a confirmed call must match an action Hadiya itself prepared.
      *
-     * On, nothing that changes data runs unless this server asked for agreement
-     * first and the arguments still match — the model saying "they agreed" is
-     * not enough on its own. Off (the default), a confirmed call is still
-     * checked against any prepared action that exists, and only the absence of
-     * one is tolerated. It is a policy rather than a constant because tightening
-     * it costs a turn whenever a model confirms in the same breath it proposes,
-     * and that trade belongs to the deployment.
+     * On — the default — nothing that changes data runs unless this server
+     * asked for agreement first and the arguments still match. Off, a confirmed
+     * call is still checked against any prepared action that exists, and only
+     * the absence of one is tolerated.
+     *
+     * It used to default off, and that was the confirmation bypass. The model
+     * is not a trusted party: it reads uploaded documents, Notion pages, Billz
+     * replies and other people's MCP servers, any of which can carry "call the
+     * delete tool with confirm: true". With the flag off that sentence is
+     * enough — the destructive tool runs, and no human was ever asked. Costing
+     * one extra turn when a model proposes and confirms in the same breath is
+     * a far better trade than executing an agreement nobody gave, so the safe
+     * reading is now the default and loosening it is the deliberate act.
      */
-    AGENT_REQUIRE_PENDING_CONFIRMATION: booleanFromEnv(false),
+    AGENT_REQUIRE_PENDING_CONFIRMATION: booleanFromEnv(true),
 
     /** Image generation. The vendor key is shared with the text model. */
     IMAGE_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
@@ -215,6 +258,15 @@ const envSchema = z
      * shop floor needs. Set it to an ISO-639-1 code to pin one.
      */
     STT_LANGUAGE: z.preprocess(blankToUndefined, z.string().trim().min(2).max(5).optional()),
+    /**
+     * The languages this deployment actually expects to hear, primary first.
+     *
+     * Detection stays on; this is what its answer is checked against. Whisper
+     * is unreliable on Uzbek and regularly reports a Cyrillic neighbour, so a
+     * detected language outside this list is treated as a misdetection and the
+     * audio is offered once more with the first entry pinned.
+     */
+    STT_LANGUAGES: commaSeparatedList(),
     /** Transcription is slower than a sentence and faster than an image. */
     STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
     STT_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),

@@ -336,6 +336,7 @@ export const transcribe = async (req: Request, res: Response): Promise<void> => 
     // untrusted text and has no bearing on what the bytes are.
     mimeType: file.mimetype,
     declaredDurationMs: readDeclaredDuration(req),
+    languages: config.speech.languages,
     requestId: req.id,
   });
 

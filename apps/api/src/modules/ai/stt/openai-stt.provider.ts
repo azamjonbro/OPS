@@ -155,9 +155,12 @@ export class OpenAiSpeechProvider implements SpeechProvider {
         `recording.${extension}`,
       );
       body.append('model', this.options.model);
-      // `json` keeps the reply small; the verbose form carries per-segment
-      // timings this product has no use for.
-      body.append('response_format', 'json');
+      // The verbose form is asked for because of two fields, not the segment
+      // timings it also carries: the detected language, which is what lets a
+      // misheard language be caught rather than passed on as if it were what
+      // the person said, and the duration, which the endpoint's own contract
+      // promises. The plain `json` form returns neither.
+      body.append('response_format', 'verbose_json');
 
       const language = request.language ?? this.options.language;
 

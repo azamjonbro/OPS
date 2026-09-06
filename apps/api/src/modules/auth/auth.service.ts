@@ -1,5 +1,6 @@
 import {
   DEFAULT_TIMEZONE,
+  isObjectIdString,
   type AuthenticatedUser,
   type AuthTokens,
   type LoginResult,
@@ -74,18 +75,37 @@ export const login = async (input: {
 };
 
 /**
- * Exchanges a refresh token for a new pair. The user is re-read so a suspended
- * or re-assigned account cannot keep refreshing with stale claims.
+ * Looks up the account a token names, or refuses.
+ *
+ * The shape of the subject is checked before the database sees it. A signature
+ * check does not make a claim well-formed — a token minted by an older version,
+ * or by a script, can carry anything in `sub` — and handing a non-id to
+ * Mongoose raises a cast error, which surfaces as a `400` naming an internal
+ * field rather than the `401` a bad token deserves. There is nothing to look up
+ * for a subject that cannot be an id, so this says so directly.
  */
-export const refresh = async (refreshToken: string): Promise<AuthTokens> => {
-  const { subject } = await verifyToken(refreshToken, 'refresh');
+const accountForToken = async (subject: string): Promise<UserDocument> => {
+  if (!isObjectIdString(subject)) {
+    throw ApiError.unauthenticated('Invalid token');
+  }
+
   const user = await userRepository.findById(subject);
 
   if (!user || user.status !== 'active') {
     throw ApiError.unauthenticated('Invalid token');
   }
 
-  return issueTokens(user);
+  return user;
+};
+
+/**
+ * Exchanges a refresh token for a new pair. The user is re-read so a suspended
+ * or re-assigned account cannot keep refreshing with stale claims.
+ */
+export const refresh = async (refreshToken: string): Promise<AuthTokens> => {
+  const { subject } = await verifyToken(refreshToken, 'refresh');
+
+  return issueTokens(await accountForToken(subject));
 };
 
 /**
@@ -95,13 +115,8 @@ export const refresh = async (refreshToken: string): Promise<AuthTokens> => {
  */
 export const resolveActor = async (accessToken: string): Promise<AuthenticatedUser> => {
   const { subject } = await verifyToken(accessToken, 'access');
-  const user = await userRepository.findById(subject);
 
-  if (!user || user.status !== 'active') {
-    throw ApiError.unauthenticated('Invalid token');
-  }
-
-  return toActor(user);
+  return toActor(await accountForToken(subject));
 };
 
 export const currentUser = async (actorId: string): Promise<Omit<UserDocument, 'passwordHash'>> => {

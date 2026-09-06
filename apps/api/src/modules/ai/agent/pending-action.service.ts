@@ -21,6 +21,9 @@ const log = createLogger('agent-pending-actions');
 /** Keys whose values are dropped before anything is written down. */
 const SENSITIVE_KEY = /(token|secret|password|credential|api[_-]?key|authorization|cookie|pin)/i;
 
+/** How far into a nested argument the redaction walks before it gives up. */
+const MAX_REDACTION_DEPTH = 8;
+
 /**
  * Strips anything that looks like a credential out of a set of arguments.
  *
@@ -29,27 +32,53 @@ const SENSITIVE_KEY = /(token|secret|password|credential|api[_-]?key|authorizati
  * is the belt to that braces: a person who pasted a token into the chat, and a
  * model that helpfully passed it along, must not end up with it stored in a
  * record whose whole purpose is to be read back later.
+ *
+ * It walks the whole structure, not only the top level. A tool argument is
+ * frequently an object — an MCP tool declares whatever schema it likes — and a
+ * redaction that only looked at the outermost keys stored `{ auth: { token:
+ * "..." } }` verbatim while reporting that it had cleaned the arguments. Depth
+ * is bounded so a pathological structure cannot turn writing a proposal into a
+ * stack overflow; anything past the limit is replaced wholesale, which errs
+ * towards storing less rather than more.
  */
 export const redactArguments = (args: Record<string, unknown>): Record<string, unknown> => {
-  const safe: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(args)) {
-    if (SENSITIVE_KEY.test(key)) {
-      safe[key] = '[redacted]';
-      continue;
+  const walk = (value: unknown, depth: number): unknown => {
+    if (depth > MAX_REDACTION_DEPTH) {
+      return '[omitted]';
     }
 
-    // `confirm` is Hadiya's own field and is never part of what was proposed:
-    // storing it would mean comparing a proposal against a confirmation on a
-    // field that is false in one and true in the other.
-    if (key === 'confirm') {
-      continue;
+    if (Array.isArray(value)) {
+      return value.map((entry) => walk(entry, depth + 1));
     }
 
-    safe[key] = value;
-  }
+    if (typeof value !== 'object' || value === null) {
+      return value;
+    }
 
-  return safe;
+    const safe: Record<string, unknown> = {};
+
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (SENSITIVE_KEY.test(key)) {
+        safe[key] = '[redacted]';
+        continue;
+      }
+
+      // `confirm` is Hadiya's own field and is never part of what was proposed:
+      // storing it would mean comparing a proposal against a confirmation on a
+      // field that is false in one and true in the other. Only at the top
+      // level — a tool whose own schema has a nested `confirm` means its own
+      // thing by it.
+      if (depth === 0 && key === 'confirm') {
+        continue;
+      }
+
+      safe[key] = walk(entry, depth + 1);
+    }
+
+    return safe;
+  };
+
+  return walk(args, 0) as Record<string, unknown>;
 };
 
 /**

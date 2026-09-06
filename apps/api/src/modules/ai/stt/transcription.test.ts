@@ -3,6 +3,7 @@ import {
   SPEECH_MAX_DECLARED_DURATION_MS,
   SPEECH_MAX_UPLOAD_BYTES,
   SPEECH_MIN_UPLOAD_BYTES,
+  type AuthenticatedUser,
 } from '@hadiya/shared';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -16,6 +17,7 @@ import type { FetchLike } from '../provider/ai-http.js';
 import { createUnconfiguredSpeechProvider } from './index.js';
 import { OpenAiSpeechProvider } from './openai-stt.provider.js';
 import { setSpeechProvider, type SpeechProvider } from './stt-provider.js';
+import { transcribe } from './transcription.service.js';
 
 /**
  * Dictation end to end, with a scripted transcription model.
@@ -522,7 +524,10 @@ describe('the OpenAI provider, driven by scripted HTTP', () => {
 
     const body = calls[0]?.body as FormData;
     expect(body.get('model')).toBe('whisper-1');
-    expect(body.get('response_format')).toBe('json');
+    // The verbose form, for two fields rather than for the segment timings it
+    // also carries: the detected language, which is what lets a misheard
+    // language be caught, and the duration the endpoint's contract promises.
+    expect(body.get('response_format')).toBe('verbose_json');
     // No language sent, so the model detects it — what a bilingual floor needs.
     expect(body.get('language')).toBeNull();
     expect(body.get('file')).toBeInstanceOf(Blob);
@@ -653,5 +658,142 @@ describe('nothing is kept', () => {
     // with memory storage, so nothing was ever written to disk — which is why
     // there is no temporary-file cleanup to test: there is no temporary file.
     expect(provider.calls[0]?.bytes).toBe(6_000);
+  });
+});
+
+describe('when the model mishears which language it is', () => {
+  /**
+   * Whisper detects the language itself, and on Uzbek it is not reliable — a
+   * short phrase is regularly heard as Kazakh or Russian, and what comes back
+   * is then confident Cyrillic the speaker never said. That is worse than a
+   * rough transcript, because it reads like a real sentence and so nobody
+   * corrects it.
+   *
+   * A provider that answers with each call's language in turn, so the
+   * correction can be watched happening.
+   */
+  const scriptedByCall = (
+    outcomes: Array<{ text: string; language: string }>,
+  ): ScriptedSpeechProvider => {
+    const calls: ScriptedSpeechProvider['calls'] = [];
+
+    return {
+      name: 'scripted',
+      isConfigured: true,
+      model: 'scripted-stt',
+      calls,
+      transcribe: async (input) => {
+        calls.push({
+          contentType: input.contentType,
+          bytes: input.audio.byteLength,
+          language: input.language ?? null,
+        });
+
+        const outcome = outcomes[calls.length - 1] ?? outcomes.at(-1);
+
+        return {
+          text: outcome?.text ?? '',
+          durationSeconds: 2,
+          language: outcome?.language ?? null,
+          model: 'scripted-stt',
+        };
+      },
+    };
+  };
+
+  const actor = {
+    id: '000000000000000000000009',
+    username: 'probe',
+    fullName: 'Probe',
+    role: 'manager',
+    branchId: null,
+    timezone: 'Asia/Tashkent',
+  } as AuthenticatedUser;
+
+  it('accepts a language the shop actually speaks, without asking twice', async () => {
+    const provider = scriptedByCall([{ text: 'Bugungi savdoni tahlil qil', language: 'Uzbek' }]);
+
+    const result = await transcribe(
+      actor,
+      { audio: recording(), mimeType: 'audio/webm' },
+      { provider },
+    );
+
+    // One call. The name "Uzbek" and the code "uz" are the same answer, and a
+    // check that did not know that would re-transcribe every single request.
+    expect(provider.calls).toHaveLength(1);
+    expect(result.text).toBe('Bugungi savdoni tahlil qil');
+  });
+
+  it('accepts English the same way, whichever spelling of it comes back', async () => {
+    const provider = scriptedByCall([{ text: "Show me today's sales", language: 'en-US' }]);
+
+    await transcribe(actor, { audio: recording(), mimeType: 'audio/webm' }, { provider });
+
+    expect(provider.calls).toHaveLength(1);
+  });
+
+  it('offers the audio again, pinned, when it heard a language nobody here speaks', async () => {
+    const provider = scriptedByCall([
+      // What the misdetection actually looks like: fluent Cyrillic nobody said.
+      { text: 'Бүгінгі сауданы талда', language: 'Kazakh' },
+      { text: 'Bugungi savdoni tahlil qil', language: 'uz' },
+    ]);
+
+    const result = await transcribe(
+      actor,
+      { audio: recording(), mimeType: 'audio/webm' },
+      { provider },
+    );
+
+    expect(provider.calls).toHaveLength(2);
+    // The first call let the model choose; the second told it.
+    expect(provider.calls[0]?.language).toBeNull();
+    expect(provider.calls[1]?.language).toBe('uz');
+    expect(result.text).toBe('Bugungi savdoni tahlil qil');
+  });
+
+  it('asks only once more, however wrong the second answer is', async () => {
+    const provider = scriptedByCall([
+      { text: 'nonsense', language: 'Kazakh' },
+      { text: 'still nonsense', language: 'Russian' },
+    ]);
+
+    const result = await transcribe(
+      actor,
+      { audio: recording(), mimeType: 'audio/webm' },
+      { provider },
+    );
+
+    // Two calls, not a loop: each one costs real time and real money, and a
+    // model that is confused twice will not be talked round by a third try.
+    expect(provider.calls).toHaveLength(2);
+    expect(result.text).toBe('still nonsense');
+  });
+
+  it('leaves a caller who pinned the language alone', async () => {
+    const provider = scriptedByCall([{ text: 'whatever', language: 'Kazakh' }]);
+
+    await transcribe(
+      actor,
+      { audio: recording(), mimeType: 'audio/webm', language: 'en' },
+      { provider },
+    );
+
+    // Nothing to second-guess: the language was not detected, it was stated.
+    expect(provider.calls).toHaveLength(1);
+    expect(provider.calls[0]?.language).toBe('en');
+  });
+
+  it('honours a deployment that expects a different pair of languages', async () => {
+    const provider = scriptedByCall([{ text: 'Сегодняшние продажи', language: 'Russian' }]);
+
+    await transcribe(
+      actor,
+      { audio: recording(), mimeType: 'audio/webm', languages: ['ru', 'en'] },
+      { provider },
+    );
+
+    expect(provider.calls).toHaveLength(1);
   });
 });

@@ -23,6 +23,17 @@ export default defineConfig({
       LOG_LEVEL: 'silent',
       MONGO_URI: TEST_DATABASE_URI,
       MONGO_SERVER_SELECTION_TIMEOUT_MS: '3000',
+      // The whole suite runs in one process, from one address, so every test
+      // file shares the global limiter's window — and the security suite spends
+      // hundreds of requests on purpose. Raised so one file's deliberate flood
+      // cannot fail an unrelated file's ordinary request. The limiter itself is
+      // tested directly, against a ceiling that test sets.
+      RATE_LIMIT_MAX: '100000',
+      // Likewise the per-endpoint budgets, whose own tests set what they need.
+      LOGIN_RATE_LIMIT_MAX: '10',
+      CHAT_RATE_LIMIT_MAX: '20',
+      IMAGE_RATE_LIMIT_MAX: '1000',
+      UPLOAD_RATE_LIMIT_MAX: '20',
       // Test-only signing keys; production start-up requires real ones.
       JWT_ACCESS_SECRET: 'test-access-secret-that-is-long-enough-32',
       JWT_REFRESH_SECRET: 'test-refresh-secret-that-is-long-enough-32',

@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, PaginatedResult } from '@hadiya/shared';
+import { searchRegexFilter, type AuthenticatedUser, type PaginatedResult } from '@hadiya/shared';
 
 import { ApiError } from '../../core/http/api-error.js';
 import { assertRole, canAccessAllBranches, requireActorBranch } from '../../core/security/actor.js';
@@ -73,11 +73,10 @@ export const listBranches = async (
     filter.isActive = query.isActive;
   }
 
-  if (query.search) {
-    filter.$or = [
-      { name: { $regex: query.search, $options: 'i' } },
-      { code: { $regex: query.search, $options: 'i' } },
-    ];
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.$or = [{ name: search }, { code: search }];
   }
 
   return branchRepository.list({

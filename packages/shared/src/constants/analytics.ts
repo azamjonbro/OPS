@@ -78,6 +78,22 @@ export const ANALYTICS_CONFIDENT_THRESHOLD = 0.7;
  */
 export const ANALYTICS_MAX_RECEIPTS = 5_000;
 
+/**
+ * The longest window a custom period may span.
+ *
+ * Two years and a day, which covers the longest question anybody actually asks
+ * — this year against last year — with room for a leap day.
+ *
+ * It is a limit rather than a preference because the `from` and `to` of a
+ * custom period are written by the *model*, and the model reads uploaded
+ * documents and other people's servers. `from: 0001-01-01, to: 9999-12-31`
+ * resolves to three and a half million days, and the report builds one entry
+ * per day: hundreds of megabytes and a second of blocked event loop, per call,
+ * from one argument. A shopkeeper asking for a decade of daily takings has
+ * asked the wrong question anyway.
+ */
+export const ANALYTICS_MAX_PERIOD_DAYS = 731;
+
 /** How many rows a ranking returns before it stops being a ranking. */
 export const ANALYTICS_MAX_RANKING = 20;
 

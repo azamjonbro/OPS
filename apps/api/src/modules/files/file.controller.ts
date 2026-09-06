@@ -47,11 +47,35 @@ export const remove: ValidatedHandler<{ params: typeof fileIdParamSchema }> = as
 };
 
 /**
+ * A `Content-Disposition` value that survives a real filename.
+ *
+ * An HTTP header is bytes, and only Latin-1 bytes at that. `hisobot-отчёт.csv`
+ * is a perfectly ordinary name in this product's own languages, and writing it
+ * into a header raw does not merely look wrong — Node emits it unencoded and
+ * the response is rejected at the protocol level, so downloading the file fails
+ * outright. Quotes and backslashes are the other half: unescaped, they end the
+ * quoted string early and let the rest of the name be read as further header
+ * parameters.
+ *
+ * So both forms are sent, which is what RFC 6266 asks for. The plain `filename`
+ * is stripped down to safe ASCII for old clients, and `filename*` carries the
+ * real name percent-encoded as UTF-8 for everything current.
+ */
+const contentDisposition = (displayName: string): string => {
+  const ascii = displayName
+    // Everything outside printable ASCII, which is what a header may hold.
+    .replace(/[^\u0020-\u007e]/g, '_')
+    .replace(/["\\]/g, '_');
+  const fallback = ascii.trim() || 'document';
+
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(displayName)}`;
+};
+
+/**
  * Downloading one's own document.
  *
  * Authenticated and ownership-resolved server-side; the storage key never
- * reaches the client, so there is no URL to guess or share. The filename is
- * sent quoted and already sanitised, so it cannot break out of the header.
+ * reaches the client, so there is no URL to guess or share.
  */
 export const download: ValidatedHandler<{ params: typeof fileIdParamSchema }> = async (
   req,
@@ -66,9 +90,6 @@ export const download: ValidatedHandler<{ params: typeof fileIdParamSchema }> = 
   res.setHeader('Content-Length', String(data.byteLength));
   // `attachment` rather than `inline`: a stored document is never rendered in
   // the origin, which is what would turn an uploaded HTML-ish file into script.
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${file.displayName.replace(/"/g, '')}"`,
-  );
+  res.setHeader('Content-Disposition', contentDisposition(file.displayName));
   res.send(data);
 };

@@ -138,6 +138,18 @@ export const AGENT_LIMITS = {
   maxModelCalls: 8,
   /** Tool calls run at once. Beyond this they queue. */
   maxParallelTools: 4,
+  /**
+   * Tool calls one round may contain at all.
+   *
+   * `maxParallelTools` bounds how many run *together*; it does not bound how
+   * many run. A model that emits five hundred calls in one response — because
+   * it looped, or because something it read told it to — has those five hundred
+   * executed four at a time, each an outbound request and a row in the
+   * transcript, and the round limit above never helps because it counts rounds.
+   * Anything past this is refused and the model is told to ask for less, which
+   * is a thing it can act on.
+   */
+  maxToolCallsPerRound: 12,
   /** One tool call, including its retries' waiting. */
   toolTimeoutMs: 45_000,
   /** Extra attempts after the first, for failures that look transient. */

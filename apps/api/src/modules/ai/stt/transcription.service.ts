@@ -1,6 +1,9 @@
 import {
+  isExpectedLanguage,
   isSupportedAudioMimeType,
   normaliseAudioMimeType,
+  normaliseLanguage,
+  SPEECH_LANGUAGES,
   SPEECH_MAX_DECLARED_DURATION_MS,
   SPEECH_MAX_UPLOAD_BYTES,
   SPEECH_MIN_UPLOAD_BYTES,
@@ -45,6 +48,13 @@ export interface TranscribeInput {
   declaredDurationMs?: number | null;
   /** Correlates the log line with the HTTP request that caused it. */
   requestId?: string | undefined;
+  /**
+   * The languages this deployment expects to hear, primary first.
+   *
+   * A detected language outside the list is treated as a misdetection rather
+   * than as an answer. Defaults to `SPEECH_LANGUAGES`.
+   */
+  languages?: readonly string[] | undefined;
 }
 
 export interface TranscriptionDependencies {
@@ -151,13 +161,39 @@ export const transcribe = async (
   }
 
   const startedAt = Date.now();
+  const expected = input.languages ?? SPEECH_LANGUAGES;
 
   try {
-    const outcome = await provider.transcribe({
+    let outcome = await provider.transcribe({
       audio: input.audio,
       contentType,
       language: input.language ?? null,
     });
+    let correctedFrom: string | null = null;
+
+    /**
+     * The model heard a language nobody here speaks.
+     *
+     * Whisper detects the language itself, and for Uzbek it is not reliable —
+     * a short phrase is regularly heard as Kazakh or Russian, and what comes
+     * back is then not a rough transcript but confident Cyrillic the speaker
+     * never said. Which is worse than a bad transcript: it looks like a real
+     * sentence, so nobody corrects it.
+     *
+     * The audio is offered once more with the primary language pinned. Once,
+     * and only when detection strayed outside the languages this shop speaks —
+     * a second call costs real time and money, and pinning by default would
+     * mangle the other language rather than the one it fixed.
+     */
+    if (!input.language && !isExpectedLanguage(outcome.language, expected)) {
+      correctedFrom = normaliseLanguage(outcome.language);
+
+      outcome = await provider.transcribe({
+        audio: input.audio,
+        contentType,
+        language: expected[0] ?? 'uz',
+      });
+    }
 
     // Trimmed here as well as in the provider: whitespace-only is "heard
     // nothing" whichever implementation is installed, and a contract that
@@ -181,6 +217,9 @@ export const transcribe = async (
         contentType,
         audioSeconds: outcome.durationSeconds,
         language: outcome.language,
+        // Present only when detection had to be overruled, so the frequency of
+        // that is visible without reading a single transcript.
+        ...(correctedFrom ? { correctedFrom } : {}),
         // The transcript itself is never logged: it is the person's words, and
         // a log is the wrong place for them. Its length is not.
         characters: text.length,

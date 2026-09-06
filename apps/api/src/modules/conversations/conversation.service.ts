@@ -2,6 +2,7 @@ import {
   buildPaginationMeta,
   CONVERSATION_TITLE_MAX_LENGTH,
   resolvePagination,
+  searchRegexFilter,
   type AuthenticatedUser,
   type ConversationStatus,
   type MessageRole,
@@ -103,8 +104,10 @@ export const listConversations = async (
     status: query.status ?? 'active',
   };
 
-  if (query.search) {
-    filter.title = { $regex: query.search, $options: 'i' };
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.title = search;
   }
 
   const { page, pageSize, skip, limit } = resolvePagination(query);

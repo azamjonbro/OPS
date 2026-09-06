@@ -36,12 +36,14 @@ export * from './constants/pagination.js';
 export * from './constants/reminders.js';
 export * from './constants/roles.js';
 export * from './constants/scheduler.js';
+export * from './constants/security.js';
 export * from './constants/speech.js';
 export * from './constants/users.js';
 
 export * from './utils/identifiers.js';
 export * from './utils/money.js';
 export * from './utils/pagination.js';
+export * from './utils/search.js';
 export * from './utils/recurrence.js';
 export * from './utils/timezone.js';
 

@@ -6,6 +6,7 @@ import {
   IMAGE_MAX_PER_CONTENT_ITEM,
   isObjectIdString,
   resolvePagination,
+  searchRegexFilter,
   type AuthenticatedUser,
   type ImageAspectRatio,
   type ImageAssetStatus,
@@ -328,8 +329,10 @@ export const listImages = async (
     filter.contentItem = null;
   }
 
-  if (query.search) {
-    filter.prompt = { $regex: query.search, $options: 'i' };
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.prompt = search;
   }
 
   const { page, pageSize, skip, limit } = resolvePagination(query);

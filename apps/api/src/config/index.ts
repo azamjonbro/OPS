@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { SPEECH_LANGUAGES } from '@hadiya/shared';
+
 import { loadEnv, type Env } from './env.js';
 import { API_ROOT } from './paths.js';
 
@@ -47,6 +49,8 @@ export interface AgentConfig {
   maxToolRounds: number;
   maxModelCalls: number;
   maxParallelTools: number;
+  /** Calls one model response may contain, however few run at once. */
+  maxToolCallsPerRound: number;
   toolTimeoutMs: number;
   maxToolRetries: number;
   retryBackoffMs: number;
@@ -85,6 +89,8 @@ export interface SpeechConfig {
   baseUrl: string | null;
   /** `null` means let the provider detect it. */
   language: string | null;
+  /** Languages a detected answer is checked against, primary first. */
+  languages: readonly string[];
   timeoutMs: number;
   maxRetries: number;
   /** Recordings one account may transcribe per minute. */
@@ -131,6 +137,16 @@ export interface AppConfig {
     trustProxy: boolean;
     shutdownTimeoutMs: number;
     rateLimit: { windowMs: number; max: number };
+    /**
+     * Per-endpoint ceilings the global limiter is too coarse to express: how
+     * many wrong passwords, and how many requests that cost real money.
+     */
+    endpointLimits: {
+      loginMax: number;
+      chatMax: number;
+      imageMax: number;
+      uploadMax: number;
+    };
   };
   log: {
     level: Env['LOG_LEVEL'];
@@ -216,6 +232,12 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     trustProxy: env.TRUST_PROXY,
     shutdownTimeoutMs: env.SHUTDOWN_TIMEOUT_MS,
     rateLimit: { windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX },
+    endpointLimits: {
+      loginMax: env.LOGIN_RATE_LIMIT_MAX,
+      chatMax: env.CHAT_RATE_LIMIT_MAX,
+      imageMax: env.IMAGE_RATE_LIMIT_MAX,
+      uploadMax: env.UPLOAD_RATE_LIMIT_MAX,
+    },
   },
   log: {
     level: env.LOG_LEVEL,
@@ -245,6 +267,7 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     maxToolRounds: env.AGENT_MAX_TOOL_ROUNDS,
     maxModelCalls: env.AGENT_MAX_MODEL_CALLS,
     maxParallelTools: env.AGENT_MAX_PARALLEL_TOOLS,
+    maxToolCallsPerRound: env.AGENT_MAX_TOOL_CALLS_PER_ROUND,
     toolTimeoutMs: env.AGENT_TOOL_TIMEOUT_MS,
     maxToolRetries: env.AGENT_MAX_TOOL_RETRIES,
     retryBackoffMs: env.AGENT_RETRY_BACKOFF_MS,
@@ -273,6 +296,7 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     model: env.STT_MODEL ?? 'whisper-1',
     baseUrl: env.STT_BASE_URL ?? null,
     language: env.STT_LANGUAGE ?? null,
+    languages: env.STT_LANGUAGES.length > 0 ? env.STT_LANGUAGES : SPEECH_LANGUAGES,
     timeoutMs: env.STT_TIMEOUT_MS,
     maxRetries: env.STT_MAX_RETRIES,
     rateLimitMax: env.STT_RATE_LIMIT_MAX,
