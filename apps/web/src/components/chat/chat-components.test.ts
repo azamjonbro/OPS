@@ -259,6 +259,10 @@ describe('the block renderer', () => {
 describe('the composer', () => {
   const textareaOf = (wrapper: ReturnType<typeof mount>) => wrapper.find('textarea');
 
+  /** The send control, by its label — the composer has several buttons. */
+  const sendButton = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.find('button[aria-label="Send message"], button[aria-label="Hadiya is answering"]');
+
   it('sends on Enter and clears itself', async () => {
     const wrapper = mount(MessageComposer);
     const textarea = textareaOf(wrapper);
@@ -298,7 +302,9 @@ describe('the composer', () => {
     await textarea.trigger('keydown', { key: 'Enter' });
 
     expect(wrapper.emitted('send')).toBeUndefined();
-    expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+    // Found by its label rather than by position: the composer holds several
+    // buttons now, and "the first one" is not a stable way to name this one.
+    expect(sendButton(wrapper).attributes('disabled')).toBeDefined();
   });
 
   it('keeps the field usable while the assistant is answering', () => {
@@ -307,6 +313,6 @@ describe('the composer', () => {
     // Only sending waits; disabling the field would close the keyboard on a
     // phone mid-sentence.
     expect(textareaOf(wrapper).attributes('disabled')).toBeUndefined();
-    expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+    expect(sendButton(wrapper).attributes('disabled')).toBeDefined();
   });
 });

@@ -493,3 +493,82 @@ describe('OpenAI streaming', () => {
     expect(double.calls).toHaveLength(1);
   });
 });
+
+describe('talking to an endpoint that is only OpenAI-shaped', () => {
+  /**
+   * Groq, Gemini's compatibility layer, OpenRouter and the rest implement this
+   * API faithfully right up to the two parameters OpenAI added for its own
+   * reasoning models. Sending those to anybody else fails every request, which
+   * on a screen looks like a rejected key rather than a wrong dialect — so the
+   * dialect is a setting, and these are the two things it changes.
+   */
+  const buildCompatible = (script: ScriptedHttpResponse[]) => {
+    const double = createProviderHttpDouble(script);
+    const provider = new OpenAiProvider({
+      apiKey: 'free-tier-key',
+      model: 'llama-3.3-70b-versatile',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      timeoutMs: 50,
+      maxRetries: 0,
+      maxOutputTokens: 1_024,
+      compatibility: 'openai-compatible',
+      fetchImpl: double.fetchImpl,
+      logger: silentLogger,
+      sleep: async () => undefined,
+    });
+
+    return { provider, double };
+  };
+
+  it('asks for a token ceiling by the name every such service accepts', async () => {
+    const { provider, double } = buildCompatible([{ body: openAiTextResponse('Salom!') }]);
+
+    await provider.complete({ messages: [], tools: [] });
+
+    expect(double.calls[0]?.body.max_tokens).toBe(1_024);
+    expect(double.calls[0]?.body.max_completion_tokens).toBeUndefined();
+  });
+
+  it('still uses OpenAI’s own name when talking to OpenAI', async () => {
+    const { provider, double } = buildOpenAi([{ body: openAiTextResponse('Salom!') }]);
+
+    await provider.complete({ messages: [], tools: [] });
+
+    expect(double.calls[0]?.body.max_completion_tokens).toBe(1_024);
+    expect(double.calls[0]?.body.max_tokens).toBeUndefined();
+  });
+
+  it('does not ask for a usage report a compatible service might reject', async () => {
+    const { provider, double } = buildCompatible([
+      {
+        rawBody: 'data: {"choices":[{"delta":{"content":"Salom"}}]}\n\ndata: [DONE]\n\n',
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    ]);
+
+    const completion = await provider.stream?.({ messages: [], tools: [] }, () => undefined);
+
+    expect(double.calls[0]?.body.stream_options).toBeUndefined();
+    expect(completion?.content).toBe('Salom');
+    // The count is simply unknown, which every caller already handles. Losing
+    // it is a far smaller loss than losing the answer to a rejected field.
+    expect(completion?.usage).toEqual({ promptTokens: null, completionTokens: null });
+  });
+
+  it('carries tools and the transcript unchanged, whichever dialect it speaks', async () => {
+    const { provider, double } = buildCompatible([{ body: openAiTextResponse('ok') }]);
+
+    await provider.complete({
+      messages: [{ role: 'user', content: 'Bugungi savdo?' }],
+      tools: TOOLS,
+    });
+
+    const body = double.calls[0]?.body as {
+      tools: Array<{ function: { name: string } }>;
+      messages: Array<{ content: string }>;
+    };
+
+    expect(body.tools[0]?.function.name).toBe('get_sales_summary');
+    expect(body.messages[0]?.content).toBe('Bugungi savdo?');
+  });
+});

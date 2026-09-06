@@ -259,12 +259,14 @@ describe('tool registry', () => {
       ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('billz_')),
       ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('analytics_')),
       ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('alerts_')),
+      ...definitions.map((tool) => tool.name).filter((name) => name.startsWith('files_')),
     ]);
     expect(definitions.map((tool) => tool.name)).toContain('billz_get_sales_summary');
     expect(definitions.map((tool) => tool.name)).toContain('billz_search_products');
     expect(definitions.map((tool) => tool.name)).toContain('analytics_get_summary');
     expect(definitions.map((tool) => tool.name)).toContain('analytics_get_insights');
     expect(definitions.map((tool) => tool.name)).toContain('alerts_list');
+    expect(definitions.map((tool) => tool.name)).toContain('files_query_table');
     expect(definitions[0]?.parameters).toMatchObject({ type: 'object' });
   });
 });
@@ -551,6 +553,6 @@ describe('POST /api/v1/ai/chat', () => {
       response.body.data.tools
         .filter((tool: { requiresConfirmation: boolean }) => tool.requiresConfirmation)
         .map((tool: { name: string }) => tool.name),
-    ).toEqual(['delete_content_plan', 'delete_content_item']);
+    ).toEqual(['delete_content_plan', 'delete_content_item', 'files_delete']);
   });
 });

@@ -56,6 +56,14 @@ export interface OpenAiProviderOptions {
   timeoutMs: number;
   maxRetries: number;
   maxOutputTokens: number;
+  /**
+   * How far the endpoint follows OpenAI.
+   *
+   * `openai` uses the parameters OpenAI's current models require;
+   * `openai-compatible` uses only what every OpenAI-shaped service accepts.
+   * Defaults to `openai`, which is what the vendor's own endpoint needs.
+   */
+  compatibility?: 'openai' | 'openai-compatible';
   fetchImpl?: FetchLike;
   logger?: Logger;
   sleep?: (ms: number) => Promise<void>;
@@ -155,12 +163,19 @@ export class OpenAiProvider implements AiProvider {
    * answer is quietly a different answer, and only one of the two is ever
    * covered by a test.
    */
+  private get isStrictOpenAi(): boolean {
+    return (this.options.compatibility ?? 'openai') === 'openai';
+  }
+
   private buildBody(request: AiCompletionRequest): Record<string, unknown> {
+    const limit = request.maxOutputTokens ?? this.options.maxOutputTokens;
     const body: Record<string, unknown> = {
       model: this.options.model,
       messages: request.messages.map(toOpenAiMessage),
-      // Reasoning models take `max_completion_tokens`; `max_tokens` is rejected.
-      max_completion_tokens: request.maxOutputTokens ?? this.options.maxOutputTokens,
+      // OpenAI's reasoning models require `max_completion_tokens` and reject
+      // `max_tokens`; everybody else implementing this API accepts only
+      // `max_tokens`. There is no name both will take, so the dialect decides.
+      ...(this.isStrictOpenAi ? { max_completion_tokens: limit } : { max_tokens: limit }),
     };
 
     if (request.tools.length > 0) {
@@ -245,9 +260,16 @@ export class OpenAiProvider implements AiProvider {
     onChunk: (chunk: AiCompletionChunk) => void,
   ): Promise<AiCompletion> {
     const body = this.buildBody(request);
+
     // Usage is not sent on a streamed reply unless it is asked for, and without
-    // it every streamed turn would be recorded as costing nothing.
-    body.stream_options = { include_usage: true };
+    // it every streamed turn would be recorded as costing nothing. Asked for
+    // only where it is certainly understood: a service that rejects an unknown
+    // field would fail the whole request, and losing a token count is a far
+    // smaller loss than losing the answer. The run's round and call ceilings
+    // still hold when the count is missing.
+    if (this.isStrictOpenAi) {
+      body.stream_options = { include_usage: true };
+    }
 
     let content = '';
     let model: string | undefined;

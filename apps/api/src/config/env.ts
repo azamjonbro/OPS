@@ -91,6 +91,22 @@ const envSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(32_000).default(4_096),
+    /**
+     * Which dialect of the OpenAI API the endpoint actually speaks.
+     *
+     * A great many services are "OpenAI compatible" — Groq, Gemini's
+     * compatibility layer, OpenRouter, Cerebras — and they are, right up to the
+     * two parameters OpenAI added for its own reasoning models. Sending those
+     * to anybody else is a 400 on every request, which looks like a broken key
+     * rather than a wrong dialect.
+     *
+     * Left unset, it is inferred: pointing `AI_BASE_URL` somewhere that is not
+     * OpenAI means the portable dialect. Set it explicitly to override that.
+     */
+    AI_COMPATIBILITY: z.preprocess(
+      blankToUndefined,
+      z.enum(['openai', 'openai-compatible']).optional(),
+    ),
 
     /**
      * What one agent run may spend.
@@ -181,6 +197,16 @@ const envSchema = z
      * Speech to text. The transcription models share `OPENAI_API_KEY` with the
      * chat models, so configuring the assistant configures dictation too.
      */
+    /**
+     * A credential of transcription's own, when it does not share the chat one.
+     *
+     * The two are usually the same key and this stays empty. It exists because
+     * the best free combination is not one vendor: Gemini's free tier has the
+     * room a large tool catalogue needs but no transcription endpoint, while
+     * Groq transcribes free and fast. Splitting the credential is what lets
+     * each half point at whichever service is actually good at it.
+     */
+    STT_API_KEY: optionalSecret,
     STT_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
     STT_MODEL: z.preprocess(blankToUndefined, z.string().min(1).max(80).optional()),
     STT_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),

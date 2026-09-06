@@ -115,7 +115,9 @@ describe('transcribing a recording', () => {
       'audio/mp4',
       'audio/ogg',
     ]);
-  });
+    // Three sequential uploads, each with its own sign-in: comfortably inside
+    // the default alone, marginal alongside a full parallel suite.
+  }, 30_000);
 
   it('never sends the transcript on to the assistant', async () => {
     setSpeechProvider(scripted());
@@ -207,7 +209,10 @@ describe('what is refused', () => {
     expect(response.body.error.message).toMatch(/too large/i);
     // Rejected at the edge: nothing is paid to find out it was too big.
     expect(provider.calls).toHaveLength(0);
-  }, 20_000);
+    // Generous, because this pushes a real 25 MB body through supertest and
+    // multer: at the suite's default it is marginal, and it flakes under the
+    // parallel load of a full run rather than because anything is wrong.
+  }, 60_000);
 
   it('refuses a recording that captured nothing', async () => {
     const provider = scripted();

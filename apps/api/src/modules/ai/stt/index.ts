@@ -35,12 +35,12 @@ export const createUnconfiguredSpeechProvider = (reason: string): SpeechProvider
 });
 
 const build = (): SpeechProvider => {
-  const { openai } = config.integrations;
-
-  // Transcription shares OpenAI's key with the chat models, so configuring the
-  // assistant configures dictation too — one credential, one place.
-  if (!openai.configured) {
-    return createUnconfiguredSpeechProvider('set OPENAI_API_KEY');
+  // Transcription uses its own credential when one is set and the chat key
+  // otherwise, so configuring the assistant configures dictation too — while
+  // still allowing the two halves to point at different services, which is
+  // what running both on free tiers actually requires.
+  if (!config.speech.configured) {
+    return createUnconfiguredSpeechProvider('set OPENAI_API_KEY or STT_API_KEY');
   }
 
   if (config.speech.provider !== null && config.speech.provider !== 'openai') {
@@ -50,7 +50,7 @@ const build = (): SpeechProvider => {
   }
 
   return new OpenAiSpeechProvider({
-    apiKey: openai.apiKey ?? '',
+    apiKey: config.speech.apiKey ?? '',
     model: config.speech.model,
     baseUrl: config.speech.baseUrl ?? DEFAULT_BASE_URL,
     timeoutMs: config.speech.timeoutMs,
