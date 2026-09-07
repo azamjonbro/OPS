@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "npm ci",
-  "buildCommand": "START=\"$PWD\"; [ -f packages/shared/package.json ] || cd ../..; npm run build:shared && npm run build -w @hadiya/web && { [ \"$PWD/apps/web/dist\" = \"$START/dist\" ] || { rm -rf \"$START/dist\"; cp -R apps/web/dist \"$START/dist\"; }; }",
+  "buildCommand": "cd ../.. && npm run build:shared && npm run build -w @hadiya/web",
   "outputDirectory": "dist",
+  "installCommand": "cd ../.. && npm ci",
+  "framework": null,
   "rewrites": [
     {
       "source": "/((?!assets/).*)",
