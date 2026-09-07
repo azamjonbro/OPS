@@ -13,6 +13,17 @@ import { loadEnvFiles } from './load-env.js';
 
 const NODE_ENVS = ['development', 'test', 'production'] as const;
 
+/**
+ * What a developer gets for free, and exactly what production must not have.
+ *
+ * These are named rather than inlined because they are used twice: once as the
+ * value a missing variable falls back to, and once as the value production
+ * refuses. A default that drifts from the check it is paired with is a default
+ * that silently ships — which is the whole failure this guards against.
+ */
+const DEVELOPMENT_MONGO_URI = 'mongodb://127.0.0.1:27017/hadiya';
+const DEVELOPMENT_CORS_ORIGIN = 'http://localhost:5173';
+
 /** Env values arrive as strings; `''` is treated as "not provided". */
 const blankToUndefined = (value: unknown): unknown =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
@@ -52,6 +63,9 @@ const commaSeparatedList = (fallback: readonly string[] = []) =>
 
 const optionalSecret = z.preprocess(blankToUndefined, z.string().min(1).optional());
 
+/** Hostnames that mean "this machine", and so never a production site. */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(NODE_ENVS).default('development'),
@@ -59,7 +73,7 @@ const envSchema = z
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     API_BASE_PATH: z.string().startsWith('/').default('/api'),
-    CORS_ORIGINS: commaSeparatedList(['http://localhost:5173']),
+    CORS_ORIGINS: commaSeparatedList([DEVELOPMENT_CORS_ORIGIN]),
     BODY_LIMIT: z.string().min(1).default('1mb'),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     TRUST_PROXY: booleanFromEnv(false),
@@ -94,7 +108,7 @@ const envSchema = z
       .max(10_000)
       .default(UPLOAD_RATE_LIMIT.max),
 
-    MONGO_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/hadiya'),
+    MONGO_URI: z.string().min(1).default(DEVELOPMENT_MONGO_URI),
     MONGO_MAX_POOL_SIZE: z.coerce.number().int().min(1).default(10),
     MONGO_SERVER_SELECTION_TIMEOUT_MS: z.coerce.number().int().min(100).default(5_000),
 
@@ -351,11 +365,82 @@ const envSchema = z
       });
     }
 
+    // Unreachable through the schema — the fallback always supplies one — but
+    // kept because a future change to `commaSeparatedList` could make an empty
+    // list possible again, and an empty allow-list is worth refusing outright.
     if (value.CORS_ORIGINS.length === 0) {
       ctx.addIssue({
         code: 'custom',
         path: ['CORS_ORIGINS'],
         message: 'CORS_ORIGINS must list at least one allowed origin in production',
+      });
+    }
+
+    /**
+     * Each allowed origin, judged one at a time.
+     *
+     * The `length === 0` rule above was the only check here, and it could never
+     * fire: an unset `CORS_ORIGINS` falls back to the development origin, so
+     * the list is never empty and production quietly trusted
+     * `http://localhost:5173`. Judging the origins themselves catches that and
+     * two other ways of getting it wrong, with one rule each.
+     */
+    for (const origin of value.CORS_ORIGINS) {
+      if (origin === '*') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message:
+            'CORS_ORIGINS must not be "*" in production: the API answers with credentials, and a wildcard origin is never a safe pairing for that',
+        });
+
+        continue;
+      }
+
+      let url: URL;
+
+      try {
+        url = new URL(origin);
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}", which is not a valid origin`,
+        });
+
+        continue;
+      }
+
+      if (url.protocol !== 'https:') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}": production origins must be https, because an access token travels to them`,
+        });
+      }
+
+      if (LOOPBACK_HOSTS.has(url.hostname)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}", which is a development origin. Set CORS_ORIGINS to the site's real address.`,
+        });
+      }
+    }
+
+    /**
+     * A production deployment that forgot `MONGO_URI` would otherwise open the
+     * *development* database and look perfectly healthy while writing a shop's
+     * real data somewhere nobody backs up. The check is against the default
+     * rather than for loopback: Mongo on the same host over loopback is an
+     * ordinary and rather good production arrangement.
+     */
+    if (value.MONGO_URI === DEVELOPMENT_MONGO_URI) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MONGO_URI'],
+        message:
+          'MONGO_URI is still the development default; set it explicitly in production so a deployment cannot write to the development database',
       });
     }
   });

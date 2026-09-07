@@ -145,3 +145,91 @@ describe('loadEnv', () => {
     expect(() => loadEnv()).toThrow(/Invalid environment configuration/);
   });
 });
+
+/**
+ * What production must not be allowed to inherit from a developer's machine.
+ *
+ * Every variable here has a fallback, which is what makes local setup one
+ * command — and what made two of them dangerous. An unset `CORS_ORIGINS` became
+ * `http://localhost:5173`, so the old "at least one origin" rule could never
+ * fire and production trusted a development origin. An unset `MONGO_URI` became
+ * the development database, so a deployment that forgot it looked healthy while
+ * writing a shop's real data somewhere nobody backs up.
+ */
+describe('production may not fall back to development values', () => {
+  const productionEnv = (overrides: Record<string, string> = {}): Record<string, string> => ({
+    NODE_ENV: 'production',
+    JWT_ACCESS_SECRET: 'a'.repeat(48),
+    JWT_REFRESH_SECRET: 'b'.repeat(48),
+    CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    MONGO_URI: 'mongodb://db.internal:27017/hadiya',
+    CORS_ORIGINS: 'https://shop.example',
+    ...overrides,
+  });
+
+  it('accepts a properly configured production environment', async () => {
+    const { parseEnv } = await import('./env.js');
+
+    expect(() => parseEnv(productionEnv())).not.toThrow();
+    // Two origins, and Mongo reached over loopback on the same host, are both
+    // ordinary production arrangements and must keep working.
+    expect(() =>
+      parseEnv(
+        productionEnv({
+          CORS_ORIGINS: 'https://shop.example,https://www.shop.example',
+          MONGO_URI: 'mongodb://127.0.0.1:27017/hadiya-prod',
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('refuses the development database, however it was arrived at', async () => {
+    const { parseEnv } = await import('./env.js');
+    const { MONGO_URI: _omitted, ...withoutMongo } = productionEnv();
+
+    expect(() => parseEnv(withoutMongo)).toThrow(/Invalid environment configuration/);
+    expect(() =>
+      parseEnv(productionEnv({ MONGO_URI: 'mongodb://127.0.0.1:27017/hadiya' })),
+    ).toThrow(/Invalid environment configuration/);
+  });
+
+  it('refuses a development origin, a wildcard, and cleartext', async () => {
+    const { parseEnv } = await import('./env.js');
+    const { CORS_ORIGINS: _omitted, ...withoutCors } = productionEnv();
+
+    // Unset and empty both land on the development origin.
+    expect(() => parseEnv(withoutCors)).toThrow(/Invalid environment configuration/);
+    expect(() => parseEnv(productionEnv({ CORS_ORIGINS: '' }))).toThrow(
+      /Invalid environment configuration/,
+    );
+
+    for (const origin of [
+      'http://localhost:5173',
+      'https://localhost',
+      'https://127.0.0.1',
+      '*',
+      'http://shop.example',
+      'shop.example',
+    ]) {
+      expect(() => parseEnv(productionEnv({ CORS_ORIGINS: origin }))).toThrow(
+        /Invalid environment configuration/,
+      );
+    }
+
+    // One bad origin in a list of good ones is still a bad list.
+    expect(() =>
+      parseEnv(productionEnv({ CORS_ORIGINS: 'https://shop.example,http://localhost:5173' })),
+    ).toThrow(/Invalid environment configuration/);
+  });
+
+  it('leaves development and test alone, so local setup stays one command', async () => {
+    const { parseEnv } = await import('./env.js');
+
+    for (const NODE_ENV of ['development', 'test'] as const) {
+      const env = parseEnv({ NODE_ENV });
+
+      expect(env.CORS_ORIGINS).toEqual(['http://localhost:5173']);
+      expect(env.MONGO_URI).toBe('mongodb://127.0.0.1:27017/hadiya');
+    }
+  });
+});

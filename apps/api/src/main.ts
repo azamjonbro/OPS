@@ -1,6 +1,7 @@
 import http from 'node:http';
 
 import { createApp } from './app.js';
+import { closeOpenSseConnections } from './core/http/sse.js';
 import { config } from './config/index.js';
 import { connectDatabase, disconnectDatabase } from './core/db/connection.js';
 import { probeTransactionSupport } from './core/db/transaction.js';
@@ -122,6 +123,15 @@ const bootstrap = async (): Promise<void> => {
   shutdownManager.register({
     name: 'http-server',
     run: async () => {
+      // Streams first. An SSE response is in flight for as long as somebody is
+      // watching, so `close()` would wait on it until the shutdown deadline and
+      // then force an exit — an ordinary restart recorded as a crash.
+      const streams = closeOpenSseConnections();
+
+      if (streams > 0) {
+        logger.info({ streams }, 'ended open event streams before closing the server');
+      }
+
       // Stop accepting connections, then let in-flight requests finish.
       await closeServer(server);
     },

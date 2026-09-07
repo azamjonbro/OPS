@@ -52,3 +52,7 @@ tmp/
 
 # Generated images written by the local storage driver.
 apps/api/storage/
+
+# Database and file backups written by deploy/scripts/backup.sh. These contain
+# the shop's own data and must never reach the repository.
+backups/
