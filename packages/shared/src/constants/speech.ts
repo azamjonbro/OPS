@@ -99,3 +99,83 @@ export const SPEECH_MAX_DECLARED_DURATION_MS = SPEECH_MAX_DURATION_SECONDS * 1_0
 
 /** The form field a client declares the recording's length on. */
 export const SPEECH_DURATION_FIELD = 'durationMs';
+
+/**
+ * The languages this shop actually speaks.
+ *
+ * Whisper detects the language itself, and for Uzbek it is not reliable: the
+ * model was trained on far less Uzbek than Russian or Kazakh, and a short
+ * Uzbek phrase is regularly heard as one of its Cyrillic neighbours. What comes
+ * back is then not a bad transcript but a different language altogether —
+ * plausible-looking Cyrillic that the speaker did not say.
+ *
+ * So detection is allowed to run, and its answer is checked against this list.
+ * Anything outside it is treated as a misdetection and the audio is offered
+ * once more with the primary language pinned. The first entry is that primary.
+ *
+ * Kept as a list rather than a single pinned language because the two are
+ * genuinely both used, and forcing one would mangle the other.
+ */
+export const SPEECH_LANGUAGES = ['uz', 'en'] as const;
+
+export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
+
+/**
+ * Whisper does not agree with itself about how to name a language.
+ *
+ * Depending on the endpoint and the response format it answers `uz`, `uz-UZ`
+ * or `Uzbek`. All three mean the same thing and all three have to reduce to
+ * the same code, or the check below fires on every request and re-transcribes
+ * audio that was understood perfectly the first time.
+ *
+ * Only the languages plausibly heard around this shop are named. Anything
+ * unrecognised keeps its own lowercased text, which will not match the
+ * allow-list — the safe direction, because an unfamiliar answer is exactly the
+ * case worth looking at again.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  uzbek: 'uz',
+  english: 'en',
+  russian: 'ru',
+  kazakh: 'kk',
+  kyrgyz: 'ky',
+  tajik: 'tg',
+  turkmen: 'tk',
+  turkish: 'tr',
+  azerbaijani: 'az',
+  karakalpak: 'kaa',
+  arabic: 'ar',
+  persian: 'fa',
+  tatar: 'tt',
+};
+
+/** `uz-UZ`, `UZ`, `uz` and `Uzbek` are the same answer. */
+export const normaliseLanguage = (value: string | null | undefined): string | null => {
+  const raw = value?.trim().toLowerCase() ?? '';
+
+  if (raw.length === 0) {
+    return null;
+  }
+
+  const named = LANGUAGE_NAMES[raw];
+
+  if (named) {
+    return named;
+  }
+
+  // A code, possibly with a region: `uz-UZ` is `uz`. Names are not truncated
+  // to two letters — "kazakh" would become "ka", which is Georgian, and the
+  // whole point of this is to notice Kazakh rather than wave it through.
+  const code = raw.split(/[-_]/)[0] ?? '';
+
+  return code.length >= 2 && code.length <= 3 ? code : raw;
+};
+
+export const isExpectedLanguage = (
+  value: string | null | undefined,
+  allowed: readonly string[] = SPEECH_LANGUAGES,
+): boolean => {
+  const code = normaliseLanguage(value);
+
+  return code === null || allowed.includes(code);
+};

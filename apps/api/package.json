@@ -13,7 +13,9 @@
     "test": "vitest run",
     "create-owner": "tsx src/scripts/create-owner.ts",
     "probe-transactions": "tsx src/scripts/probe-transactions.ts",
-    "probe-agent": "tsx src/scripts/probe-agent.ts"
+    "probe-agent": "tsx src/scripts/probe-agent.ts",
+    "db:indexes": "tsx src/scripts/sync-indexes.ts",
+    "check:production": "tsx src/scripts/check-production.ts"
   },
   "dependencies": {
     "@hadiya/shared": "2.0.0",

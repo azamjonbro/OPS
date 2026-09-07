@@ -10,6 +10,7 @@ import {
   RecurrenceError,
   REMINDER_DELIVERY_MAX_ATTEMPTS,
   resolvePagination,
+  searchRegexFilter,
   type AuthenticatedUser,
   type NotificationChannel,
   type PaginatedResult,
@@ -220,11 +221,10 @@ export const listReminders = async (
     };
   }
 
-  if (query.search) {
-    filter.$or = [
-      { title: { $regex: query.search, $options: 'i' } },
-      { description: { $regex: query.search, $options: 'i' } },
-    ];
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.$or = [{ title: search }, { description: search }];
   }
 
   const { page, pageSize, skip, limit } = resolvePagination(query);

@@ -26,6 +26,19 @@ import type { Request, Response } from 'express';
 
 const HEARTBEAT_MS = 20_000;
 
+/**
+ * Every stream currently open.
+ *
+ * An SSE response is a request that never finishes, which is the point of it
+ * and a problem for `server.close()`: that waits for in-flight requests, and a
+ * stream somebody is watching is in flight indefinitely. A deployment would
+ * therefore stall for the whole shutdown budget and then be killed — reported
+ * by the supervisor as a crash rather than as the ordinary restart it was.
+ *
+ * Holding the open connections lets shutdown end them deliberately instead.
+ */
+const openConnections = new Set<{ end: () => void }>();
+
 export interface SseConnection {
   /** Writes one event. Named so a client can listen for a specific kind. */
   send: (event: string, data: unknown, id?: number | string) => void;
@@ -57,6 +70,7 @@ export const openSse = (req: Request, res: Response): SseConnection => {
 
     closed = true;
     clearInterval(heartbeat);
+    openConnections.delete(connection);
 
     for (const listener of listeners) {
       listener();
@@ -89,7 +103,7 @@ export const openSse = (req: Request, res: Response): SseConnection => {
   req.on('close', finish);
   res.on('close', finish);
 
-  return {
+  const connection: SseConnection = {
     get closed() {
       return closed;
     },
@@ -125,7 +139,42 @@ export const openSse = (req: Request, res: Response): SseConnection => {
       }
     },
   };
+
+  openConnections.add(connection);
+
+  return connection;
 };
+
+/**
+ * Ends every open stream, and reports how many there were.
+ *
+ * Called by shutdown before the HTTP server is closed. Without it `close()`
+ * waits on connections that are designed never to end, so a deploy performed
+ * while somebody was watching an answer would sit out the entire shutdown
+ * budget and then be killed — which the supervisor records as a crash and which
+ * makes an ordinary restart look like a fault.
+ *
+ * The client sees the stream end rather than a truncated response, and the
+ * browser's own reconnection takes it from there. What it cannot do is rejoin
+ * the run: the run registry lives in this process's memory, so a turn
+ * interrupted by a deploy is a turn that has to be asked again. That is a real
+ * cost of a single-process deployment and is written down as one in
+ * `docs/deployment.md`.
+ */
+export const closeOpenSseConnections = (): number => {
+  const count = openConnections.size;
+
+  for (const connection of [...openConnections]) {
+    connection.end();
+  }
+
+  openConnections.clear();
+
+  return count;
+};
+
+/** How many streams are open. For the shutdown log and for tests. */
+export const openSseConnectionCount = (): number => openConnections.size;
 
 /**
  * Reads the sequence a reconnecting client last saw.

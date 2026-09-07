@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { SPEECH_LANGUAGES } from '@hadiya/shared';
+
 import { loadEnv, type Env } from './env.js';
 import { API_ROOT } from './paths.js';
 
@@ -18,6 +20,9 @@ export interface BillzConfig extends IntegrationConfig {
   shopIds: string[];
 }
 
+/** How far an OpenAI-shaped endpoint follows OpenAI. */
+export type AiCompatibility = 'openai' | 'openai-compatible';
+
 /** Which model answers, and how patiently. */
 export interface AiConfig {
   /** Explicit choice, or `null` to let the configured key decide. */
@@ -28,6 +33,8 @@ export interface AiConfig {
   timeoutMs: number;
   maxRetries: number;
   maxOutputTokens: number;
+  /** Which request parameters the endpoint will accept. */
+  compatibility: AiCompatibility;
 }
 
 /**
@@ -42,6 +49,8 @@ export interface AgentConfig {
   maxToolRounds: number;
   maxModelCalls: number;
   maxParallelTools: number;
+  /** Calls one model response may contain, however few run at once. */
+  maxToolCallsPerRound: number;
   toolTimeoutMs: number;
   maxToolRetries: number;
   retryBackoffMs: number;
@@ -72,10 +81,16 @@ export interface StorageConfig {
 export interface SpeechConfig {
   /** Explicit choice, or `null` to let the configured key decide. */
   provider: 'openai' | null;
+  /** Transcription's own credential; falls back to the chat one. */
+  apiKey: string | undefined;
+  /** True once transcription has a credential from either source. */
+  configured: boolean;
   model: string;
   baseUrl: string | null;
   /** `null` means let the provider detect it. */
   language: string | null;
+  /** Languages a detected answer is checked against, primary first. */
+  languages: readonly string[];
   timeoutMs: number;
   maxRetries: number;
   /** Recordings one account may transcribe per minute. */
@@ -122,6 +137,16 @@ export interface AppConfig {
     trustProxy: boolean;
     shutdownTimeoutMs: number;
     rateLimit: { windowMs: number; max: number };
+    /**
+     * Per-endpoint ceilings the global limiter is too coarse to express: how
+     * many wrong passwords, and how many requests that cost real money.
+     */
+    endpointLimits: {
+      loginMax: number;
+      chatMax: number;
+      imageMax: number;
+      uploadMax: number;
+    };
   };
   log: {
     level: Env['LOG_LEVEL'];
@@ -159,6 +184,18 @@ export interface AppConfig {
   };
 }
 
+/**
+ * Which dialect an endpoint speaks, when nobody has said.
+ *
+ * A base URL pointing away from OpenAI is the whole signal: somebody has
+ * deliberately aimed this at another service, and the portable dialect is what
+ * every other service accepts. Getting it wrong in this direction costs a
+ * slightly older parameter name; getting it wrong the other way makes every
+ * request fail with a message about an unknown field.
+ */
+const inferCompatibility = (baseUrl: string | undefined): AiCompatibility =>
+  baseUrl && !/(^|\.)openai\.com/i.test(new URL(baseUrl).hostname) ? 'openai-compatible' : 'openai';
+
 const readPackageVersion = (): string => {
   try {
     const manifest: unknown = JSON.parse(readFileSync(path.join(API_ROOT, 'package.json'), 'utf8'));
@@ -195,6 +232,12 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     trustProxy: env.TRUST_PROXY,
     shutdownTimeoutMs: env.SHUTDOWN_TIMEOUT_MS,
     rateLimit: { windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX },
+    endpointLimits: {
+      loginMax: env.LOGIN_RATE_LIMIT_MAX,
+      chatMax: env.CHAT_RATE_LIMIT_MAX,
+      imageMax: env.IMAGE_RATE_LIMIT_MAX,
+      uploadMax: env.UPLOAD_RATE_LIMIT_MAX,
+    },
   },
   log: {
     level: env.LOG_LEVEL,
@@ -218,11 +261,13 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
     timeoutMs: env.AI_TIMEOUT_MS,
     maxRetries: env.AI_MAX_RETRIES,
     maxOutputTokens: env.AI_MAX_OUTPUT_TOKENS,
+    compatibility: env.AI_COMPATIBILITY ?? inferCompatibility(env.AI_BASE_URL),
   },
   agent: {
     maxToolRounds: env.AGENT_MAX_TOOL_ROUNDS,
     maxModelCalls: env.AGENT_MAX_MODEL_CALLS,
     maxParallelTools: env.AGENT_MAX_PARALLEL_TOOLS,
+    maxToolCallsPerRound: env.AGENT_MAX_TOOL_CALLS_PER_ROUND,
     toolTimeoutMs: env.AGENT_TOOL_TIMEOUT_MS,
     maxToolRetries: env.AGENT_MAX_TOOL_RETRIES,
     retryBackoffMs: env.AGENT_RETRY_BACKOFF_MS,
@@ -241,11 +286,17 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
   },
   speech: {
     provider: env.STT_PROVIDER ?? null,
+    // Its own key when one is set, the chat key otherwise — so the common case
+    // stays one credential in one place, and the split is available when the
+    // two halves are best served by different vendors.
+    apiKey: env.STT_API_KEY ?? env.OPENAI_API_KEY,
+    configured: Boolean(env.STT_API_KEY ?? env.OPENAI_API_KEY),
     // Whisper is the model with documented Uzbek coverage, so it is the default
     // for a shop floor that speaks it; overridable for anywhere that does not.
     model: env.STT_MODEL ?? 'whisper-1',
     baseUrl: env.STT_BASE_URL ?? null,
     language: env.STT_LANGUAGE ?? null,
+    languages: env.STT_LANGUAGES.length > 0 ? env.STT_LANGUAGES : SPEECH_LANGUAGES,
     timeoutMs: env.STT_TIMEOUT_MS,
     maxRetries: env.STT_MAX_RETRIES,
     rateLimitMax: env.STT_RATE_LIMIT_MAX,

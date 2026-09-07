@@ -82,6 +82,15 @@ export const forgetById: ValidatedHandler<{ params: typeof memoryIdParamSchema }
 ) => {
   const result = await memoryService.forget(requireActor(req), { id: req.validated.params.id });
 
+  if (result.forgotten === 0) {
+    // The id named nothing this account owns. Reported as missing, like every
+    // other by-id route: answering `200 { forgotten: 0 }` told a caller their
+    // delete had succeeded when the record is still there and belongs to
+    // somebody else — and told a client to remove a row from a screen that the
+    // server had not removed from anything.
+    throw ApiError.notFound('Memory not found');
+  }
+
   sendSuccess(req, res, result);
 };
 

@@ -1,6 +1,7 @@
 import {
   DEFAULT_TIMEZONE,
   hasAtLeastRole,
+  searchRegexFilter,
   type AuthenticatedUser,
   type PaginatedResult,
   type UserRole,
@@ -121,11 +122,10 @@ export const listUsers = async (
     filter.status = query.status;
   }
 
-  if (query.search) {
-    filter.$or = [
-      { username: { $regex: query.search, $options: 'i' } },
-      { fullName: { $regex: query.search, $options: 'i' } },
-    ];
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.$or = [{ username: search }, { fullName: search }];
   }
 
   return userRepository.list({ filter, pagination: query, sort: { fullName: 1 } });

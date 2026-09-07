@@ -58,6 +58,7 @@ export type AgentLimitOverrides = Partial<{
   maxToolRounds: number;
   maxModelCalls: number;
   maxParallelTools: number;
+  maxToolCallsPerRound: number;
   toolTimeoutMs: number;
   maxToolRetries: number;
   retryBackoffMs: number;
@@ -151,6 +152,7 @@ const resolveLimits = (overrides: AgentLimitOverrides = {}) => ({
   maxToolRounds: overrides.maxToolRounds ?? config.agent.maxToolRounds,
   maxModelCalls: overrides.maxModelCalls ?? config.agent.maxModelCalls,
   maxParallelTools: overrides.maxParallelTools ?? config.agent.maxParallelTools,
+  maxToolCallsPerRound: overrides.maxToolCallsPerRound ?? config.agent.maxToolCallsPerRound,
   toolTimeoutMs: overrides.toolTimeoutMs ?? config.agent.toolTimeoutMs,
   maxToolRetries: overrides.maxToolRetries ?? config.agent.maxToolRetries,
   retryBackoffMs: overrides.retryBackoffMs ?? config.agent.retryBackoffMs,
@@ -512,8 +514,28 @@ export const sendMessage = async (
       rounds += 1;
       state = 'executing';
 
+      // A round is capped by the number of calls in it, not only by how many
+      // run at once. `maxParallelTools` decides the width of the batch; without
+      // this, a model that emitted five hundred calls would still make five
+      // hundred outbound requests, four at a time, and the round limit would
+      // never come into it. The excess is dropped rather than queued, and the
+      // model is told below, so it can ask for less instead of guessing why
+      // half its plan has no result.
+      const requested = completion.toolCalls;
+      const accepted = requested.slice(0, limits.maxToolCallsPerRound);
+      const dropped = requested.length - accepted.length;
+
+      if (dropped > 0) {
+        limitReached = true;
+        log.warn(
+          { user: actor.id, workflow: workflowId, requested: requested.length, dropped },
+          'the model asked for more tools in one round than the budget allows',
+        );
+        events.emit('tool.skipped', { tool: `+${dropped}`, reason: 'round_call_limit' });
+      }
+
       const outcomes = await runRound(
-        completion.toolCalls.map((call) => ({
+        accepted.map((call) => ({
           callId: call.callId,
           name: call.name,
           arguments: call.arguments,
@@ -606,7 +628,10 @@ export const sendMessage = async (
       promptMessages.push({
         role: 'assistant',
         content: completion.content,
-        toolCalls: completion.toolCalls,
+        // The accepted calls, not everything the model asked for: a provider
+        // rejects a prompt whose tool requests are not all answered, and the
+        // dropped ones never ran and so have no result to answer with.
+        toolCalls: accepted,
       });
 
       for (const call of roundCalls) {
@@ -621,6 +646,13 @@ export const sendMessage = async (
           role: 'tool',
           content: call.result ?? '',
           toolCallId: call.callId,
+        });
+      }
+
+      if (dropped > 0) {
+        promptMessages.push({
+          role: 'system',
+          content: `You asked for ${requested.length} tools in one step, and Hadiya runs at most ${limits.maxToolCallsPerRound}. The last ${dropped} were not run and have no result. Ask for the few you actually need, one step at a time.`,
         });
       }
     }

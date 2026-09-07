@@ -247,6 +247,45 @@ describe('failures and confirmations', () => {
 
     expect(block.kind).toBe('confirmation');
   });
+
+  it('asks the person the human half of the question, not the model’s half', () => {
+    // The server's summary is addressed to the model and says so. All of it
+    // used to reach the screen: a shopkeeper was shown an internal tool name,
+    // an argument called `confirm`, and two sentences of instruction meant for
+    // something else — beside a pending-action card asking the same thing
+    // properly, so the same decision appeared twice.
+    const block = toolToBlock(
+      makeToolCall({
+        name: 'delete_content_plan',
+        status: 'needs_confirmation',
+        result:
+          'Confirmation needed: permanently delete the plan "Sentabr" and its 4 item(s). Ask the user to confirm, then call "delete_content_plan" again with confirm: true. Do not assume they agreed.',
+      }),
+    );
+
+    expect(block.kind).toBe('confirmation');
+
+    const question = block.kind === 'confirmation' ? block.question : '';
+
+    expect(question).toContain('permanently delete the plan "Sentabr" and its 4 item(s)');
+    expect(question).not.toContain('delete_content_plan');
+    expect(question).not.toContain('confirm: true');
+    expect(question).not.toContain('Ask the user');
+    expect(question).not.toContain('Do not assume');
+  });
+
+  it('falls back to a plain question when the summary is not the shape it expects', () => {
+    // An unrecognised summary is precisely the case where showing it verbatim
+    // goes worst, so it is the case that must not fall back to the raw string.
+    for (const result of [null, '', 'something else entirely', 'ERR: internal/tool.ts:42 threw']) {
+      const block = toolToBlock(
+        makeToolCall({ name: 'files_delete', status: 'needs_confirmation', result }),
+      );
+      const question = block.kind === 'confirmation' ? block.question : '';
+
+      expect(question).toBe('Hadiya needs you to confirm this first.');
+    }
+  });
 });
 
 describe('a whole message', () => {

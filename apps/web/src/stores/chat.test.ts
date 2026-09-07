@@ -196,6 +196,68 @@ describe('sending a message', () => {
   });
 });
 
+describe('when the turn succeeded but the screen could not catch up', () => {
+  /**
+   * The difference between "your question was lost" and "your answer is on the
+   * server and this screen is behind" is the difference between a helpful retry
+   * and running the whole turn a second time — a second set of model calls, a
+   * second reminder created, a second image drawn and paid for.
+   *
+   * The reads after `deliver` are ordinary reads and fail like any other, so
+   * this is not a rare shape: a connection that drops a second after the answer
+   * arrives lands here.
+   */
+  it('does not offer to resend a turn the server already ran', async () => {
+    const send = vi.spyOn(chatService, 'send').mockResolvedValue(makeChatResponse());
+    vi.spyOn(conversationService, 'get').mockResolvedValue(makeConversation());
+    // The turn worked. Re-reading the transcript afterwards did not.
+    vi.spyOn(conversationService, 'messages').mockRejectedValue(
+      new ApiClientError('Could not reach the server.', { code: 'NETWORK_ERROR' }),
+    );
+
+    const chat = useChatStore();
+    await chat.send('Ertaga 10:00 da omborni tekshirishni eslat');
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(chat.error).toContain('could not load the reply');
+    // The whole point: no retry, because retrying would set a second reminder.
+    expect(chat.canRetry).toBe(false);
+
+    await chat.retry();
+
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the same when the conversation record is the read that failed', async () => {
+    const send = vi.spyOn(chatService, 'send').mockResolvedValue(makeChatResponse());
+    vi.spyOn(conversationService, 'messages').mockResolvedValue(paginated([makeMessage()]));
+    vi.spyOn(conversationService, 'get').mockRejectedValue(
+      new ApiClientError('boom', { code: 'INTERNAL_ERROR' }),
+    );
+
+    const chat = useChatStore();
+    await chat.send('Savdo?');
+
+    expect(chat.error).toContain('could not load the reply');
+    expect(chat.canRetry).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('still ends idle, so nothing is left spinning', async () => {
+    vi.spyOn(chatService, 'send').mockResolvedValue(makeChatResponse());
+    vi.spyOn(conversationService, 'get').mockResolvedValue(makeConversation());
+    vi.spyOn(conversationService, 'messages').mockRejectedValue(
+      new ApiClientError('gone', { code: 'NETWORK_ERROR' }),
+    );
+
+    const chat = useChatStore();
+    await chat.send('Savdo?');
+
+    expect(chat.isSending).toBe(false);
+    expect(chat.pending).toBeNull();
+  });
+});
+
 describe('when a turn fails', () => {
   it('names an exhausted account instead of telling the person to wait', async () => {
     vi.spyOn(chatService, 'send').mockRejectedValue(

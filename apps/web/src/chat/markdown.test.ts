@@ -49,6 +49,31 @@ describe('structure', () => {
       '<p>Birinchi qator<br />Ikkinchi qator</p>',
     );
   });
+
+  it('always makes progress, even on a table row with no separator beneath it', () => {
+    // Regression, and the sharpest kind: this used to loop for ever. A line
+    // like `| Mahsulot | Soni |` is recognised as beginning a block, so the
+    // paragraph branch collected nothing and never advanced — the tab froze
+    // and the renderer grew an array until it ran out of memory. A model
+    // forgetting the `| --- |` row is an everyday occurrence, so this was
+    // reachable from an ordinary answer rather than only from an attack.
+    for (const source of [
+      '| Mahsulot | Soni |',
+      'Mana jadval:\n| Mahsulot | Soni |',
+      '| a |\n| b |\n| c |',
+      '|'.repeat(200),
+      '| Mahsulot | Soni |\nkeyingi qator',
+    ]) {
+      const startedAt = Date.now();
+      const html = renderMarkdown(source);
+
+      expect(html.length).toBeGreaterThan(0);
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+    }
+
+    // A well-formed table still renders as a table.
+    expect(renderMarkdown('| a |\n| --- |\n| 1 |')).toContain('<table>');
+  });
 });
 
 describe('escaping', () => {

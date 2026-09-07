@@ -26,6 +26,18 @@ const isMongoDuplicateKeyError = (error: unknown): boolean =>
   error instanceof mongoose.mongo.MongoServerError && error.code === MONGO_DUPLICATE_KEY_CODE;
 
 /**
+ * The body parser's own "too big".
+ *
+ * Recognised by its `type` rather than by its class, because the error comes
+ * from `raw-body` through `body-parser` and neither exports a type this module
+ * could import without reaching into somebody else's internals.
+ */
+const isPayloadTooLarge = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  (error as { type?: unknown }).type === 'entity.too.large';
+
+/**
  * Translates anything thrown inside the app into a client-safe HTTP shape.
  * Kept free of Express so it can be unit tested directly.
  */
@@ -90,6 +102,18 @@ export const mapError = (error: unknown): MappedError => {
     return {
       statusCode: HTTP_STATUS.BAD_REQUEST,
       body: { code: 'VALIDATION_ERROR', message: 'Request body is not valid JSON' },
+      isOperational: true,
+    };
+  }
+
+  // A body over `BODY_LIMIT`. The parser throws its own error type, which
+  // without this becomes a `500` carrying a stack trace — an unhandled server
+  // fault reported for a limit the server enforced on purpose, and a free way
+  // to fill the error log from outside.
+  if (isPayloadTooLarge(error)) {
+    return {
+      statusCode: HTTP_STATUS.PAYLOAD_TOO_LARGE,
+      body: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' },
       isOperational: true,
     };
   }

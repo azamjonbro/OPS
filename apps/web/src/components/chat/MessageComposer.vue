@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DOCUMENT_ACCEPT_ATTRIBUTE } from '@hadiya/shared';
-import { computed, nextTick, ref, useId, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 
 import AttachmentChip from './AttachmentChip.vue';
 import RecordingIndicator from './RecordingIndicator.vue';
@@ -106,6 +106,53 @@ const resize = (): void => {
 };
 
 watch(text, () => void nextTick(resize));
+
+/**
+ * The field also has to be measured when nothing was typed.
+ *
+ * `resize` used to run only when `text` changed, which quietly assumed the box
+ * is the right height until somebody types in it. It is not: `rows="1"` is one
+ * line, and the empty field is showing a forty-character placeholder that wraps
+ * to two lines on a phone. The result was the placeholder cut in half across
+ * the bottom edge of the composer on every narrow screen, before any
+ * interaction at all.
+ *
+ * Width is the trigger rather than the window, because the width that matters
+ * is the element's: the sidebar opening, a phone rotating and the window
+ * resizing all change it, and only one of them is a window resize. A
+ * `ResizeObserver` catches all three and nothing else has to know about them.
+ */
+let widthObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  resize();
+
+  const element = textarea.value;
+
+  if (!element || typeof ResizeObserver === 'undefined') {
+    return;
+  }
+
+  let lastWidth = element.clientWidth;
+
+  widthObserver = new ResizeObserver(() => {
+    // Height changes are this function's own doing; reacting to them would be
+    // a loop. Only a change in width can alter how the text wraps.
+    if (element.clientWidth === lastWidth) {
+      return;
+    }
+
+    lastWidth = element.clientWidth;
+    resize();
+  });
+
+  widthObserver.observe(element);
+});
+
+onBeforeUnmount(() => {
+  widthObserver?.disconnect();
+  widthObserver = null;
+});
 
 const focus = (): void => {
   textarea.value?.focus();

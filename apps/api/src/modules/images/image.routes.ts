@@ -1,6 +1,9 @@
+import { IMAGE_RATE_LIMIT } from '@hadiya/shared';
 import { Router } from 'express';
 
+import { config } from '../../config/index.js';
 import { asyncHandler } from '../../core/http/async-handler.js';
+import { actorRateLimiter } from '../../core/middleware/rate-limit.js';
 import { validated } from '../../core/middleware/validate.js';
 import * as imageController from './image.controller.js';
 import {
@@ -21,6 +24,14 @@ imageRouter.get('/', ...validated({ query: listImagesQuerySchema }, imageControl
 /** Literal paths are declared before `/:id` so they win the match. */
 imageRouter.post(
   '/generate',
+  // An image is billed per picture, and the request asks for several. Counted
+  // per account before anything is drawn, so a loop is refused rather than
+  // invoiced.
+  actorRateLimiter({
+    windowMs: IMAGE_RATE_LIMIT.windowMs,
+    max: config.http.endpointLimits.imageMax,
+    message: 'That is a lot of images at once. Wait a moment and try again.',
+  }),
   ...validated({ body: generateImageSchema }, imageController.generate),
 );
 imageRouter.get(

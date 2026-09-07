@@ -1,6 +1,7 @@
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 
+import { redactProviderBody } from './ai-http.js';
 import { AiProviderError } from './ai-error.js';
 import { AnthropicProvider } from './anthropic.provider.js';
 import { OpenAiProvider } from './openai.provider.js';
@@ -61,6 +62,46 @@ const TOOLS: AiCompletionRequest['tools'] = [
     },
   },
 ];
+
+/**
+ * A provider that refuses a credential quotes it back — OpenAI's own wording is
+ * "Incorrect API key provided: sk-…". The failure body is logged because it is
+ * genuinely useful, so the key has to come out of it before it is written down.
+ */
+describe('what a failed provider call is allowed to log', () => {
+  it('strips credential-shaped values out of the body, keeping the rest', () => {
+    const cases: Array<[string, string]> = [
+      [
+        '{"error":{"message":"Incorrect API key provided: sk-proj-AbCdEf1234567890"}}',
+        'sk-proj-AbCdEf1234567890',
+      ],
+      ['{"error":{"message":"invalid key gsk_ABCDEFGH12345678"}}', 'gsk_ABCDEFGH12345678'],
+      ['{"error":{"message":"bad key AIzaSyA1234567890abcdef"}}', 'AIzaSyA1234567890abcdef'],
+      ['{"error":{"message":"Bearer abcdefgh12345678 rejected"}}', 'Bearer abcdefgh12345678'],
+      [
+        '{"error":{"message":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcdefghij expired"}}',
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcdefghij',
+      ],
+    ];
+
+    for (const [body, secret] of cases) {
+      const logged = redactProviderBody(body);
+
+      expect(logged).not.toContain(secret);
+      expect(logged).toContain('[redacted]');
+    }
+  });
+
+  it('leaves an ordinary diagnostic body alone', () => {
+    const body = '{"error":{"message":"model gpt-9 does not exist","code":"model_not_found"}}';
+
+    expect(redactProviderBody(body)).toBe(body);
+  });
+
+  it('still bounds the length, so a body cannot become a log payload', () => {
+    expect(redactProviderBody('x'.repeat(5_000)).length).toBeLessThanOrEqual(300);
+  });
+});
 
 describe('OpenAI provider', () => {
   it('returns text and usage from a successful reply', async () => {
@@ -491,5 +532,84 @@ describe('OpenAI streaming', () => {
 
     expect(completion?.content).toBe('Bugungi ');
     expect(double.calls).toHaveLength(1);
+  });
+});
+
+describe('talking to an endpoint that is only OpenAI-shaped', () => {
+  /**
+   * Groq, Gemini's compatibility layer, OpenRouter and the rest implement this
+   * API faithfully right up to the two parameters OpenAI added for its own
+   * reasoning models. Sending those to anybody else fails every request, which
+   * on a screen looks like a rejected key rather than a wrong dialect — so the
+   * dialect is a setting, and these are the two things it changes.
+   */
+  const buildCompatible = (script: ScriptedHttpResponse[]) => {
+    const double = createProviderHttpDouble(script);
+    const provider = new OpenAiProvider({
+      apiKey: 'free-tier-key',
+      model: 'llama-3.3-70b-versatile',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      timeoutMs: 50,
+      maxRetries: 0,
+      maxOutputTokens: 1_024,
+      compatibility: 'openai-compatible',
+      fetchImpl: double.fetchImpl,
+      logger: silentLogger,
+      sleep: async () => undefined,
+    });
+
+    return { provider, double };
+  };
+
+  it('asks for a token ceiling by the name every such service accepts', async () => {
+    const { provider, double } = buildCompatible([{ body: openAiTextResponse('Salom!') }]);
+
+    await provider.complete({ messages: [], tools: [] });
+
+    expect(double.calls[0]?.body.max_tokens).toBe(1_024);
+    expect(double.calls[0]?.body.max_completion_tokens).toBeUndefined();
+  });
+
+  it('still uses OpenAI’s own name when talking to OpenAI', async () => {
+    const { provider, double } = buildOpenAi([{ body: openAiTextResponse('Salom!') }]);
+
+    await provider.complete({ messages: [], tools: [] });
+
+    expect(double.calls[0]?.body.max_completion_tokens).toBe(1_024);
+    expect(double.calls[0]?.body.max_tokens).toBeUndefined();
+  });
+
+  it('does not ask for a usage report a compatible service might reject', async () => {
+    const { provider, double } = buildCompatible([
+      {
+        rawBody: 'data: {"choices":[{"delta":{"content":"Salom"}}]}\n\ndata: [DONE]\n\n',
+        headers: { 'content-type': 'text/event-stream' },
+      },
+    ]);
+
+    const completion = await provider.stream?.({ messages: [], tools: [] }, () => undefined);
+
+    expect(double.calls[0]?.body.stream_options).toBeUndefined();
+    expect(completion?.content).toBe('Salom');
+    // The count is simply unknown, which every caller already handles. Losing
+    // it is a far smaller loss than losing the answer to a rejected field.
+    expect(completion?.usage).toEqual({ promptTokens: null, completionTokens: null });
+  });
+
+  it('carries tools and the transcript unchanged, whichever dialect it speaks', async () => {
+    const { provider, double } = buildCompatible([{ body: openAiTextResponse('ok') }]);
+
+    await provider.complete({
+      messages: [{ role: 'user', content: 'Bugungi savdo?' }],
+      tools: TOOLS,
+    });
+
+    const body = double.calls[0]?.body as {
+      tools: Array<{ function: { name: string } }>;
+      messages: Array<{ content: string }>;
+    };
+
+    expect(body.tools[0]?.function.name).toBe('get_sales_summary');
+    expect(body.messages[0]?.content).toBe('Bugungi savdo?');
   });
 });

@@ -1,0 +1,98 @@
+name: CI
+
+# Every push and every pull request, and nothing else. There is deliberately no
+# deploy job here: the deployment is a single host reached over SSH, and a
+# workflow that can restart production is a workflow whose credentials are worth
+# stealing. Releases are cut by running `deploy/scripts/deploy.sh` on the host.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # The API's tests run against a real MongoDB — the behaviour under test
+      # (unique indexes, conditional updates, transactions) only exists in a
+      # database. A single-node replica set rather than a standalone, because
+      # transactions need one and the non-transactional fallback is a different
+      # code path from the one production takes.
+      mongo:
+        image: mongo:8
+        ports:
+          - 27018:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci` rather than `install`: the lockfile is the contract, and a build
+      # that quietly resolved a different tree has not tested what will ship.
+      - name: Install
+        run: npm ci
+
+      # The replica set has to be initiated after the container is up; the
+      # image does not do it for a single node on its own.
+      - name: Initiate the replica set
+        run: |
+          docker exec "$(docker ps -q --filter ancestor=mongo:8)" \
+            mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for i in $(seq 1 30); do
+            if docker exec "$(docker ps -q --filter ancestor=mongo:8)" \
+              mongosh --quiet --eval 'rs.status().ok' | grep -q 1; then
+              echo "replica set ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "the replica set never became ready" >&2
+          exit 1
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+        env:
+          MONGO_TEST_URI: mongodb://127.0.0.1:27018/hadiya-test?replicaSet=rs0&directConnection=true
+
+      - name: Build
+        run: npm run build
+
+      # A build that silently started shipping a secret to the browser is worth
+      # failing over, and it is cheap to check: the bundle is right there.
+      - name: Check the web bundle carries no server secret
+        run: |
+          if grep -rqE "mongodb(\+srv)?://|JWT_(ACCESS|REFRESH)_SECRET|CREDENTIALS_ENCRYPTION_KEY|sk-[A-Za-z0-9]{20}" apps/web/dist; then
+            echo "A server-side value appears in the web bundle." >&2
+            exit 1
+          fi
+          echo "The web bundle is clean."
+
+      - name: Check the deployment scripts parse
+        run: |
+          for script in deploy/scripts/*.sh; do bash -n "$script"; done
+          node --check deploy/scripts/verify-restore.mjs
+          node -e "require('./ecosystem.config.cjs')"

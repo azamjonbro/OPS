@@ -3,6 +3,7 @@ import {
   CONTENT_PLAN_MAX_ITEMS,
   isObjectIdString,
   resolvePagination,
+  searchRegexFilter,
   type AuthenticatedUser,
   type ContentItemStatus,
   type ContentPlanStatus,
@@ -191,11 +192,10 @@ export const listPlans = async (
     filter.platform = query.platform;
   }
 
-  if (query.search) {
-    filter.$or = [
-      { title: { $regex: query.search, $options: 'i' } },
-      { description: { $regex: query.search, $options: 'i' } },
-    ];
+  const search = searchRegexFilter(query.search);
+
+  if (search) {
+    filter.$or = [{ title: search }, { description: search }];
   }
 
   const { page, pageSize, skip, limit } = resolvePagination(query);

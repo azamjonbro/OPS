@@ -1,5 +1,6 @@
 import {
   addCalendarDays,
+  ANALYTICS_MAX_PERIOD_DAYS,
   dayNumber,
   startOfIsoWeek,
   toCalendarDay,
@@ -180,6 +181,15 @@ export const resolvePeriod = (options: {
 
         if (dayNumber(end) < dayNumber(start)) {
           throw ApiError.badRequest('The custom period ends before it starts.');
+        }
+
+        // Bounded, because these two dates were written by the model and every
+        // report below builds one row per day in the window. Unbounded, a
+        // single argument turns into millions of rows.
+        if (dayNumber(end) - dayNumber(start) + 1 > ANALYTICS_MAX_PERIOD_DAYS) {
+          throw ApiError.badRequest(
+            `A custom period may cover at most ${ANALYTICS_MAX_PERIOD_DAYS} days. Ask about a shorter window.`,
+          );
         }
 
         return { start, end, label: '' };

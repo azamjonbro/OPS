@@ -220,8 +220,10 @@ describe('user isolation', () => {
 
     expect(list.body.data.items).toHaveLength(0);
     expect(read.status).toBe(HTTP_STATUS.NOT_FOUND);
-    // Nothing matched, so nothing was forgotten.
-    expect(forget.body.data).toEqual({ forgotten: 0 });
+    // Nothing matched, and that is reported the way every other by-id route
+    // reports it. Answering `200 { forgotten: 0 }` told the caller their delete
+    // had succeeded on a record that is still there and is not theirs.
+    expect(forget.status).toBe(HTTP_STATUS.NOT_FOUND);
 
     // The owner's memory is still active.
     expect(await memoryService.listActiveMemories(actorOf(owner.user), 10)).toHaveLength(1);

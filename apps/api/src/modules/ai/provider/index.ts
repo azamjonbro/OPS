@@ -100,7 +100,11 @@ const build = (): AiProvider => {
     });
   }
 
-  return new OpenAiProvider({ apiKey: config.integrations.openai.apiKey ?? '', ...shared });
+  return new OpenAiProvider({
+    apiKey: config.integrations.openai.apiKey ?? '',
+    compatibility: config.ai.compatibility,
+    ...shared,
+  });
 };
 
 /**

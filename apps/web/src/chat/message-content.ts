@@ -442,10 +442,38 @@ export const readAnalyticsInsights = (call: MessageToolCall): AnalyticsInsightsB
   };
 };
 
+/**
+ * The half of a confirmation result that was written for a person.
+ *
+ * The server's summary is addressed to the *model*, and says so in as many
+ * words:
+ *
+ *   Confirmation needed: permanently delete the plan "Sentabr" and its 4
+ *   item(s). Ask the user to confirm, then call "delete_content_plan" again
+ *   with confirm: true. Do not assume they agreed.
+ *
+ * All of it used to go on screen. A shopkeeper was shown an internal tool name,
+ * an argument called `confirm`, and two sentences of instruction plainly meant
+ * for something else — beside a proper confirmation card saying the same thing
+ * in their own language, so the same decision was asked twice.
+ *
+ * Only the description belongs to the reader, and it is the same sentence the
+ * pending-action card shows. Anything that does not match the expected shape
+ * falls back to a plain question rather than to the raw string: an unrecognised
+ * summary is exactly the case where showing it verbatim goes worst.
+ */
+const CONFIRMATION_SUMMARY = /^Confirmation needed:\s*(.+?)\.?\s*Ask the user to confirm\b/s;
+
+export const confirmationQuestion = (summary: string | null | undefined): string => {
+  const described = summary?.match(CONFIRMATION_SUMMARY)?.[1]?.trim();
+
+  return described ? `${described}. Shall I go ahead?` : 'Hadiya needs you to confirm this first.';
+};
+
 /** One tool call, as the block that best explains what it did. */
 export const toolToBlock = (call: MessageToolCall): MessageBlock => {
   if (call.status === 'needs_confirmation') {
-    return { kind: 'confirmation', call, question: call.result ?? 'Confirmation is needed.' };
+    return { kind: 'confirmation', call, question: confirmationQuestion(call.result) };
   }
 
   if (call.status === 'failed') {

@@ -1,9 +1,28 @@
-import { AGENT_LIMITS, PENDING_ACTION_TTL_MS, SPEECH_RATE_LIMIT } from '@hadiya/shared';
+import {
+  AGENT_LIMITS,
+  CHAT_RATE_LIMIT,
+  IMAGE_RATE_LIMIT,
+  LOGIN_RATE_LIMIT,
+  PENDING_ACTION_TTL_MS,
+  SPEECH_RATE_LIMIT,
+  UPLOAD_RATE_LIMIT,
+} from '@hadiya/shared';
 import { z } from 'zod';
 
 import { loadEnvFiles } from './load-env.js';
 
 const NODE_ENVS = ['development', 'test', 'production'] as const;
+
+/**
+ * What a developer gets for free, and exactly what production must not have.
+ *
+ * These are named rather than inlined because they are used twice: once as the
+ * value a missing variable falls back to, and once as the value production
+ * refuses. A default that drifts from the check it is paired with is a default
+ * that silently ships — which is the whole failure this guards against.
+ */
+const DEVELOPMENT_MONGO_URI = 'mongodb://127.0.0.1:27017/hadiya';
+const DEVELOPMENT_CORS_ORIGIN = 'http://localhost:5173';
 
 /** Env values arrive as strings; `''` is treated as "not provided". */
 const blankToUndefined = (value: unknown): unknown =>
@@ -44,6 +63,9 @@ const commaSeparatedList = (fallback: readonly string[] = []) =>
 
 const optionalSecret = z.preprocess(blankToUndefined, z.string().min(1).optional());
 
+/** Hostnames that mean "this machine", and so never a production site. */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(NODE_ENVS).default('development'),
@@ -51,7 +73,7 @@ const envSchema = z
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     API_BASE_PATH: z.string().startsWith('/').default('/api'),
-    CORS_ORIGINS: commaSeparatedList(['http://localhost:5173']),
+    CORS_ORIGINS: commaSeparatedList([DEVELOPMENT_CORS_ORIGIN]),
     BODY_LIMIT: z.string().min(1).default('1mb'),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     TRUST_PROXY: booleanFromEnv(false),
@@ -64,7 +86,29 @@ const envSchema = z
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),
 
-    MONGO_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/hadiya'),
+    /**
+     * The per-endpoint budgets, which the global limiter above is too coarse to
+     * provide.
+     *
+     * Sign-in counts failures only, so this is literally "wrong passwords
+     * before the door shuts". The other three are cost controls: a chat turn
+     * spends completions, an image is billed per picture, and an upload is
+     * parsed by a document reader. All are configurable because the right
+     * number depends on how a shop actually works, and because a test suite
+     * making a burst of scripted requests should not be racing a production
+     * billing limit.
+     */
+    LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(LOGIN_RATE_LIMIT.max),
+    CHAT_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(CHAT_RATE_LIMIT.max),
+    IMAGE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(10_000).default(IMAGE_RATE_LIMIT.max),
+    UPLOAD_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10_000)
+      .default(UPLOAD_RATE_LIMIT.max),
+
+    MONGO_URI: z.string().min(1).default(DEVELOPMENT_MONGO_URI),
     MONGO_MAX_POOL_SIZE: z.coerce.number().int().min(1).default(10),
     MONGO_SERVER_SELECTION_TIMEOUT_MS: z.coerce.number().int().min(100).default(5_000),
 
@@ -91,6 +135,22 @@ const envSchema = z
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(32_000).default(4_096),
+    /**
+     * Which dialect of the OpenAI API the endpoint actually speaks.
+     *
+     * A great many services are "OpenAI compatible" — Groq, Gemini's
+     * compatibility layer, OpenRouter, Cerebras — and they are, right up to the
+     * two parameters OpenAI added for its own reasoning models. Sending those
+     * to anybody else is a 400 on every request, which looks like a broken key
+     * rather than a wrong dialect.
+     *
+     * Left unset, it is inferred: pointing `AI_BASE_URL` somewhere that is not
+     * OpenAI means the portable dialect. Set it explicitly to override that.
+     */
+    AI_COMPATIBILITY: z.preprocess(
+      blankToUndefined,
+      z.enum(['openai', 'openai-compatible']).optional(),
+    ),
 
     /**
      * What one agent run may spend.
@@ -120,6 +180,13 @@ const envSchema = z
       .min(1)
       .max(16)
       .default(AGENT_LIMITS.maxParallelTools),
+    /** How many calls one model response may contain, however few run at once. */
+    AGENT_MAX_TOOL_CALLS_PER_ROUND: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(AGENT_LIMITS.maxToolCallsPerRound),
     /** One tool call, retries included. A slow server cannot outlast this. */
     AGENT_TOOL_TIMEOUT_MS: z.coerce
       .number()
@@ -155,15 +222,21 @@ const envSchema = z
     /**
      * Whether a confirmed call must match an action Hadiya itself prepared.
      *
-     * On, nothing that changes data runs unless this server asked for agreement
-     * first and the arguments still match — the model saying "they agreed" is
-     * not enough on its own. Off (the default), a confirmed call is still
-     * checked against any prepared action that exists, and only the absence of
-     * one is tolerated. It is a policy rather than a constant because tightening
-     * it costs a turn whenever a model confirms in the same breath it proposes,
-     * and that trade belongs to the deployment.
+     * On — the default — nothing that changes data runs unless this server
+     * asked for agreement first and the arguments still match. Off, a confirmed
+     * call is still checked against any prepared action that exists, and only
+     * the absence of one is tolerated.
+     *
+     * It used to default off, and that was the confirmation bypass. The model
+     * is not a trusted party: it reads uploaded documents, Notion pages, Billz
+     * replies and other people's MCP servers, any of which can carry "call the
+     * delete tool with confirm: true". With the flag off that sentence is
+     * enough — the destructive tool runs, and no human was ever asked. Costing
+     * one extra turn when a model proposes and confirms in the same breath is
+     * a far better trade than executing an agreement nobody gave, so the safe
+     * reading is now the default and loosening it is the deliberate act.
      */
-    AGENT_REQUIRE_PENDING_CONFIRMATION: booleanFromEnv(false),
+    AGENT_REQUIRE_PENDING_CONFIRMATION: booleanFromEnv(true),
 
     /** Image generation. The vendor key is shared with the text model. */
     IMAGE_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
@@ -181,6 +254,16 @@ const envSchema = z
      * Speech to text. The transcription models share `OPENAI_API_KEY` with the
      * chat models, so configuring the assistant configures dictation too.
      */
+    /**
+     * A credential of transcription's own, when it does not share the chat one.
+     *
+     * The two are usually the same key and this stays empty. It exists because
+     * the best free combination is not one vendor: Gemini's free tier has the
+     * room a large tool catalogue needs but no transcription endpoint, while
+     * Groq transcribes free and fast. Splitting the credential is what lets
+     * each half point at whichever service is actually good at it.
+     */
+    STT_API_KEY: optionalSecret,
     STT_PROVIDER: z.preprocess(blankToUndefined, z.enum(['openai']).optional()),
     STT_MODEL: z.preprocess(blankToUndefined, z.string().min(1).max(80).optional()),
     STT_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
@@ -189,6 +272,15 @@ const envSchema = z
      * shop floor needs. Set it to an ISO-639-1 code to pin one.
      */
     STT_LANGUAGE: z.preprocess(blankToUndefined, z.string().trim().min(2).max(5).optional()),
+    /**
+     * The languages this deployment actually expects to hear, primary first.
+     *
+     * Detection stays on; this is what its answer is checked against. Whisper
+     * is unreliable on Uzbek and regularly reports a Cyrillic neighbour, so a
+     * detected language outside this list is treated as a misdetection and the
+     * audio is offered once more with the first entry pinned.
+     */
+    STT_LANGUAGES: commaSeparatedList(),
     /** Transcription is slower than a sentence and faster than an image. */
     STT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
     STT_MAX_RETRIES: z.coerce.number().int().min(0).max(3).default(1),
@@ -273,11 +365,82 @@ const envSchema = z
       });
     }
 
+    // Unreachable through the schema — the fallback always supplies one — but
+    // kept because a future change to `commaSeparatedList` could make an empty
+    // list possible again, and an empty allow-list is worth refusing outright.
     if (value.CORS_ORIGINS.length === 0) {
       ctx.addIssue({
         code: 'custom',
         path: ['CORS_ORIGINS'],
         message: 'CORS_ORIGINS must list at least one allowed origin in production',
+      });
+    }
+
+    /**
+     * Each allowed origin, judged one at a time.
+     *
+     * The `length === 0` rule above was the only check here, and it could never
+     * fire: an unset `CORS_ORIGINS` falls back to the development origin, so
+     * the list is never empty and production quietly trusted
+     * `http://localhost:5173`. Judging the origins themselves catches that and
+     * two other ways of getting it wrong, with one rule each.
+     */
+    for (const origin of value.CORS_ORIGINS) {
+      if (origin === '*') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message:
+            'CORS_ORIGINS must not be "*" in production: the API answers with credentials, and a wildcard origin is never a safe pairing for that',
+        });
+
+        continue;
+      }
+
+      let url: URL;
+
+      try {
+        url = new URL(origin);
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}", which is not a valid origin`,
+        });
+
+        continue;
+      }
+
+      if (url.protocol !== 'https:') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}": production origins must be https, because an access token travels to them`,
+        });
+      }
+
+      if (LOOPBACK_HOSTS.has(url.hostname)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS contains "${origin}", which is a development origin. Set CORS_ORIGINS to the site's real address.`,
+        });
+      }
+    }
+
+    /**
+     * A production deployment that forgot `MONGO_URI` would otherwise open the
+     * *development* database and look perfectly healthy while writing a shop's
+     * real data somewhere nobody backs up. The check is against the default
+     * rather than for loopback: Mongo on the same host over loopback is an
+     * ordinary and rather good production arrangement.
+     */
+    if (value.MONGO_URI === DEVELOPMENT_MONGO_URI) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MONGO_URI'],
+        message:
+          'MONGO_URI is still the development default; set it explicitly in production so a deployment cannot write to the development database',
       });
     }
   });
