@@ -10,7 +10,7 @@ import {
   isRunActive,
   type AgentRun,
 } from '@/chat/agent-run';
-import { toChatError, EMPTY_ANSWER } from '@/chat/chat-errors';
+import { toChatError, EMPTY_ANSWER, REFRESH_FAILED } from '@/chat/chat-errors';
 import { streamChat, watchRun, StreamUnavailableError } from '@/services/agent-stream';
 import { chatService } from '@/services/chat.service';
 import { isCancelled } from '@/services/api-error';
@@ -406,8 +406,29 @@ export const useChatStore = defineStore('chat', () => {
     lastFailedMessage.value = null;
     resetRun();
 
+    /**
+     * Whether the turn itself got through.
+     *
+     * Everything after `deliver` is housekeeping — re-reading the transcript so
+     * the tool cards are the server's rather than reconstructed, and refreshing
+     * the conversation record for the sidebar. Both are reads, and a read can
+     * fail on its own: a dropped connection a second after the answer arrived,
+     * a `500` on the way back.
+     *
+     * Without this flag one `catch` served both halves, so a turn that had
+     * already run — spending model calls, writing memories, creating a
+     * reminder — was reported to the person as a failure with a "try again"
+     * beside it. Taking that offer sent the same message a second time and did
+     * all of it again. A retry may only ever be offered for a turn that never
+     * reached the agent.
+     */
+    let delivered = false;
+
     try {
       const response = await deliver(content);
+
+      delivered = true;
+
       const isNewThread = conversationId.value !== response.conversationId;
 
       conversationId.value = response.conversationId;
@@ -445,6 +466,19 @@ export const useChatStore = defineStore('chat', () => {
       conversation.value = record;
       conversations.upsert(record);
     } catch (caught) {
+      if (delivered) {
+        // The answer exists on the server; only the refresh afterwards failed.
+        // The person is told the screen is behind rather than that their
+        // question was lost, and is offered a reload rather than a resend —
+        // sending again would run the whole turn a second time.
+        pending.value = null;
+        error.value = REFRESH_FAILED.message;
+        canRetry.value = false;
+        lastFailedMessage.value = null;
+
+        return;
+      }
+
       // The words go back to the composer rather than being lost, and the
       // bubble is withdrawn so nothing looks delivered that was not.
       const failure = toChatError(caught);

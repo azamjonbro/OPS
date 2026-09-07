@@ -2,6 +2,7 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../app.js';
+import { billzCapabilitySchemas } from './billz.capabilities.js';
 import { HTTP_STATUS } from '../../core/http/http-status.js';
 import { clearTestDatabase, startTestDatabase, stopTestDatabase } from '../../test/database.js';
 import { createTestBranch, signInAs } from '../../test/factories.js';
@@ -125,6 +126,45 @@ describe(`GET ${base}/sales`, () => {
       .set('Authorization', authorization);
 
     expect(response.status).toBe(HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  });
+});
+
+describe('the capability schemas the model calls through', () => {
+  /**
+   * The model is the less trustworthy of the two callers, and it used to be the
+   * one held to the looser rule: the HTTP routes have always rejected a bad
+   * date, while the capability schema accepted any four characters and let
+   * Billz answer `400`. These assert the two now agree.
+   */
+  const summary = billzCapabilitySchemas.getSalesSummary;
+
+  it('accepts a real calendar window', () => {
+    expect(summary.safeParse({ from: '2026-09-01', to: '2026-09-30' }).success).toBe(true);
+    expect(summary.safeParse({ from: '2026-09-01', to: '2026-09-01' }).success).toBe(true);
+    // A leap day in a leap year is a real date.
+    expect(summary.safeParse({ from: '2024-02-29', to: '2024-03-01' }).success).toBe(true);
+  });
+
+  it('refuses something that is not a date, rather than asking Billz about it', () => {
+    for (const value of ['oxirgi hafta', 'soon', 'today', '2026', '2026-9-1', '01/09/2026', '']) {
+      expect(summary.safeParse({ from: value, to: '2026-09-30' }).success).toBe(false);
+    }
+  });
+
+  it('refuses a day that does not exist', () => {
+    for (const value of ['2026-02-30', '2026-13-01', '2026-00-10', '2025-02-29']) {
+      expect(summary.safeParse({ from: value, to: '2026-12-31' }).success).toBe(false);
+    }
+  });
+
+  it('refuses a window that runs backwards, like the route does', () => {
+    expect(summary.safeParse({ from: '2026-09-10', to: '2026-09-01' }).success).toBe(false);
+    expect(
+      billzCapabilitySchemas.getSales.safeParse({ from: '2026-09-10', to: '2026-09-01' }).success,
+    ).toBe(false);
+    expect(
+      billzCapabilitySchemas.getDebts.safeParse({ from: '2026-09-10', to: '2026-09-01' }).success,
+    ).toBe(false);
   });
 });
 

@@ -54,6 +54,27 @@ interface ProviderErrorBody {
   type?: string;
 }
 
+/**
+ * Credential-shaped runs of characters, wherever they appear in a string.
+ *
+ * Pino's `redact` works on keys, and this is not a key: it is a value *inside*
+ * an error message the provider wrote. That distinction is the whole problem —
+ * a provider refusing a credential routinely quotes it back, and OpenAI's own
+ * wording is "Incorrect API key provided: sk-…". Logging the body verbatim
+ * therefore wrote the deployment's live key into the application log at WARN
+ * level, where it is retained, shipped and searchable.
+ *
+ * The rest of the body is worth keeping — "model not found" and "context length
+ * exceeded" are exactly what somebody reads a log for — so this redacts rather
+ * than drops.
+ */
+const CREDENTIAL_SHAPED =
+  /\b(sk-[A-Za-z0-9_-]{8,}|gsk_[A-Za-z0-9]{8,}|AIza[A-Za-z0-9_-]{8,}|xai-[A-Za-z0-9]{8,}|Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+)/g;
+
+/** What is safe to write down about a failed provider call. */
+export const redactProviderBody = (body: string, limit = LOGGED_BODY_LIMIT): string =>
+  body.replace(CREDENTIAL_SHAPED, '[redacted]').slice(0, limit);
+
 /** The provider's own error code, which is safe to keep; the message is not. */
 const readProviderCode = (body: string): string | undefined => {
   try {
@@ -161,7 +182,7 @@ export const postJson = async <TResponse>(
             endpoint: request.endpoint,
             status: response.status,
             providerCode,
-            body: text.slice(0, LOGGED_BODY_LIMIT),
+            body: redactProviderBody(text),
           },
           'ai provider request failed',
         );
@@ -279,7 +300,7 @@ export const postSse = async (
             endpoint: request.endpoint,
             status: response.status,
             providerCode,
-            body: text.slice(0, LOGGED_BODY_LIMIT),
+            body: redactProviderBody(text),
           },
           'ai provider stream failed',
         );

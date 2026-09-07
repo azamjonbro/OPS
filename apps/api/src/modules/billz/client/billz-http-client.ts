@@ -247,11 +247,9 @@ export class BillzHttpClient {
       case HTTP_UNAUTHORIZED:
         return new BillzError('unauthorized', 'Billz rejected the credential', context);
       case HTTP_FORBIDDEN:
-        return new BillzError(
-          'forbidden',
-          `The Billz API key is not allowed to call ${endpoint}`,
-          context,
-        );
+        // Same reasoning as the default below: which endpoint was refused is a
+        // fact for whoever holds the API key, not for the conversation.
+        return new BillzError('forbidden', 'The Billz API key is not allowed to do that', context);
       case HTTP_NOT_FOUND:
         return new BillzError('not_found', 'The Billz record does not exist', context);
       case HTTP_TOO_MANY_REQUESTS:
@@ -262,11 +260,13 @@ export class BillzHttpClient {
             : { retryAfterSeconds: parseRetryAfter(response.headers.get('retry-after')) }),
         });
       default:
-        return new BillzError(
-          'upstream_error',
-          `Billz answered ${response.status} for ${endpoint}`,
-          context,
-        );
+        // The endpoint stays on `context`, where the logs read it, and out of
+        // the message, which does not stop at the logs: a tool failure is
+        // handed to the model, stored in the transcript and rendered in the
+        // conversation, so `/v3/order-search` ended up on a shopkeeper's screen
+        // as the explanation for why their question failed. The status is the
+        // part that means anything to either reader.
+        return new BillzError('upstream_error', `Billz answered ${response.status}`, context);
     }
   }
 }

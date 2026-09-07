@@ -25,6 +25,10 @@ import { ApiError } from './api-error.js';
  */
 const audioUpload = multer({
   storage: multer.memoryStorage(),
+  // Set here too, for consistency rather than for need: the recording's name is
+  // discarded, but a decoder that differs between the two upload paths is a
+  // difference somebody will eventually rely on.
+  defParamCharset: 'utf8',
   limits: {
     fileSize: SPEECH_MAX_UPLOAD_BYTES,
     // One field, one file: a request carrying more than that is not a
@@ -105,6 +109,14 @@ export const uploadAudio = (): RequestHandler => {
 const documentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: FILE_LIMITS.maxBytes, files: 1, fields: 4 },
+  // Filenames arrive as UTF-8 bytes, and multer decodes them as Latin-1 unless
+  // told otherwise. In a product whose users name things `hisobot-otchyot.csv`
+  // in Cyrillic and Uzbek Latin, that default corrupts a large share of every
+  // upload: `otchyot` came back as mojibake, and it stayed corrupted in the
+  // list, in the download header and in the text handed to the model. The
+  // filename is still untrusted and still never used as a path — this only
+  // decides which characters it is understood to contain.
+  defParamCharset: 'utf8',
 });
 
 const DOCUMENT_MESSAGES: Record<string, string> = {

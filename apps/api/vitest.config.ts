@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -7,14 +9,61 @@ import { defineConfig } from 'vitest/config';
  * the transactional paths; a standalone server runs the same tests through the
  * non-transactional fallback.
  */
-const TEST_DATABASE_URI =
+const BASE_URI =
   process.env.MONGO_TEST_URI ?? 'mongodb://127.0.0.1:27018/hadiya-test?replicaSet=rs0';
+
+/**
+ * A database of this run's own.
+ *
+ * Every file empties every collection in `beforeEach`, which is the right way
+ * to isolate one test from the next *within* a run and a loaded gun pointed at
+ * anything else using the same database. A second run — a watch-mode window
+ * left open, a colleague on the same machine, two CI jobs on one Mongo, a
+ * developer running one file while the whole suite goes — deletes rows out from
+ * under the first one mid-test.
+ *
+ * That failed rarely and moved around: whichever test happened to be holding a
+ * row when somebody else's `deleteMany` landed. It looked like flakiness in a
+ * dozen unrelated files and was one shared mutable resource. Reproduced by
+ * running the suite twice at once: 22 failures in 25 attempts, against 0 in 25
+ * when run alone.
+ *
+ * So the name carries a per-run suffix. Concurrent runs no longer collide, and
+ * `globalSetup` drops the database afterwards so they do not accumulate. The
+ * suffix is appended to whatever `MONGO_TEST_URI` names rather than replacing
+ * it, so a deployment keeps its host, credentials and options — and gets the
+ * isolation whether or not it thought to ask for it.
+ */
+const withRunSuffix = (uri: string): string => {
+  const url = new URL(uri);
+  const database = url.pathname.replace(/^\//, '') || 'hadiya-test';
+
+  url.pathname = `/${database}-${process.pid}-${randomBytes(3).toString('hex')}`;
+
+  return url.toString();
+};
+
+const TEST_DATABASE_URI = withRunSuffix(BASE_URI);
+
+/**
+ * The same URI, on the runner's own environment.
+ *
+ * `env` below reaches the worker processes; `globalSetup` runs in this one and
+ * is handed nothing, so the teardown that drops the database would otherwise
+ * have no way to learn its name. This config module is evaluated once, here, in
+ * the process that will run it — which makes this the one place both sides can
+ * see. It is deliberately not called `MONGO_URI`: nothing in the runner should
+ * connect to it by accident.
+ */
+process.env.HADIYA_TEST_DATABASE_URI = TEST_DATABASE_URI;
 
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    // Test files share one database, so they must not run at the same time.
+    // Drops this run's database when every worker has finished.
+    globalSetup: ['./src/test/global-setup.ts'],
+    // Files share this run's database, so they must not run at the same time.
     fileParallelism: false,
     testTimeout: 20_000,
     hookTimeout: 30_000,

@@ -46,6 +46,15 @@ beforeEach(async () => {
   registerNotificationProvider(inAppNotificationProvider);
 });
 
+/**
+ * Each attempt is a thunk rather than a built request.
+ *
+ * `request(app)` starts an ephemeral server the moment it is called, so an
+ * array literal of seven of them left six listening while the first was
+ * awaited. Building each one at the moment it is sent keeps a single socket
+ * open at a time, which is both what the test means and one less thing to be
+ * short of when a machine is running several suites at once.
+ */
 const twoAccounts = async () => {
   const branch = await createTestBranch();
   const owner = await signInAs(app, 'owner', String(branch._id));
@@ -74,27 +83,28 @@ describe('one account reaching for another account’s records', () => {
     });
 
     const reads = [
-      request(app).get(`/api/v1/conversations/${id}`),
-      request(app).get(`/api/v1/conversations/${id}/messages`),
-      request(app).get(`/api/v1/ai/chat/${id}/pending-actions`),
-      request(app).get(`/api/v1/ai/chat/${id}/run`),
+      () => request(app).get(`/api/v1/conversations/${id}`),
+      () => request(app).get(`/api/v1/conversations/${id}/messages`),
+      () => request(app).get(`/api/v1/ai/chat/${id}/pending-actions`),
+      () => request(app).get(`/api/v1/ai/chat/${id}/run`),
     ];
 
     for (const read of reads) {
-      const response = await read.set('authorization', stranger.authorization);
+      const response = await read().set('authorization', stranger.authorization);
 
       expect(response.status).toBe(HTTP_STATUS.NOT_FOUND);
       expect(JSON.stringify(response.body)).not.toContain('a secret only the owner said');
     }
 
     const writes = [
-      request(app).patch(`/api/v1/conversations/${id}`).send({ title: 'renamed by a stranger' }),
-      request(app).delete(`/api/v1/conversations/${id}`),
-      request(app).post('/api/v1/ai/chat/cancel').send({ conversationId: id }),
+      () =>
+        request(app).patch(`/api/v1/conversations/${id}`).send({ title: 'renamed by a stranger' }),
+      () => request(app).delete(`/api/v1/conversations/${id}`),
+      () => request(app).post('/api/v1/ai/chat/cancel').send({ conversationId: id }),
     ];
 
     for (const write of writes) {
-      expect((await write.set('authorization', stranger.authorization)).status).toBe(
+      expect((await write().set('authorization', stranger.authorization)).status).toBe(
         HTTP_STATUS.NOT_FOUND,
       );
     }
@@ -119,11 +129,11 @@ describe('one account reaching for another account’s records', () => {
     const id = (created.body.data.memory?.id ?? created.body.data.id) as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/memory/${id}`),
-      request(app).patch(`/api/v1/memory/${id}`).send({ value: 'rewritten' }),
-      request(app).delete(`/api/v1/memory/${id}`),
+      () => request(app).get(`/api/v1/memory/${id}`),
+      () => request(app).patch(`/api/v1/memory/${id}`).send({ value: 'rewritten' }),
+      () => request(app).delete(`/api/v1/memory/${id}`),
     ]) {
-      expect((await attempt.set('authorization', stranger.authorization)).status).toBe(
+      expect((await attempt().set('authorization', stranger.authorization)).status).toBe(
         HTTP_STATUS.NOT_FOUND,
       );
     }
@@ -149,12 +159,12 @@ describe('one account reaching for another account’s records', () => {
     const id = created.body.data.id as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/reminders/${id}`),
-      request(app).patch(`/api/v1/reminders/${id}`).send({ title: 'moved by a stranger' }),
-      request(app).post(`/api/v1/reminders/${id}/cancel`),
-      request(app).delete(`/api/v1/reminders/${id}`),
+      () => request(app).get(`/api/v1/reminders/${id}`),
+      () => request(app).patch(`/api/v1/reminders/${id}`).send({ title: 'moved by a stranger' }),
+      () => request(app).post(`/api/v1/reminders/${id}/cancel`),
+      () => request(app).delete(`/api/v1/reminders/${id}`),
     ]) {
-      expect((await attempt.set('authorization', stranger.authorization)).status).toBe(
+      expect((await attempt().set('authorization', stranger.authorization)).status).toBe(
         HTTP_STATUS.NOT_FOUND,
       );
     }
@@ -183,11 +193,11 @@ describe('one account reaching for another account’s records', () => {
     const id = listed.body.data.items[0].id as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/notifications/${id}`),
-      request(app).post(`/api/v1/notifications/${id}/read`),
-      request(app).delete(`/api/v1/notifications/${id}`),
+      () => request(app).get(`/api/v1/notifications/${id}`),
+      () => request(app).post(`/api/v1/notifications/${id}/read`),
+      () => request(app).delete(`/api/v1/notifications/${id}`),
     ]) {
-      expect((await attempt.set('authorization', stranger.authorization)).status).toBe(
+      expect((await attempt().set('authorization', stranger.authorization)).status).toBe(
         HTTP_STATUS.NOT_FOUND,
       );
     }
@@ -226,11 +236,11 @@ describe('one account reaching for another account’s records', () => {
     const id = uploaded.body.data.id as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/files/${id}`),
-      request(app).get(`/api/v1/files/${id}/download`),
-      request(app).delete(`/api/v1/files/${id}`),
+      () => request(app).get(`/api/v1/files/${id}`),
+      () => request(app).get(`/api/v1/files/${id}/download`),
+      () => request(app).delete(`/api/v1/files/${id}`),
     ]) {
-      const response = await attempt.set('authorization', stranger.authorization);
+      const response = await attempt().set('authorization', stranger.authorization);
 
       expect(response.status).toBe(HTTP_STATUS.NOT_FOUND);
       expect(response.text).not.toContain('secret widget');
@@ -269,11 +279,11 @@ describe('one account reaching for another account’s records', () => {
     const planId = created.body.data.id as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/content/plans/${planId}`),
-      request(app).patch(`/api/v1/content/plans/${planId}`).send({ title: 'stolen' }),
-      request(app).delete(`/api/v1/content/plans/${planId}`),
+      () => request(app).get(`/api/v1/content/plans/${planId}`),
+      () => request(app).patch(`/api/v1/content/plans/${planId}`).send({ title: 'stolen' }),
+      () => request(app).delete(`/api/v1/content/plans/${planId}`),
     ]) {
-      const response = await attempt.set('authorization', stranger.authorization);
+      const response = await attempt().set('authorization', stranger.authorization);
 
       expect(response.status).toBe(HTTP_STATUS.NOT_FOUND);
       expect(response.text).not.toContain('unreleased product reveal');
@@ -297,17 +307,18 @@ describe('one account reaching for another account’s records', () => {
     const id = created.body.data.id as string;
 
     for (const attempt of [
-      request(app).get(`/api/v1/integrations/${id}`),
-      request(app).patch(`/api/v1/integrations/${id}`).send({ name: 'stolen' }),
-      request(app).post(`/api/v1/integrations/${id}/connect`),
-      request(app).post(`/api/v1/integrations/${id}/disconnect`),
-      request(app).post(`/api/v1/integrations/${id}/test`),
-      request(app).delete(`/api/v1/integrations/${id}`),
-      request(app)
-        .patch(`/api/v1/integrations/${id}/tools/create_invoice`)
-        .send({ permission: 'enabled' }),
+      () => request(app).get(`/api/v1/integrations/${id}`),
+      () => request(app).patch(`/api/v1/integrations/${id}`).send({ name: 'stolen' }),
+      () => request(app).post(`/api/v1/integrations/${id}/connect`),
+      () => request(app).post(`/api/v1/integrations/${id}/disconnect`),
+      () => request(app).post(`/api/v1/integrations/${id}/test`),
+      () => request(app).delete(`/api/v1/integrations/${id}`),
+      () =>
+        request(app)
+          .patch(`/api/v1/integrations/${id}/tools/create_invoice`)
+          .send({ permission: 'enabled' }),
     ]) {
-      const response = await attempt.set('authorization', stranger.authorization);
+      const response = await attempt().set('authorization', stranger.authorization);
 
       expect(response.status).toBe(HTTP_STATUS.NOT_FOUND);
     }
@@ -330,11 +341,11 @@ describe('one account reaching for another account’s records', () => {
     void owner;
 
     for (const attempt of [
-      request(app).get(`/api/v1/images/${OTHER_ID}`),
-      request(app).get(`/api/v1/images/${OTHER_ID}/file`),
-      request(app).delete(`/api/v1/images/${OTHER_ID}`),
+      () => request(app).get(`/api/v1/images/${OTHER_ID}`),
+      () => request(app).get(`/api/v1/images/${OTHER_ID}/file`),
+      () => request(app).delete(`/api/v1/images/${OTHER_ID}`),
     ]) {
-      expect((await attempt.set('authorization', stranger.authorization)).status).toBe(
+      expect((await attempt().set('authorization', stranger.authorization)).status).toBe(
         HTTP_STATUS.NOT_FOUND,
       );
     }

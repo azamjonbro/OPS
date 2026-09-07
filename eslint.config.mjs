@@ -41,9 +41,16 @@ export default tseslint.config(
     rules: typescriptRules,
   },
   {
-    // The API bootstrap is the one place allowed to write to stdout directly:
-    // the logger itself may not exist yet when configuration fails.
-    files: ['apps/api/src/main.ts', 'apps/api/src/config/env.ts'],
+    // Places allowed to write to stdout directly. The API bootstrap, because
+    // the logger itself may not exist yet when configuration fails; and the
+    // test runner's global teardown, because it runs outside the application
+    // entirely and a cleanup that failed silently is a database nobody knows
+    // to remove.
+    files: [
+      'apps/api/src/main.ts',
+      'apps/api/src/config/env.ts',
+      'apps/api/src/test/global-setup.ts',
+    ],
     rules: { 'no-console': 'off' },
   },
   {

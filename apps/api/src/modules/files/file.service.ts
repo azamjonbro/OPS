@@ -217,7 +217,11 @@ export const listFiles = async (
       .limit(limit)
       // The extracted content is deliberately excluded from a listing: it can
       // be megabytes, and nothing rendering a list of files needs it.
-      .select('-text -tables -chunks')
+      // The extracted content is excluded because it can be megabytes and
+      // nothing rendering a list of files needs it. `storageKey` is excluded
+      // because it is not part of the `BusinessFile` contract and no client has
+      // ever read it: a download resolves the key from the row itself.
+      .select('-text -tables -chunks -storageKey')
       .lean<FileDocument[]>()
       .exec(),
     FileModel.countDocuments(filter).exec(),

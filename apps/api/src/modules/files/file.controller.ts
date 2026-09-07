@@ -4,8 +4,28 @@ import { sendPaginated, sendSuccess } from '../../core/http/api-response.js';
 import { ApiError } from '../../core/http/api-error.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import { requireActor } from '../../core/security/actor.js';
+import type { FileDocument } from './file.model.js';
 import * as fileService from './file.service.js';
 import type { fileIdParamSchema, listFilesQuerySchema } from './file.validators.js';
+
+/**
+ * A stored document as the API describes one.
+ *
+ * Three things are dropped, for two different reasons. The extraction — text,
+ * tables, chunks — is omitted because it can be megabytes and the card is drawn
+ * from the summary. `storageKey` is omitted because it is not part of
+ * `BusinessFile` at all: the shared type has never declared it, the client has
+ * never read it, and `download` resolves the key from the row rather than from
+ * anything a caller sends. Sending it anyway published an internal object path
+ * to no purpose and contradicted the invariant the download handler relies on.
+ */
+const toFileView = (file: FileDocument) => ({
+  ...file,
+  text: undefined,
+  tables: undefined,
+  chunks: undefined,
+  storageKey: undefined,
+});
 
 /**
  * Uploading a document.
@@ -27,9 +47,7 @@ export const upload = async (req: Request, res: Response): Promise<void> => {
     data: file.buffer,
   });
 
-  // The extracted content is not echoed back: the client renders a card from
-  // the summary, and the text can be megabytes.
-  sendSuccess(req, res, { ...created, text: undefined, tables: undefined, chunks: undefined });
+  sendSuccess(req, res, toFileView(created));
 };
 
 export const list: ValidatedHandler<{ query: typeof listFilesQuerySchema }> = async (req, res) => {
@@ -39,7 +57,7 @@ export const list: ValidatedHandler<{ query: typeof listFilesQuerySchema }> = as
 export const detail: ValidatedHandler<{ params: typeof fileIdParamSchema }> = async (req, res) => {
   const file = await fileService.getFile(requireActor(req), req.validated.params.id);
 
-  sendSuccess(req, res, { ...file, text: undefined, tables: undefined, chunks: undefined });
+  sendSuccess(req, res, toFileView(file));
 };
 
 export const remove: ValidatedHandler<{ params: typeof fileIdParamSchema }> = async (req, res) => {

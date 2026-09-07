@@ -142,3 +142,18 @@ export const EMPTY_ANSWER: ChatError = {
   message: 'Hadiya did not return an answer. Please try again.',
   retriable: true,
 };
+
+/**
+ * The turn worked; reading the result back afterwards did not.
+ *
+ * A separate sentence because it is a separate thing, and confusing the two is
+ * how a person is invited to duplicate work that already happened. The answer
+ * is on the server — it may have set a reminder, written a memory, drawn an
+ * image — and the only thing wrong is that this screen has not caught up. So
+ * it says so, and offers a reload rather than a resend: `retriable` is false
+ * because "try again" here would mean running the entire turn twice.
+ */
+export const REFRESH_FAILED: ChatError = {
+  message: 'Hadiya answered, but this screen could not load the reply. Reload to see it.',
+  retriable: false,
+};

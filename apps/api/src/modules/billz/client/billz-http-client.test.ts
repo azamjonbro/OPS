@@ -100,6 +100,22 @@ describe('error normalisation', () => {
     expect((error as BillzError).status).toBe(status);
   });
 
+  it('does not put the upstream endpoint into the message a person will read', async () => {
+    // A tool failure does not stop at the logs: it is handed to the model,
+    // written into the transcript and rendered in the conversation. Naming the
+    // vendor's own route there put `/v3/order-search` on a shopkeeper's screen
+    // as the reason their question failed. It stays on the error for the logs.
+    for (const status of [403, 500, 502]) {
+      const { client } = buildClient([{ status }], { maxRetries: 0 });
+      const error = (await client
+        .request('/v3/order-search')
+        .catch((caught: unknown) => caught)) as BillzError;
+
+      expect(error.message).not.toContain('/v3/order-search');
+      expect(error.endpoint).toBe('/v3/order-search');
+    }
+  });
+
   it('maps an unreachable host to a network error', async () => {
     const { client } = buildClient([{ throws: new Error('ECONNREFUSED') }], { maxRetries: 0 });
 

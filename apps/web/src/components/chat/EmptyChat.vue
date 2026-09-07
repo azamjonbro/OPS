@@ -48,7 +48,17 @@ const SUGGESTIONS = [
     </div>
 
     <ul class="grid w-full gap-3 sm:grid-cols-2 mt-4">
-      <li v-for="suggestion in SUGGESTIONS" :key="suggestion.text">
+      <!--
+        `min-w-0` is what lets a card be narrower than its own sentence.
+
+        A grid item defaults to `min-width: auto`, which means "never smaller
+        than my content needs". The longest suggestion here wants 319px, so on
+        a 320px phone the card kept that width inside a 256px column and hung
+        63px off the right edge — and the `truncate` below never engaged,
+        because truncation is what happens *after* an element is allowed to be
+        too small. This is the one line that allows it.
+      -->
+      <li v-for="suggestion in SUGGESTIONS" :key="suggestion.text" class="min-w-0">
         <button
           type="button"
           class="group flex w-full flex-col gap-2 rounded-[14px] bg-surface p-4 text-left shadow-sm ring-1 ring-border-subtle transition-all duration-200 hover:bg-surface-muted hover:shadow-md hover:ring-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500"

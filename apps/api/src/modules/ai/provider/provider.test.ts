@@ -1,6 +1,7 @@
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 
+import { redactProviderBody } from './ai-http.js';
 import { AiProviderError } from './ai-error.js';
 import { AnthropicProvider } from './anthropic.provider.js';
 import { OpenAiProvider } from './openai.provider.js';
@@ -61,6 +62,46 @@ const TOOLS: AiCompletionRequest['tools'] = [
     },
   },
 ];
+
+/**
+ * A provider that refuses a credential quotes it back — OpenAI's own wording is
+ * "Incorrect API key provided: sk-…". The failure body is logged because it is
+ * genuinely useful, so the key has to come out of it before it is written down.
+ */
+describe('what a failed provider call is allowed to log', () => {
+  it('strips credential-shaped values out of the body, keeping the rest', () => {
+    const cases: Array<[string, string]> = [
+      [
+        '{"error":{"message":"Incorrect API key provided: sk-proj-AbCdEf1234567890"}}',
+        'sk-proj-AbCdEf1234567890',
+      ],
+      ['{"error":{"message":"invalid key gsk_ABCDEFGH12345678"}}', 'gsk_ABCDEFGH12345678'],
+      ['{"error":{"message":"bad key AIzaSyA1234567890abcdef"}}', 'AIzaSyA1234567890abcdef'],
+      ['{"error":{"message":"Bearer abcdefgh12345678 rejected"}}', 'Bearer abcdefgh12345678'],
+      [
+        '{"error":{"message":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcdefghij expired"}}',
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcdefghij',
+      ],
+    ];
+
+    for (const [body, secret] of cases) {
+      const logged = redactProviderBody(body);
+
+      expect(logged).not.toContain(secret);
+      expect(logged).toContain('[redacted]');
+    }
+  });
+
+  it('leaves an ordinary diagnostic body alone', () => {
+    const body = '{"error":{"message":"model gpt-9 does not exist","code":"model_not_found"}}';
+
+    expect(redactProviderBody(body)).toBe(body);
+  });
+
+  it('still bounds the length, so a body cannot become a log payload', () => {
+    expect(redactProviderBody('x'.repeat(5_000)).length).toBeLessThanOrEqual(300);
+  });
+});
 
 describe('OpenAI provider', () => {
   it('returns text and usage from a successful reply', async () => {

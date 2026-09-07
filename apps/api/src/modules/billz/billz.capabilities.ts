@@ -30,7 +30,44 @@ import type { BillzSalesSummary } from './services/billz-sales.service.js';
  * Each entry also carries a description written for a model rather than for a
  * developer: it says what the data means and when to reach for it.
  */
-const dateSchema = z.string().min(4).describe('ISO-8601 date, e.g. 2026-09-01');
+/**
+ * A calendar day the model wrote, checked before it becomes an outbound call.
+ *
+ * `z.string().min(4)` accepted anything four characters long — `"oxirgi hafta"`,
+ * `"2026-02-30"`, `"soon"` — and forwarded it to Billz, which answered `400`.
+ * That is the wrong place for the refusal in three ways: it spends a request on
+ * a third party for input that is knowably wrong, it turns a fixable mistake
+ * into an upstream outage as far as the model can tell, and the HTTP routes
+ * have validated the very same field properly all along. A model is the less
+ * trustworthy of the two callers, so it should not be the one held to the
+ * looser rule.
+ *
+ * The `Date` round-trip is what rejects 31 February, which the pattern alone
+ * would wave through.
+ */
+const dateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a calendar date in the form 2026-09-01')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number) as [number, number, number];
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() + 1 === month &&
+      parsed.getUTCDate() === day
+    );
+  }, 'That is not a real calendar date')
+  .describe('ISO-8601 date, e.g. 2026-09-01');
+
+/**
+ * A window may not run backwards — the same rule the HTTP routes already apply.
+ * Billz answers `400` for a reversed range, so without this the model learns
+ * only that the integration failed.
+ */
+const isForwards = (value: { from: string; to: string }): boolean => value.from <= value.to;
+const BACKWARDS_RANGE = '`from` must not be after `to`';
 
 const limitSchema = (max: number, fallback: number) =>
   z.number().int().min(1).max(max).default(fallback);
@@ -61,17 +98,19 @@ export const billzCapabilitySchemas = {
   getCustomerByPhone: z.object({
     phone: z.string().trim().min(4).max(32),
   }),
-  getSales: z.object({
-    from: dateSchema,
-    to: dateSchema,
-    limit: limitSchema(1_000, 200),
-  }),
+  getSales: z
+    .object({ from: dateSchema, to: dateSchema, limit: limitSchema(1_000, 200) })
+    .refine(isForwards, BACKWARDS_RANGE),
   getSale: z.object({
     saleId: z.string().trim().min(1).describe('The Billz order id'),
   }),
-  getSalesSummary: z.object({ from: dateSchema, to: dateSchema }),
-  getPaymentBreakdown: z.object({ from: dateSchema, to: dateSchema }),
-  getDebts: z.object({ from: dateSchema, to: dateSchema }),
+  getSalesSummary: z
+    .object({ from: dateSchema, to: dateSchema })
+    .refine(isForwards, BACKWARDS_RANGE),
+  getPaymentBreakdown: z
+    .object({ from: dateSchema, to: dateSchema })
+    .refine(isForwards, BACKWARDS_RANGE),
+  getDebts: z.object({ from: dateSchema, to: dateSchema }).refine(isForwards, BACKWARDS_RANGE),
   getInventory: z.object({
     shopId: z.string().trim().min(1).optional(),
     maxQuantity: z.number().min(0).optional().describe('Only stock at or below this level'),
