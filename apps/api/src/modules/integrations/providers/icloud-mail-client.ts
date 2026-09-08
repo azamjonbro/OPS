@@ -336,18 +336,24 @@ export const checkIcloudMailbox = async (
 /* MIME, in the subset a mailbox actually uses                                */
 /* -------------------------------------------------------------------------- */
 
-const CHARSETS: Record<string, BufferEncoding> = {
-  'utf-8': 'utf8',
-  utf8: 'utf8',
-  'us-ascii': 'ascii',
-  ascii: 'ascii',
-  'iso-8859-1': 'latin1',
-  'windows-1252': 'latin1',
-  latin1: 'latin1',
-};
+/**
+ * Decodes bytes in whatever the message says they are.
+ *
+ * `TextDecoder` rather than `Buffer.toString`, because a mailbox is full of
+ * encodings Node's own list does not have: a Russian subject line arrives in
+ * `windows-1251` or `koi8-r` far more often than in UTF-8, and read as UTF-8 it
+ * becomes a row of replacement characters. An unknown label falls back to UTF-8
+ * rather than throwing — a mangled subject is worth more than no message.
+ */
+const decodeBytes = (bytes: Buffer, charset: string | undefined): string => {
+  const label = (charset ?? 'utf-8').trim().toLowerCase().replace(/^"|"$/g, '');
 
-const encodingFor = (charset: string | undefined): BufferEncoding =>
-  CHARSETS[(charset ?? '').trim().toLowerCase()] ?? 'utf8';
+  try {
+    return new TextDecoder(label).decode(bytes);
+  } catch {
+    return bytes.toString('utf8');
+  }
+};
 
 const decodeQuotedPrintable = (value: string): Buffer => {
   const joined = value.replace(/=\r?\n/g, '');
@@ -393,7 +399,7 @@ const decodeHeaderValue = (value: string): string => {
             ? Buffer.from(text, 'base64')
             : decodeQuotedPrintable(text.replace(/_/g, ' '));
 
-        return bytes.toString(encodingFor(charset));
+        return decodeBytes(bytes, charset);
       } catch {
         return whole;
       }
@@ -401,8 +407,18 @@ const decodeHeaderValue = (value: string): string => {
   );
 };
 
+/**
+ * One header's value, continuation lines and all.
+ *
+ * A header may be *folded*: broken across lines, each continuation beginning
+ * with a space or a tab. It is not a rare shape — `Content-Type` carries its
+ * boundary parameter on the next line in most multipart mail, and a subject
+ * long enough to need encoding is usually folded too. Reading only the first
+ * line loses exactly the part that matters, which is how a message ends up
+ * looking like it has no subject and no structure.
+ */
 const headerField = (headers: string, name: string): string => {
-  const match = new RegExp(`^${name}:[ \\t]*([\\s\\S]*?)(?=\\r?\\n[^ \\t]|$)`, 'im').exec(headers);
+  const match = new RegExp(`^${name}:[ \\t]*(.*(?:\\r?\\n[ \\t]+.*)*)`, 'im').exec(headers);
 
   return match?.[1] === undefined ? '' : decodeHeaderValue(match[1]);
 };
@@ -425,11 +441,11 @@ const decodeBody = (body: string, headers: string): string => {
   const charset = /charset=("?)([^";\s]+)\1/i.exec(headerField(headers, 'Content-Type'))?.[2];
 
   if (encoding === 'base64') {
-    return Buffer.from(body.replace(/\s+/g, ''), 'base64').toString(encodingFor(charset));
+    return decodeBytes(Buffer.from(body.replace(/\s+/g, ''), 'base64'), charset);
   }
 
   if (encoding === 'quoted-printable') {
-    return decodeQuotedPrintable(body).toString(encodingFor(charset));
+    return decodeBytes(decodeQuotedPrintable(body), charset);
   }
 
   return body;
@@ -707,21 +723,13 @@ export const searchIcloudMail = async (
   }
 };
 
-/** Temporary: hands back exactly what the server sent, for diagnosis. */
-export const debugFetchRaw = async (
-  email: string,
-  appPassword: string,
-  uid: number,
-): Promise<string> => {
+export const debugRaw = async (email: string, appPassword: string, uid: number): Promise<string> => {
   const session = await openSession(30_000);
-
   try {
     await login(session, email, appPassword);
     await session.send('d1', 'EXAMINE "INBOX"');
-
     const fetched = await session.send('d2', `UID FETCH ${uid} (BODY.PEEK[]<0.128000>)`);
-
-    return JSON.stringify(fetched.lines.slice(0, 3)) + '\n@@LITERAL@@\n' + (fetched.literals[0] ?? '(none)');
+    return fetched.literals[0] ?? '';
   } finally {
     session.close();
   }
