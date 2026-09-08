@@ -105,7 +105,7 @@ const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
 
   return [
     defineTool({
-      name: 'notion.search',
+      name: 'notion_search',
       description:
         'Search the Notion pages and databases the person has shared with Hadiya. Use it when they refer to something they wrote down — a supplier agreement, a plan, meeting notes — rather than to something in the shop.',
       schema: z.object({
@@ -134,18 +134,18 @@ const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
       },
     }),
     defineTool({
-      name: 'notion.read_page',
+      name: 'notion_read_page',
       description:
-        'Read the text of one Notion page. Call notion.search first to find its id; do not guess one.',
+        'Read the text of one Notion page. Call notion_search first to find its id; do not guess one.',
       schema: z.object({
-        pageId: z.string().trim().min(8).max(64).describe('The page id from notion.search'),
+        pageId: z.string().trim().min(8).max(64).describe('The page id from notion_search'),
       }),
       mutates: false,
       category: 'integration',
       risk: 'read',
       // The id comes from a search. If both are asked for in one round and the
       // search failed, there is no id to read with, and none is invented.
-      dependsOn: ['notion.search'],
+      dependsOn: ['notion_search'],
       provenance: provenanceFor('read_page'),
       execute: async (args, context) => {
         const page = await useToken(context.actor, (token) => readNotionPage(token, args.pageId));

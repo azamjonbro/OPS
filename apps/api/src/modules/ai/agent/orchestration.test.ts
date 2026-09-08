@@ -1035,7 +1035,7 @@ describe('MCP tools behave like any other', () => {
     const registry = await buildActorToolRegistry(actor);
 
     expect(
-      registry.list().some((tool) => tool.name.startsWith(`mcp.${String(integration._id)}`)),
+      registry.list().some((tool) => tool.name.startsWith(`mcp_${String(integration._id)}`)),
     ).toBe(false);
   });
 

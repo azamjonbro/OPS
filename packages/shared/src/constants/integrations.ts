@@ -204,13 +204,13 @@ export const MCP_TOOL_CACHE_TTL_MS = 15 * 60 * 1_000;
  * audit log and the ownership check both need.
  */
 export const mcpToolRegistryName = (integrationId: string, toolName: string): string =>
-  `mcp.${integrationId}.${toolName}`;
+  `mcp_${integrationId}_${toolName}`;
 
 /** The inverse, for a name that came back from a model. */
 export const parseMcpToolRegistryName = (
   name: string,
 ): { integrationId: string; toolName: string } | null => {
-  const match = /^mcp\.([0-9a-fA-F]{24})\.(.+)$/.exec(name);
+  const match = /^mcp_([0-9a-fA-F]{24})_(.+)$/.exec(name);
 
   return match?.[1] && match[2] ? { integrationId: match[1], toolName: match[2] } : null;
 };

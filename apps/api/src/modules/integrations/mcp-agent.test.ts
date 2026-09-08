@@ -238,7 +238,7 @@ describe('the assistant with a connected MCP server', () => {
     );
 
     const offered = provider.requests[0]?.toolNames ?? [];
-    expect(offered.some((name) => name.startsWith('mcp.'))).toBe(false);
+    expect(offered.some((name) => name.startsWith('mcp_'))).toBe(false);
   });
 
   it('never offers a blocked tool to the model', async () => {
@@ -280,7 +280,7 @@ describe('the assistant with a connected MCP server', () => {
     // The registry is built per turn from the actor's own integrations, so
     // Bob's turn cannot contain Alice's CRM.
     const offered = provider.requests[0]?.toolNames ?? [];
-    expect(offered.some((name) => name.startsWith('mcp.'))).toBe(false);
+    expect(offered.some((name) => name.startsWith('mcp_'))).toBe(false);
   });
 
   it('carries on with its own tools when an integration cannot be reached', async () => {

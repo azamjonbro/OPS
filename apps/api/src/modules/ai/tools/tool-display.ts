@@ -256,12 +256,12 @@ const LABELS: Record<string, ToolDisplayLabels> = {
     doneLabel: 'Image created',
   },
 
-  'notion.search': {
+  'notion_search': {
     displayName: 'Notion',
     runningLabel: 'Searching Notion',
     doneLabel: 'Searched Notion',
   },
-  'notion.read_page': {
+  'notion_read_page': {
     displayName: 'Notion page',
     runningLabel: 'Reading the Notion page',
     doneLabel: 'Read the Notion page',
@@ -283,7 +283,7 @@ const humanise = (value: string): string => {
  *
  * Chiefly the MCP case: the name comes from somebody else's server and Hadiya
  * has never seen it before. The external name is used rather than the
- * namespaced registry name — `mcp.65f1a.…search_customers` is an internal
+ * namespaced registry name — `mcp_65f1a…_search_customers` is an internal
  * identifier and putting it on a screen would be leaking a shape nobody needs
  * to see — and the integration's own name says where the work is happening.
  */
