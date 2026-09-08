@@ -22,6 +22,17 @@ import type { NavigationSection } from '@/types/navigation';
  */
 export const settingsSections: NavigationSection[] = [
   {
+    title: 'The shop',
+    items: [
+      {
+        label: 'Dashboard',
+        module: 'reports',
+        to: { name: 'dashboard' },
+        icon: 'M4 19V9M10 19V5M16 19v-7M22 19H2',
+      },
+    ],
+  },
+  {
     title: 'What the assistant made',
     items: [
       {

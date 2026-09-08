@@ -45,6 +45,15 @@ export const routes: RouteRecordRaw[] = [
     component: AppLayout,
     children: [
       {
+        // The one screen that mirrors Billz, and it is asked for: the morning
+        // question ("bugun qanday ketyapti?") deserves an answer that is
+        // already on the page rather than one that costs a conversation.
+        path: 'dashboard',
+        name: 'dashboard',
+        component: () => import('@/pages/DashboardPage.vue'),
+        meta: { title: 'Do‘kon holati', requiresAuth: true },
+      },
+      {
         // Signing in lands on the assistant, not on a menu of screens: the
         // first thing Hadiya should offer is a question box.
         path: '',

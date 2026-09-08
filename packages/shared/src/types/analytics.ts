@@ -194,6 +194,41 @@ export interface AnalyticsSummary {
   currency: string;
 }
 
+/** One row of stock that is running out or sitting still. */
+export interface AnalyticsStockRow {
+  productName: string;
+  sku: string;
+  shopName: string;
+  quantity: number;
+  stockValue: number;
+  unitsSold: number;
+}
+
+/**
+ * Everything the dashboard shows, in one answer.
+ *
+ * Assembled server-side rather than by the browser making four calls, because
+ * all of it comes from one window of receipts: fetching that window once is the
+ * difference between a screen that appears and a screen that fills in.
+ *
+ * There is no margin or profit figure here, and its absence is a fact about the
+ * data rather than an omission. Cost of goods lives behind a Billz endpoint the
+ * API token is refused (`/v1/gl-transaction`, 403), so any margin this could
+ * report would be invented.
+ */
+export interface AnalyticsDashboard {
+  period: AnalyticsPeriod;
+  currency: string;
+  metrics: AnalyticsMetricSet;
+  comparison: AnalyticsSummary['comparison'];
+  daily: AnalyticsDailyPoint[];
+  topProducts: AnalyticsRanking[];
+  lowStock: AnalyticsStockRow[];
+  slowMoving: AnalyticsStockRow[];
+  stock: { totalUnits: number; totalValue: number };
+  dataQuality: AnalyticsDataQuality;
+}
+
 /** The executive summary: what changed, why it might have, what to look at. */
 export interface AnalyticsInsightReport {
   period: AnalyticsPeriod;

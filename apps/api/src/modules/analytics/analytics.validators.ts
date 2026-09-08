@@ -24,7 +24,10 @@ export const dashboardQuerySchema = z
     /** Quantity at or below which stock counts as low. */
     lowStockThreshold: z.coerce.number().int().min(0).max(1_000).default(5),
   })
-  .refine((value) => value.period !== 'custom' || (value.from !== undefined && value.to !== undefined), {
-    message: 'A custom period needs both from and to.',
-    path: ['period'],
-  });
+  .refine(
+    (value) => value.period !== 'custom' || (value.from !== undefined && value.to !== undefined),
+    {
+      message: 'A custom period needs both from and to.',
+      path: ['period'],
+    },
+  );
