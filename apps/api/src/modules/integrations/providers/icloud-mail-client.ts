@@ -448,6 +448,17 @@ const decodeBody = (body: string, headers: string): string => {
     return decodeBytes(decodeQuotedPrintable(body), charset);
   }
 
+  // A part that declares `7bit` and then holds `=E2=80=8C` is mislabelled, and
+  // enough senders do it — marketing mail especially — that following the
+  // declaration alone puts rows of `=C2=A0` in front of the model. The sniff is
+  // deliberately narrow: a soft line break, or several escapes, neither of
+  // which occurs by accident in text that really is plain.
+  const escapes = body.match(/=[0-9A-F]{2}/g)?.length ?? 0;
+
+  if (/=\r?\n/.test(body) || escapes >= 3) {
+    return decodeBytes(decodeQuotedPrintable(body), charset);
+  }
+
   return body;
 };
 
@@ -718,18 +729,6 @@ export const searchIcloudMail = async (
     return fetchedLiterals(headers)
       .map(({ uid, payload }) => headerFrom(uid, payload))
       .sort((left, right) => (byUid.get(left.uid) ?? 0) - (byUid.get(right.uid) ?? 0));
-  } finally {
-    session.close();
-  }
-};
-
-export const debugRaw = async (email: string, appPassword: string, uid: number): Promise<string> => {
-  const session = await openSession(30_000);
-  try {
-    await login(session, email, appPassword);
-    await session.send('d1', 'EXAMINE "INBOX"');
-    const fetched = await session.send('d2', `UID FETCH ${uid} (BODY.PEEK[]<0.128000>)`);
-    return fetched.literals[0] ?? '';
   } finally {
     session.close();
   }
