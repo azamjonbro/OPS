@@ -203,8 +203,7 @@ const icloudMailTools = (integration: IntegrationDocument): RegisteredTool[] => 
   return [
     defineTool({
       name: 'icloud_mail_search',
-      description:
-        `Search the person's own iCloud mailbox (${email}) and return the matching messages' sender, subject and date, newest first. This is the tool for anything about email: what someone wrote, what was agreed by mail, whether a message arrived. Give whichever of the fields you know; they narrow the search together.`,
+      description: `Search the person's own iCloud mailbox (${email}) and return the matching messages' sender, subject and date, newest first. This is the tool for anything about email: what someone wrote, what was agreed by mail, whether a message arrived. Give whichever of the fields you know; they narrow the search together.`,
       schema: z.object({
         from: z
           .string()
@@ -220,7 +219,12 @@ const icloudMailTools = (integration: IntegrationDocument): RegisteredTool[] => 
           .max(120)
           .optional()
           .describe('Words anywhere in the message, headers or body'),
-        since: z.string().trim().max(10).optional().describe('Only messages on or after YYYY-MM-DD'),
+        since: z
+          .string()
+          .trim()
+          .max(10)
+          .optional()
+          .describe('Only messages on or after YYYY-MM-DD'),
         before: z.string().trim().max(10).optional().describe('Only messages before YYYY-MM-DD'),
         limit: z.number().int().min(1).max(25).default(10),
       }),
@@ -265,11 +269,7 @@ const icloudMailTools = (integration: IntegrationDocument): RegisteredTool[] => 
       description:
         'Read the text of one message from the mailbox. Call icloud_mail_search first to find its id; do not guess one.',
       schema: z.object({
-        messageId: z
-          .number()
-          .int()
-          .min(1)
-          .describe('The message id from icloud_mail_search'),
+        messageId: z.number().int().min(1).describe('The message id from icloud_mail_search'),
       }),
       mutates: false,
       category: 'integration',

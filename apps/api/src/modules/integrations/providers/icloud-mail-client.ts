@@ -104,7 +104,12 @@ interface Session {
    * byte count, the server answers `+`, and only then do the bytes go. Without
    * it a search for a Cyrillic or Uzbek word is a syntax error.
    */
-  sendWithLiteral: (tag: string, before: string, literal: string, after: string) => Promise<ImapReply>;
+  sendWithLiteral: (
+    tag: string,
+    before: string,
+    literal: string,
+    after: string,
+  ) => Promise<ImapReply>;
   close: () => void;
 }
 
