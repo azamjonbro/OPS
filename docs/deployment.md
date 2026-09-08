@@ -21,9 +21,9 @@ of what follows.
       │                 ops-web-lm3a.vercel.app
       │
       └──────────────► Cloudflare ──► home server
-                        ops.sds-max.uz              Nginx :443
+                        ops.sds-max.uz              Nginx :80  (Cloudflare Flexible)
                                                       │
-                                                    Hadiya API :4000  (PM2, one process)
+                                                    Hadiya API :4400  (PM2, one process)
                                                       │
                                                     MongoDB (replica set)
 
@@ -114,7 +114,7 @@ characters, a missing encryption key, or `MCP_ALLOW_PRIVATE_HOSTS=true`. Check a
 file before you deploy it:
 
 ```bash
-npm run check:production -w @hadiya/api -- --env-file /srv/hadiya/.env
+npm run check:production -w @hadiya/api -- --env-file ~/ops-back/.env
 ```
 
 It reports errors and warnings, exits non-zero on an error, and never prints a
@@ -128,11 +128,13 @@ came from the proxy and the rate limits apply to everyone at once.
 ## 4. First install
 
 ```bash
-sudo mkdir -p /srv/hadiya /var/lib/hadiya/storage
-sudo chown -R "$USER" /srv/hadiya /var/lib/hadiya
+# The checkout lives in the deploying user's home, so nothing here needs root.
+# Only the uploads directory does, because it is outside it.
+sudo mkdir -p /var/lib/hadiya/storage
+sudo chown -R "$USER" /var/lib/hadiya
 
-git clone <repository> /srv/hadiya
-cd /srv/hadiya
+git clone https://github.com/azamjonbro/OPS.git ~/ops-back
+cd ~/ops-back
 cp .env.example .env && $EDITOR .env      # see §3
 chmod 600 .env
 
@@ -207,15 +209,47 @@ on a large collection is a decision about when, not just whether.
 `deploy/nginx/ops.sds-max.uz.conf` serves the **API only** — no static files, no
 SPA fallback, because the app is on Vercel.
 
+There are two versions of that file, and installing them in the wrong order is
+the single easiest way to take the site down:
+
+| File                            | For                                             |
+| ------------------------------- | ----------------------------------------------- |
+| `ops.sds-max.uz.conf`           | plain `:80`, for a zone on **Flexible**. This is what is installed today. |
+| `ops.sds-max.uz.tls.conf`       | `:443` + a redirect from `:80`, for a zone on **Full (strict)** *after* an origin certificate exists. |
+
+### Stage 1 — what is running now (Flexible, plain :80)
+
 ```bash
 sudo mkdir -p /etc/nginx/snippets
 sudo cp deploy/nginx/cloudflare-real-ip.conf /etc/nginx/snippets/
-sudo cp deploy/nginx/ops.sds-max.uz.conf /etc/nginx/sites-available/hadiya
-sudo ln -s /etc/nginx/sites-available/hadiya /etc/nginx/sites-enabled/hadiya
+sudo cp deploy/nginx/ops.sds-max.uz.conf /etc/nginx/sites-available/ops.sds-max.uz
+sudo ln -sfn ../sites-available/ops.sds-max.uz /etc/nginx/sites-enabled/ops.sds-max.uz
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### The certificate
+Note the file name: every other site on this host is named after its hostname,
+and calling this one `hadiya` would collide with `hadiya.sds-max.uz`, which is a
+different, older application on port 3912.
+
+> **On Flexible, the origin must not redirect to HTTPS.**
+>
+> Cloudflare fetches from the origin over plain HTTP on port 80. If the port-80
+> block redirects to HTTPS, Cloudflare hands that redirect to the browser, the
+> browser asks Cloudflare again, Cloudflare fetches port 80 again — and the
+> browser gives up with `ERR_TOO_MANY_REDIRECTS`. `ops.sds-max.uz.conf`
+> therefore has no redirect in it, on purpose.
+>
+> Getting the browser onto HTTPS is the *edge's* job in this arrangement:
+> Cloudflare → **SSL/TLS → Edge Certificates → Always Use HTTPS**. That
+> redirect happens before the origin is ever contacted, so it cannot loop.
+
+The other half of the same trap: `X-Forwarded-Proto`. Cloudflare forwards over
+plain HTTP, so `$scheme` at the origin is always `http` and would tell the API
+that a genuinely secure session is insecure. The config maps Cloudflare's own
+`X-Forwarded-Proto` through instead, and only falls back to `$scheme` for a
+request that did not come through Cloudflare.
+
+### Stage 2 — the certificate, and Full (strict)
 
 Use a **Cloudflare Origin Certificate** rather than Let's Encrypt. Cloudflare
 terminates TLS for the browser; this certificate only has to satisfy Cloudflare,
@@ -236,17 +270,15 @@ goes dark — a renewal that quietly stopped.
    Cloudflare reach the origin over plain HTTP or without checking the
    certificate, which is not what you want on a home connection.
 
-> **Set Full (strict) before enabling this config, or the site will loop.**
->
-> In **Flexible** mode Cloudflare fetches from the origin over plain HTTP on
-> port 80. The port-80 block here redirects everything to HTTPS — so Cloudflare
-> returns that redirect to the browser, the browser asks Cloudflare again,
-> Cloudflare fetches port 80 again, and the browser gives up with
-> `ERR_TOO_MANY_REDIRECTS`.
->
-> A stock Ubuntu nginx only listens on port 80, so a server that has never had
-> a certificate installed is almost certainly on Flexible today. Install the
-> origin certificate, switch the mode, _then_ enable the site.
+4. **Only now** swap in the TLS config — the certificate first, then the mode,
+   then the file. `nginx -t` refuses a config whose `ssl_certificate` is
+   missing, so a wrong order here fails loudly; the mode is the one that fails
+   quietly, as a redirect loop.
+
+   ```bash
+   sudo cp deploy/nginx/ops.sds-max.uz.tls.conf /etc/nginx/sites-available/ops.sds-max.uz
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
 
 Let's Encrypt still works if you prefer it — point `ssl_certificate` at
 `/etc/letsencrypt/live/…` and keep the ACME block in the HTTP server. It needs
@@ -256,7 +288,8 @@ port 80 reachable through Cloudflare for renewal.
 
 | Setting                 | Value            | Why                                             |
 | ----------------------- | ---------------- | ----------------------------------------------- |
-| SSL/TLS mode            | Full (strict)    | the origin is verified, not just encrypted      |
+| SSL/TLS mode            | Full (strict)    | the origin is verified, not just encrypted. Until an origin certificate exists this is **Flexible** — see §7 |
+| Always Use HTTPS        | On               | the edge redirects `http://` to `https://`. On Flexible this is the *only* safe place for that redirect: at the origin it loops |
 | Cache rule for `/api/*` | Bypass cache     | an API response must never be served from cache |
 | Proxy status            | Proxied (orange) | this is what hides the home address             |
 | WebSockets              | On               | harmless, and covers future use                 |
@@ -316,7 +349,7 @@ not want to.
 ## 8. Deploying
 
 ```bash
-cd /srv/hadiya && deploy/scripts/deploy.sh
+cd ~/ops-back && deploy/scripts/deploy.sh
 ```
 
 It checks the configuration, fetches, `npm ci`, builds, publishes the frontend,
@@ -354,7 +387,7 @@ tool, confirms a pending action, or writes to Billz.
 Automatic on a failed health check, as above. By hand:
 
 ```bash
-cd /srv/hadiya
+cd ~/ops-back
 git checkout <previous-sha>
 npm ci && npm run build
 rsync -a --delete apps/web/dist/ /var/www/hadiya/
@@ -388,7 +421,7 @@ Back it up with the database — §10 does.
 
 ```bash
 deploy/scripts/backup.sh
-17 * * * * cd /srv/hadiya && deploy/scripts/backup.sh >> /var/log/hadiya-backup.log 2>&1
+17 * * * * cd ~/ops-back && deploy/scripts/backup.sh >> /var/log/hadiya-backup.log 2>&1
 ```
 
 Hourly, keeping 14 days (`BACKUP_RETENTION_DAYS`). Each backup is a gzipped
@@ -432,8 +465,8 @@ is the most likely way for one to go wrong and the easiest to miss.
 
 | Where                          | What                             |
 | ------------------------------ | -------------------------------- |
-| `/srv/hadiya/logs/api.out.log` | the API's JSON lines             |
-| `/srv/hadiya/logs/api.err.log` | crashes and PM2's own errors     |
+| `~/ops-back/logs/api.out.log` | the API's JSON lines             |
+| `~/ops-back/logs/api.err.log` | crashes and PM2's own errors     |
 | `/var/log/nginx/access.log`    | requests, minus the health probe |
 | `journalctl -u mongod`         | the database                     |
 
@@ -478,7 +511,7 @@ Worth watching, in rough order of how often it matters:
 | Signal            | Where                                     | Act when                              |
 | ----------------- | ----------------------------------------- | ------------------------------------- |
 | Disk usage        | `df -h`                                   | over 80%                              |
-| Log directory     | `du -sh /srv/hadiya/logs`                 | over 1 GB — rotation is not working   |
+| Log directory     | `du -sh ~/ops-back/logs`                 | over 1 GB — rotation is not working   |
 | Storage directory | `du -sh /var/lib/hadiya/storage`          | growing unexpectedly                  |
 | Memory            | `pm2 status`                              | near the 900 MB restart ceiling       |
 | Restarts          | `pm2 status`                              | the count climbing means a crash loop |
@@ -566,7 +599,7 @@ curl -i https://ops.sds-max.uz/api/health/live
 
 - **`Welcome to nginx!` or a 404 in an HTML page** — Nginx never reached the
   API. The site config is not enabled, or the default site is winning. See §7.
-- **502** — Nginx is proxying, but nothing is listening on :4000. `pm2 status`.
+- **502** — Nginx is proxying, but nothing is listening on :4400. `pm2 status`.
 - **200 with JSON** — the API is fine and it really is CORS; carry on below.
 
 **A real CORS failure: the origin is not allowed.** The app's origin is
