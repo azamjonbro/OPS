@@ -348,8 +348,14 @@ export const checkIcloudMailbox = async (
 const decodeBytes = (bytes: Buffer, charset: string | undefined): string => {
   const label = (charset ?? 'utf-8').trim().toLowerCase().replace(/^"|"$/g, '');
 
+  // ASCII is a subset of UTF-8, so reading a part that says `us-ascii` as UTF-8
+  // cannot change text that really is ASCII — and it repairs the common case of
+  // a sender labelling UTF-8 bytes as ASCII, which otherwise arrives as a line
+  // of `â Â` where the words were.
+  const effective = label === 'us-ascii' || label === 'ascii' || label === '' ? 'utf-8' : label;
+
   try {
-    return new TextDecoder(label).decode(bytes);
+    return new TextDecoder(effective).decode(bytes);
   } catch {
     return bytes.toString('utf8');
   }
