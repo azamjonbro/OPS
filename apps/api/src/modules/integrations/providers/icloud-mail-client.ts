@@ -707,6 +707,26 @@ export const searchIcloudMail = async (
   }
 };
 
+/** Temporary: hands back exactly what the server sent, for diagnosis. */
+export const debugFetchRaw = async (
+  email: string,
+  appPassword: string,
+  uid: number,
+): Promise<string> => {
+  const session = await openSession(30_000);
+
+  try {
+    await login(session, email, appPassword);
+    await session.send('d1', 'EXAMINE "INBOX"');
+
+    const fetched = await session.send('d2', `UID FETCH ${uid} (BODY.PEEK[]<0.128000>)`);
+
+    return JSON.stringify(fetched.lines.slice(0, 3)) + '\n@@LITERAL@@\n' + (fetched.literals[0] ?? '(none)');
+  } finally {
+    session.close();
+  }
+};
+
 /**
  * Reads one message by UID.
  *
