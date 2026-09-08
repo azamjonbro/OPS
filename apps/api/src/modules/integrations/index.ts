@@ -44,6 +44,12 @@ export { resetMcpGuards } from './mcp/mcp-guard.js';
 export { resetSecretBox } from './credential.service.js';
 
 export { getNotionIdentity, readNotionPage, searchNotion } from './providers/notion-client.js';
+export {
+  readIcloudMessage,
+  searchIcloudMail,
+  type IcloudMailHeader,
+  type IcloudMailMessage,
+} from './providers/icloud-mail-client.js';
 export { withOptionalSecret } from './providers/provider-secret.js';
 export { CREDENTIAL_PURPOSE, hasSecret, withSecret } from './credential.service.js';
 
