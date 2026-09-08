@@ -231,6 +231,77 @@ export type ToolPreflight =
   | { kind: 'ready'; args: unknown; plan: ToolPlan; tool: RegisteredTool };
 
 /**
+ * What both providers accept as a tool name.
+ *
+ * OpenAI and Anthropic agree on this: letters, digits, underscore, hyphen, up
+ * to sixty-four characters. Nothing else, and a dot least of all.
+ */
+const PROVIDER_TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/**
+ * Pulls a number the model pushed past its own bound back onto it.
+ *
+ * Every limit's maximum is in the JSON Schema the model is given, so a call
+ * that exceeds one is not a misunderstanding a refusal can correct — the bound
+ * was already stated. Rejecting it spends the turn on a paging mistake: the
+ * model asks for fifty files, is told twenty-five is the most, and reports to
+ * the person that it could not read their files at all. Clamping to the stated
+ * bound answers the question it was actually asking, which is "as many as you
+ * will give me".
+ *
+ * Two restrictions keep this from becoming a licence to rewrite arguments.
+ * It only ever moves a value *onto* a boundary the schema itself declared, so
+ * no call reaches a tool with a number the tool would not have accepted from a
+ * person. And it is applied only where nothing can be written — an inflated
+ * number on a mutation is an amount, a quantity or a span of days, never a page
+ * size, and rounding one of those away silently is how a model's arithmetic
+ * slip becomes somebody's money.
+ *
+ * Returns `null` when the arguments cannot be repaired this way, which is every
+ * case but the one described: a missing field, a wrong type, a nested value, an
+ * exclusive bound. Those still fail, and the model still hears why.
+ */
+const clampToDeclaredBounds = (
+  rawArguments: unknown,
+  issues: readonly { code: string; path: PropertyKey[]; origin?: unknown }[],
+): Record<string, unknown> | null => {
+  if (typeof rawArguments !== 'object' || rawArguments === null || Array.isArray(rawArguments)) {
+    return null;
+  }
+
+  const repaired: Record<string, unknown> = { ...(rawArguments as Record<string, unknown>) };
+
+  for (const issue of issues) {
+    // Only a top-level number of this call's own arguments. A nested path
+    // belongs to a shape this function does not know how to reason about.
+    if (issue.origin !== 'number' || issue.path.length !== 1) {
+      return null;
+    }
+
+    const key = issue.path[0];
+
+    if (typeof key !== 'string') {
+      return null;
+    }
+
+    const bound =
+      issue.code === 'too_big'
+        ? (issue as { maximum?: unknown }).maximum
+        : issue.code === 'too_small'
+          ? (issue as { minimum?: unknown }).minimum
+          : undefined;
+
+    if (typeof bound !== 'number') {
+      return null;
+    }
+
+    repaired[key] = bound;
+  }
+
+  return repaired;
+};
+
+/**
  * The one place a model's tool requests are turned into code.
  *
  * Nothing else dispatches on a tool name, and nothing outside a registered tool
@@ -303,7 +374,23 @@ export class ToolRegistry {
    * choose, and all of it is surface a prompt-injected reply could aim at.
    */
   definitions(): AiToolDefinition[] {
-    return this.list().map((tool) => {
+    return this.list().flatMap((tool) => {
+      // A name a provider will not accept fails the *whole* request, not the
+      // one tool: the model never gets to answer, and every question in that
+      // conversation comes back as "the AI service is not responding". Dropping
+      // the offender costs one capability and keeps the assistant alive, which
+      // is the trade worth making every time. It is logged as an error because
+      // nothing here should ever be unnameable — reaching this line means a
+      // tool was registered under a name that cannot be sent anywhere.
+      if (!PROVIDER_TOOL_NAME.test(tool.name)) {
+        log.error(
+          { tool: tool.name },
+          'tool name is not one a provider accepts; it is not being offered to the model',
+        );
+
+        return [];
+      }
+
       const plan = resolveToolPlan(tool);
       const notes: string[] = [];
 
@@ -317,11 +404,14 @@ export class ToolRegistry {
         notes.push('Ask the user first and call again with confirm: true only after they agree.');
       }
 
-      return {
-        name: tool.name,
-        description: notes.length > 0 ? `${tool.description} ${notes.join(' ')}` : tool.description,
-        parameters: z.toJSONSchema(tool.schema, { io: 'input' }) as Record<string, unknown>,
-      };
+      return [
+        {
+          name: tool.name,
+          description:
+            notes.length > 0 ? `${tool.description} ${notes.join(' ')}` : tool.description,
+          parameters: z.toJSONSchema(tool.schema, { io: 'input' }) as Record<string, unknown>,
+        },
+      ];
     });
   }
 
@@ -346,7 +436,20 @@ export class ToolRegistry {
       return { kind: 'unknown_tool', message: `There is no tool named "${name}".` };
     }
 
-    const parsed = tool.schema.safeParse(rawArguments ?? {});
+    let parsed = tool.schema.safeParse(rawArguments ?? {});
+
+    if (!parsed.success && !tool.mutates) {
+      const repaired = clampToDeclaredBounds(rawArguments ?? {}, parsed.error.issues);
+      const second = repaired === null ? null : tool.schema.safeParse(repaired);
+
+      if (second?.success) {
+        log.debug(
+          { tool: name, fields: parsed.error.issues.map((issue) => issue.path.join('.')) },
+          'out-of-range argument clamped to the schema bound',
+        );
+        parsed = second;
+      }
+    }
 
     if (!parsed.success) {
       const issues = parsed.error.issues

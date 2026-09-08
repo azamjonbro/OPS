@@ -174,7 +174,7 @@ describe('the Notion tools', () => {
 
     const names = (await buildIntegrationTools(actor)).map((tool) => tool.name);
 
-    expect(names).toEqual(['notion.search', 'notion.read_page']);
+    expect(names).toEqual(['notion_search', 'notion_read_page']);
   });
 
   it('search returns titles as untrusted, labelled data', async () => {
@@ -202,7 +202,7 @@ describe('the Notion tools', () => {
     });
 
     const tools = await buildIntegrationTools(actor);
-    const search = tools.find((tool) => tool.name === 'notion.search');
+    const search = tools.find((tool) => tool.name === 'notion_search');
     const outcome = await search?.execute(
       { query: 'supplier', limit: 5 },
       { actor, conversationId: 'conversation-1' },
@@ -231,7 +231,7 @@ describe('the Notion tools', () => {
     });
 
     const tools = await buildIntegrationTools(actor);
-    const read = tools.find((tool) => tool.name === 'notion.read_page');
+    const read = tools.find((tool) => tool.name === 'notion_read_page');
     const outcome = await read?.execute(
       { pageId: 'page-1234' },
       { actor, conversationId: 'conversation-1' },
