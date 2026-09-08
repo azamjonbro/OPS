@@ -125,6 +125,19 @@ const envSchema = z
     BILLZ_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     /** Restricts every read to these Billz shops. Empty means the whole company. */
     BILLZ_SHOP_IDS: commaSeparatedList(),
+    /**
+     * The one business this deployment is about, by name.
+     *
+     * `BILLZ_SHOP_IDS` already keeps Billz readings to it, but Billz is not the
+     * only place a business appears: a person's Notion holds pages about every
+     * company they run, and their mailbox holds all of the correspondence. The
+     * assistant has no way to tell which of it belongs here unless the
+     * deployment says so, and an answer that folds another company's figures
+     * into this one's is wrong in the way that matters most.
+     *
+     * Left unset, no scope is claimed and everything reachable is fair game.
+     */
+    BUSINESS_NAME: z.preprocess(blankToUndefined, z.string().trim().min(1).max(80).optional()),
     OPENAI_API_KEY: optionalSecret,
     ANTHROPIC_API_KEY: optionalSecret,
     /** Which vendor to use. Left unset, the configured key decides. */

@@ -122,6 +122,8 @@ export interface NotionConfig {
 export interface AppConfig {
   app: {
     name: string;
+    /** The business this deployment reports on, when it is scoped to one. */
+    businessName: string | null;
     version: string;
     env: Env['NODE_ENV'];
     isProduction: boolean;
@@ -217,6 +219,7 @@ const readPackageVersion = (): string => {
 export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
   app: {
     name: 'hadiya-api',
+    businessName: env.BUSINESS_NAME ?? null,
     version: readPackageVersion(),
     env: env.NODE_ENV,
     isProduction: env.NODE_ENV === 'production',
