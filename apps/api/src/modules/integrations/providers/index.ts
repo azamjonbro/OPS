@@ -2,6 +2,7 @@ import type { IntegrationProvider, IntegrationProviderInfo } from '@hadiya/share
 
 import { ApiError } from '../../../core/http/api-error.js';
 import { billzProvider } from './billz.provider.js';
+import { icloudMailProvider } from './icloud-mail.provider.js';
 import { mcpProvider } from './mcp.provider.js';
 import { notionProvider } from './notion.provider.js';
 import type { IntegrationProviderAdapter } from './provider.types.js';
@@ -20,6 +21,7 @@ import type { IntegrationProviderAdapter } from './provider.types.js';
 const ADAPTERS: Record<IntegrationProvider, IntegrationProviderAdapter> = {
   billz: billzProvider,
   notion: notionProvider,
+  icloud_mail: icloudMailProvider,
   custom_mcp: mcpProvider,
 };
 
@@ -49,6 +51,7 @@ export const listProviderCatalogue = (): IntegrationProviderInfo[] =>
 export type { IntegrationProviderAdapter, ProviderSetupInput } from './provider.types.js';
 export { billzProvider } from './billz.provider.js';
 export { notionProvider } from './notion.provider.js';
+export { icloudMailProvider } from './icloud-mail.provider.js';
 export { mcpProvider } from './mcp.provider.js';
 export { getNotionIdentity, readNotionPage, searchNotion } from './notion-client.js';
 export { withOptionalSecret } from './provider-secret.js';

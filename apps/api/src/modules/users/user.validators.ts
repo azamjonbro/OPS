@@ -59,6 +59,17 @@ export const updateUserStatusSchema = z.object({
   status: z.enum(USER_STATUSES),
 });
 
+/**
+ * Changing the login itself. The current password is what proves the request
+ * came from the account's owner rather than from a session left open on a till,
+ * which is the same protection a password change gets.
+ */
+export const changeUsernameSchema = z.object({
+  username: usernameSchema,
+  /** Required when a user renames their own login; admins may rename without it. */
+  currentPassword: passwordSchema.optional(),
+});
+
 export const changePasswordSchema = z.object({
   /** Required when a user changes their own password; admins may reset without it. */
   currentPassword: passwordSchema.optional(),

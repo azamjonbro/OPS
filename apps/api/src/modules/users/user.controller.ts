@@ -9,6 +9,7 @@ import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import * as userService from './user.service.js';
 import type {
   changePasswordSchema,
+  changeUsernameSchema,
   createUserSchema,
   listUsersQuerySchema,
   updateOwnPreferencesSchema,
@@ -64,6 +65,19 @@ export const updateStatus: ValidatedHandler<{
     requireActor(req),
     req.validated.params.id,
     req.validated.body.status,
+  );
+
+  sendSuccess(req, res, user);
+};
+
+export const changeUsername: ValidatedHandler<{
+  params: typeof userIdParamSchema;
+  body: typeof changeUsernameSchema;
+}> = async (req, res) => {
+  const user = await userService.changeUsername(
+    requireActor(req),
+    req.validated.params.id,
+    req.validated.body,
   );
 
   sendSuccess(req, res, user);

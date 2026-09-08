@@ -24,7 +24,7 @@ export type IntegrationType = (typeof INTEGRATION_TYPES)[number];
  * entry the whole MCP side shares, because what distinguishes one MCP server
  * from another is its URL, not a name Hadiya knows in advance.
  */
-export const NATIVE_INTEGRATION_PROVIDERS = ['billz', 'notion'] as const;
+export const NATIVE_INTEGRATION_PROVIDERS = ['billz', 'notion', 'icloud_mail'] as const;
 
 export type NativeIntegrationProvider = (typeof NATIVE_INTEGRATION_PROVIDERS)[number];
 

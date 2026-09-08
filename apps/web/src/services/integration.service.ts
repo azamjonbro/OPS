@@ -3,6 +3,7 @@ import type {
   IntegrationAuditEntry,
   IntegrationDetail,
   IntegrationHealth,
+  IntegrationProvider,
   IntegrationProviderInfo,
   Integration as IntegrationView,
   McpAuthMethod,
@@ -70,7 +71,7 @@ export const integrationService = {
  * screen that could accidentally render it.
  */
 export interface CreateIntegrationPayload {
-  provider: 'billz' | 'notion' | 'custom_mcp';
+  provider: IntegrationProvider;
   name: string;
   description?: string | null;
   serverUrl?: string;
@@ -78,6 +79,8 @@ export interface CreateIntegrationPayload {
   authMethod?: McpAuthMethod;
   authHeaderName?: string | null;
   secret?: string;
+  /** Non-sensitive provider settings; iCloud Mail's Apple ID lives here. */
+  options?: { email?: string };
 }
 
 export type UpdateIntegrationPayload = Partial<Omit<CreateIntegrationPayload, 'provider'>> & {

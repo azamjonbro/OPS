@@ -150,7 +150,8 @@ export const BILLZ_CAPABILITIES: readonly BillzCapabilityDescriptor[] = [
   },
   {
     name: 'getShops',
-    description: 'The company shops (branches) configured in Billz.',
+    description:
+      'The Billz shops this deployment reports on. Other shops on the same Billz account are out of scope and never appear.',
     schema: billzCapabilitySchemas.getShops,
   },
   {

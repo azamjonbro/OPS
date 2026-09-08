@@ -4,6 +4,7 @@ import { validated } from '../../core/middleware/validate.js';
 import * as userController from './user.controller.js';
 import {
   changePasswordSchema,
+  changeUsernameSchema,
   createUserSchema,
   listUsersQuerySchema,
   updateOwnPreferencesSchema,
@@ -31,6 +32,13 @@ userRouter.patch(
   ...validated(
     { params: userIdParamSchema, body: updateUserStatusSchema },
     userController.updateStatus,
+  ),
+);
+userRouter.post(
+  '/:id/username',
+  ...validated(
+    { params: userIdParamSchema, body: changeUsernameSchema },
+    userController.changeUsername,
   ),
 );
 userRouter.post(

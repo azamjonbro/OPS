@@ -193,6 +193,12 @@ const operationalFindings = (values: Record<string, string>): Finding[] => {
       'BILLZ_API_TOKEN',
       'is unset, so every Billz reading is unavailable and the assistant cannot answer questions about the shop',
     );
+  } else if (!get('BILLZ_SHOP_IDS')) {
+    add(
+      'warning',
+      'BILLZ_SHOP_IDS',
+      'is empty, so every reading covers the whole Billz account. If that account holds more than one business, "today\u2019s takings" will quietly include the other shops\u2019 receipts. Set it to the shop ids this deployment reports on.',
+    );
   }
 
   if (!get('STT_API_KEY') && !get('OPENAI_API_KEY')) {

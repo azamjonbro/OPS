@@ -34,6 +34,20 @@ const descriptionSchema = z.string().trim().max(500).nullable();
  */
 const secretSchema = z.string().min(1).max(4_096);
 
+/**
+ * Non-sensitive, provider-specific settings.
+ *
+ * Narrow rather than a free record, and that is the point: every key here is
+ * one an adapter reads, so a client cannot use this field to write arbitrary
+ * state into an integration document that other code later trusts.
+ */
+const optionsSchema = z
+  .object({
+    /** iCloud Mail: the Apple ID the app-specific password belongs to. */
+    email: z.string().trim().toLowerCase().max(160).optional(),
+  })
+  .strict();
+
 /** Checked properly by `parseMcpServerUrl`; this only bounds the field. */
 const serverUrlSchema = z.string().trim().min(1).max(2_048);
 
@@ -47,6 +61,7 @@ export const createIntegrationSchema = z
     authMethod: z.enum(MCP_AUTH_METHODS).optional(),
     authHeaderName: z.string().trim().max(64).nullable().optional(),
     secret: secretSchema.optional(),
+    options: optionsSchema.optional(),
   })
   .superRefine((value, ctx) => {
     // The adapter enforces the provider's real requirements; this catches the
@@ -71,6 +86,7 @@ export const updateIntegrationSchema = z
     authMethod: z.enum(MCP_AUTH_METHODS).optional(),
     authHeaderName: z.string().trim().max(64).nullable().optional(),
     secret: secretSchema.optional(),
+    options: optionsSchema.optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'There is nothing to update',
