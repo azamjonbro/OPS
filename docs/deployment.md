@@ -11,44 +11,68 @@ Nothing here contains a real credential, and none of the scripts prints one.
 
 ## 1. Architecture
 
+The web client and the API live on different hosts, and that split decides most
+of what follows.
+
 ```
-                    Internet
-                       │  443
-                       ▼
-              ┌──────────────────┐
-              │      Nginx       │  TLS, static files, reverse proxy
-              └────────┬─────────┘
-                 /     │      \
-     static files      │ /api  │ /api/v1/ai/*  (streamed, unbuffered)
-                       ▼       ▼
-              ┌──────────────────┐
-              │   Hadiya API     │  one Node process, supervised by PM2
-              │   :4000          │  · HTTP · scheduler · agent
-              └────────┬─────────┘
-                       │
-                  ┌────┴────┐
-                  │ MongoDB │  replica set (transactions)
-                  └─────────┘
+   Browser
+      │
+      ├──────────────► Vercel                    the Vue app (static)
+      │                 ops-web-lm3a.vercel.app
+      │
+      └──────────────► Cloudflare ──► home server
+                        ops.sds-max.uz              Nginx :80  (Cloudflare Flexible)
+                                                      │
+                                                    Hadiya API :4400  (PM2, one process)
+                                                      │
+                                                    MongoDB (replica set)
 
 The API also reaches, outbound only:
-  Billz · Notion · a user's MCP servers · the model provider · STT · images
+  Billz · Notion · a user's MCP servers · OpenAI · STT · images
 ```
 
-**One API process, deliberately.** Two things live in this process's memory:
-the rate limiters and the agent run registry a reconnecting browser rejoins a
-stream through. A second worker would halve every rate limit's effectiveness
-and lose half the reconnections. The scheduler is safe either way — it claims
-jobs by a database lease — but the other two are not. Scaling out means giving
-those a shared store first; until then, `instances: 1` and `exec_mode: 'fork'`
-in `ecosystem.config.cjs` are load-bearing, not incidental.
+**Every request from the app is cross-origin.** The browser loads the page from
+Vercel and calls `ops.sds-max.uz`, so each API call carries an `Authorization`
+header, which is not CORS-safelisted, which means the browser sends a preflight
+`OPTIONS` first. Two settings have to agree or nothing works:
 
-**Why not Docker.** It would be a reasonable choice, and it is deliberately not
-made here: the Docker daemon was not available in the environment this phase was
-prepared in, so an image could not be built or started even once. Shipping an
-unverified Dockerfile as the recommended path would be worse than not shipping
-one. PM2 is what is configured, documented and tested.
+| Where              | Variable            | Value                                                          |
+| ------------------ | ------------------- | -------------------------------------------------------------- |
+| Vercel             | `VITE_API_BASE_URL` | `https://ops.sds-max.uz/api`                                   |
+| Home server `.env` | `CORS_ORIGINS`      | the app's exact origin, e.g. `https://ops-web-lm3a.vercel.app` |
 
----
+A mismatch fails in a way that looks like the API being down. The smoke test
+checks it directly — see §8.
+
+Authentication is a bearer token in `localStorage`, not a cookie, so it crosses
+origins without any cookie or `SameSite` consideration. There is nothing to
+configure for it, and no CSRF surface either.
+
+**Cloudflare is in front of the home server**, which is the right choice here:
+the home connection's address is never exposed, and only Cloudflare's ranges
+need to reach the router. It has three consequences, all handled:
+
+- The visitor's real address arrives in `CF-Connecting-IP`, and Nginx must
+  recover it — otherwise every request looks like Cloudflare and the API's
+  rate limits become one shared bucket. `deploy/nginx/cloudflare-real-ip.conf`
+  does this, and it is only safe because trust is restricted to Cloudflare's own
+  ranges.
+- The certificate on the home server is an _origin_ certificate the browser
+  never sees. Use a **Cloudflare Origin Certificate**: fifteen years, no
+  renewal, and so no certbot cron quietly failing and taking the site down.
+- Streaming passes through. Cloudflare does not buffer `text/event-stream`, and
+  the API's 20-second heartbeat keeps the connection under Cloudflare's
+  inactivity timeout.
+
+**One API process, deliberately.** The rate limiters and the agent run registry
+live in this process's memory. A second worker would halve every limit's effect
+and lose half the stream reconnections. `instances: 1` and `exec_mode: 'fork'`
+in `ecosystem.config.cjs` are load-bearing.
+
+**Why not Docker.** The Docker daemon was unavailable in the environment this
+was prepared in, so an image could not be built or started even once. Shipping
+an unverified Dockerfile as the recommended path would be worse than shipping
+none. PM2 is what is configured and tested.
 
 ## 2. Prerequisites
 
@@ -90,7 +114,7 @@ characters, a missing encryption key, or `MCP_ALLOW_PRIVATE_HOSTS=true`. Check a
 file before you deploy it:
 
 ```bash
-npm run check:production -w @hadiya/api -- --env-file /srv/hadiya/.env
+npm run check:production -w @hadiya/api -- --env-file ~/ops-back/.env
 ```
 
 It reports errors and warnings, exits non-zero on an error, and never prints a
@@ -104,11 +128,13 @@ came from the proxy and the rate limits apply to everyone at once.
 ## 4. First install
 
 ```bash
-sudo mkdir -p /srv/hadiya /var/www/hadiya /var/lib/hadiya/storage
-sudo chown -R "$USER" /srv/hadiya /var/www/hadiya /var/lib/hadiya
+# The checkout lives in the deploying user's home, so nothing here needs root.
+# Only the uploads directory does, because it is outside it.
+sudo mkdir -p /var/lib/hadiya/storage
+sudo chown -R "$USER" /var/lib/hadiya
 
-git clone <repository> /srv/hadiya
-cd /srv/hadiya
+git clone https://github.com/azamjonbro/OPS.git ~/ops-back
+cd ~/ops-back
 cp .env.example .env && $EDITOR .env      # see §3
 chmod 600 .env
 
@@ -118,7 +144,6 @@ npm run build
 npm run db:indexes -w @hadiya/api          # see §6
 npm run create-owner -w @hadiya/api -- --username owner --password '…' --name 'Your Name'
 
-rsync -a --delete apps/web/dist/ /var/www/hadiya/
 pm2 start ecosystem.config.cjs
 pm2 save && pm2 startup                    # survive a reboot
 ```
@@ -179,50 +204,152 @@ on a large collection is a decision about when, not just whether.
 
 ---
 
-## 7. Nginx and HTTPS
+## 7. Nginx, Cloudflare and the certificate
 
-`deploy/nginx/hadiya.conf` is the configuration. Replace the hostname, then:
+`deploy/nginx/ops.sds-max.uz.conf` serves the **API only** — no static files, no
+SPA fallback, because the app is on Vercel.
+
+There are two versions of that file, and installing them in the wrong order is
+the single easiest way to take the site down:
+
+| File                            | For                                             |
+| ------------------------------- | ----------------------------------------------- |
+| `ops.sds-max.uz.conf`           | plain `:80`, for a zone on **Flexible**. This is what is installed today. |
+| `ops.sds-max.uz.tls.conf`       | `:443` + a redirect from `:80`, for a zone on **Full (strict)** *after* an origin certificate exists. |
+
+### Stage 1 — what is running now (Flexible, plain :80)
 
 ```bash
-sudo cp deploy/nginx/hadiya.conf /etc/nginx/sites-available/hadiya
-sudo ln -s /etc/nginx/sites-available/hadiya /etc/nginx/sites-enabled/hadiya
+sudo mkdir -p /etc/nginx/snippets
+sudo cp deploy/nginx/cloudflare-real-ip.conf /etc/nginx/snippets/
+sudo cp deploy/nginx/ops.sds-max.uz.conf /etc/nginx/sites-available/ops.sds-max.uz
+sudo ln -sfn ../sites-available/ops.sds-max.uz /etc/nginx/sites-enabled/ops.sds-max.uz
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Get a certificate **before** enabling the TLS block, or `nginx -t` fails on a
-path that does not exist yet:
+Note the file name: every other site on this host is named after its hostname,
+and calling this one `hadiya` would collide with `hadiya.sds-max.uz`, which is a
+different, older application on port 3912.
+
+> **On Flexible, the origin must not redirect to HTTPS.**
+>
+> Cloudflare fetches from the origin over plain HTTP on port 80. If the port-80
+> block redirects to HTTPS, Cloudflare hands that redirect to the browser, the
+> browser asks Cloudflare again, Cloudflare fetches port 80 again — and the
+> browser gives up with `ERR_TOO_MANY_REDIRECTS`. `ops.sds-max.uz.conf`
+> therefore has no redirect in it, on purpose.
+>
+> Getting the browser onto HTTPS is the *edge's* job in this arrangement:
+> Cloudflare → **SSL/TLS → Edge Certificates → Always Use HTTPS**. That
+> redirect happens before the origin is ever contacted, so it cannot loop.
+
+The other half of the same trap: `X-Forwarded-Proto`. Cloudflare forwards over
+plain HTTP, so `$scheme` at the origin is always `http` and would tell the API
+that a genuinely secure session is insecure. The config maps Cloudflare's own
+`X-Forwarded-Proto` through instead, and only falls back to `$scheme` for a
+request that did not come through Cloudflare.
+
+### Stage 2 — the certificate, and Full (strict)
+
+Use a **Cloudflare Origin Certificate** rather than Let's Encrypt. Cloudflare
+terminates TLS for the browser; this certificate only has to satisfy Cloudflare,
+it is issued for fifteen years, and it removes the most common way a home server
+goes dark — a renewal that quietly stopped.
+
+1. Cloudflare dashboard → **SSL/TLS → Origin Server → Create Certificate**.
+2. Save the certificate and key on the server:
+
+   ```bash
+   sudo mkdir -p /etc/ssl/cloudflare && sudo chmod 700 /etc/ssl/cloudflare
+   sudo nano /etc/ssl/cloudflare/ops.sds-max.uz.pem   # the certificate
+   sudo nano /etc/ssl/cloudflare/ops.sds-max.uz.key   # the private key
+   sudo chmod 600 /etc/ssl/cloudflare/*
+   ```
+
+3. Cloudflare → **SSL/TLS → Overview → Full (strict)**. Anything less lets
+   Cloudflare reach the origin over plain HTTP or without checking the
+   certificate, which is not what you want on a home connection.
+
+4. **Only now** swap in the TLS config — the certificate first, then the mode,
+   then the file. `nginx -t` refuses a config whose `ssl_certificate` is
+   missing, so a wrong order here fails loudly; the mode is the one that fails
+   quietly, as a redirect loop.
+
+   ```bash
+   sudo cp deploy/nginx/ops.sds-max.uz.tls.conf /etc/nginx/sites-available/ops.sds-max.uz
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+Let's Encrypt still works if you prefer it — point `ssl_certificate` at
+`/etc/letsencrypt/live/…` and keep the ACME block in the HTTP server. It needs
+port 80 reachable through Cloudflare for renewal.
+
+### Cloudflare settings that matter
+
+| Setting                 | Value            | Why                                             |
+| ----------------------- | ---------------- | ----------------------------------------------- |
+| SSL/TLS mode            | Full (strict)    | the origin is verified, not just encrypted. Until an origin certificate exists this is **Flexible** — see §7 |
+| Always Use HTTPS        | On               | the edge redirects `http://` to `https://`. On Flexible this is the *only* safe place for that redirect: at the origin it loops |
+| Cache rule for `/api/*` | Bypass cache     | an API response must never be served from cache |
+| Proxy status            | Proxied (orange) | this is what hides the home address             |
+| WebSockets              | On               | harmless, and covers future use                 |
+
+Streaming needs nothing special at the edge: Cloudflare passes
+`text/event-stream` through, and the API's 20-second heartbeat keeps the
+connection inside Cloudflare's inactivity timeout.
+
+### The router and the firewall
+
+Forward TCP 80 and 443 from the router to this machine. Because Cloudflare
+proxies everything, only its ranges need to reach you — worth enforcing so the
+origin cannot be found and hit directly:
 
 ```bash
-sudo certbot --nginx -d hadiya.example.com
-sudo systemctl status certbot.timer      # renewal is automatic; check it is armed
+for range in $(curl -s https://www.cloudflare.com/ips-v4); do
+  sudo ufw allow from "$range" to any port 443 proto tcp
+done
+sudo ufw deny 443/tcp
 ```
 
-Two things in that file matter more than the rest:
+Refresh the trusted ranges a few times a year:
 
-- **Streaming.** `proxy_buffering off` is set for `/api/v1/ai/(chat|runs/…/stream)`
-  and nowhere else. With buffering on, the browser sees nothing until the whole
-  turn finishes and the assistant looks broken. It is scoped to those routes
-  because every other response is small JSON that benefits from buffering. The
-  API also sends `X-Accel-Buffering: no` on each stream, which Nginx honours on
-  its own — belt and braces.
-- **Timeouts.** `proxy_read_timeout 600s` on the streaming routes. A turn with
-  several model calls and a dozen tools legitimately takes minutes; the API's own
-  budgets are the real limit and Nginx must not cut in first.
+```bash
+sudo deploy/scripts/update-cloudflare-ips.sh
+sudo nginx -t && sudo systemctl reload nginx
+```
 
-`client_max_body_size 25m` clears the API's own 20 MB document limit. Keep them
-in step, or Nginx rejects a large upload with a bare 413 the application never
-sees.
+---
 
-HSTS is set by Nginx so it also covers static files and Nginx's own error pages.
-Do not enable it until HTTPS is known to work — a browser that has seen it will
-refuse plain HTTP for the whole `max-age`.
+## 7b. The web client on Vercel
+
+`apps/web/vercel.json` carries the build, the SPA rewrite and the cache headers.
+In the Vercel project:
+
+- **Root directory**: `apps/web`
+- **Environment variables** (Production):
+
+  | Variable             | Value                        |
+  | -------------------- | ---------------------------- |
+  | `VITE_API_BASE_URL`  | `https://ops.sds-max.uz/api` |
+  | `VITE_APP_NAME`      | `Hadiya`                     |
+  | `VITE_AUTH_ENFORCED` | `true`                       |
+
+Only `VITE_`-prefixed variables reach the browser, and none of them is a secret.
+**Never put a server-side key in the Vercel project** — `OPENAI_API_KEY`,
+`MONGO_URI`, the JWT secrets and `CREDENTIALS_ENCRYPTION_KEY` belong on the home
+server and nowhere else.
+
+After the first deploy, add the Vercel URL to `CORS_ORIGINS` on the home server
+and restart the API. Every preview deployment gets its own URL, so preview
+builds will not reach the API unless you add those origins too — usually you do
+not want to.
 
 ---
 
 ## 8. Deploying
 
 ```bash
-cd /srv/hadiya && deploy/scripts/deploy.sh
+cd ~/ops-back && deploy/scripts/deploy.sh
 ```
 
 It checks the configuration, fetches, `npm ci`, builds, publishes the frontend,
@@ -242,9 +369,15 @@ when the shop is quiet.
 Afterwards:
 
 ```bash
-deploy/scripts/smoke-test.sh https://hadiya.example.com
-SMOKE_USER=owner SMOKE_PASSWORD='…' deploy/scripts/smoke-test.sh https://hadiya.example.com
+SMOKE_ORIGIN=https://ops-web-lm3a.vercel.app \
+SMOKE_USER=owner SMOKE_PASSWORD='…' \
+deploy/scripts/smoke-test.sh https://ops.sds-max.uz
 ```
+
+`SMOKE_ORIGIN` is what checks the cross-origin setup: it sends the preflight the
+browser will send, confirms the app's origin is allowed, and confirms an
+unconfigured one is not. That is the failure most likely to follow a redeploy of
+the front end, and the one that looks least like what it is.
 
 Read-only apart from creating one conversation. It never runs a destructive
 tool, confirms a pending action, or writes to Billz.
@@ -254,7 +387,7 @@ tool, confirms a pending action, or writes to Billz.
 Automatic on a failed health check, as above. By hand:
 
 ```bash
-cd /srv/hadiya
+cd ~/ops-back
 git checkout <previous-sha>
 npm ci && npm run build
 rsync -a --delete apps/web/dist/ /var/www/hadiya/
@@ -288,7 +421,7 @@ Back it up with the database — §10 does.
 
 ```bash
 deploy/scripts/backup.sh
-17 * * * * cd /srv/hadiya && deploy/scripts/backup.sh >> /var/log/hadiya-backup.log 2>&1
+17 * * * * cd ~/ops-back && deploy/scripts/backup.sh >> /var/log/hadiya-backup.log 2>&1
 ```
 
 Hourly, keeping 14 days (`BACKUP_RETENTION_DAYS`). Each backup is a gzipped
@@ -332,8 +465,8 @@ is the most likely way for one to go wrong and the easiest to miss.
 
 | Where                          | What                             |
 | ------------------------------ | -------------------------------- |
-| `/srv/hadiya/logs/api.out.log` | the API's JSON lines             |
-| `/srv/hadiya/logs/api.err.log` | crashes and PM2's own errors     |
+| `~/ops-back/logs/api.out.log` | the API's JSON lines             |
+| `~/ops-back/logs/api.err.log` | crashes and PM2's own errors     |
 | `/var/log/nginx/access.log`    | requests, minus the health probe |
 | `journalctl -u mongod`         | the database                     |
 
@@ -378,7 +511,7 @@ Worth watching, in rough order of how often it matters:
 | Signal            | Where                                     | Act when                              |
 | ----------------- | ----------------------------------------- | ------------------------------------- |
 | Disk usage        | `df -h`                                   | over 80%                              |
-| Log directory     | `du -sh /srv/hadiya/logs`                 | over 1 GB — rotation is not working   |
+| Log directory     | `du -sh ~/ops-back/logs`                 | over 1 GB — rotation is not working   |
 | Storage directory | `du -sh /var/lib/hadiya/storage`          | growing unexpectedly                  |
 | Memory            | `pm2 status`                              | near the 900 MB restart ceiling       |
 | Restarts          | `pm2 status`                              | the count climbing means a crash loop |
@@ -452,6 +585,44 @@ first matching regex location, so a broader one added above it wins.
 
 **Uploads fail at about 1 MB.** `client_max_body_size` in Nginx, not the API.
 
+**The browser console says CORS — but check the API is answering first.**
+
+A browser reports _any_ failed cross-origin request as a CORS error, because a
+response without `Access-Control-Allow-Origin` is all it can see. A 404 from
+Nginx, a 502 while the API is down, and a genuinely missing origin all look
+identical from the console. So diagnose from outside the browser before
+touching `CORS_ORIGINS`:
+
+```bash
+curl -i https://ops.sds-max.uz/api/health/live
+```
+
+- **`Welcome to nginx!` or a 404 in an HTML page** — Nginx never reached the
+  API. The site config is not enabled, or the default site is winning. See §7.
+- **502** — Nginx is proxying, but nothing is listening on :4400. `pm2 status`.
+- **200 with JSON** — the API is fine and it really is CORS; carry on below.
+
+**A real CORS failure: the origin is not allowed.** The app's origin is
+not in `CORS_ORIGINS` on the home server, or the API was not restarted after it
+was added. A new Vercel domain — a custom domain, or a preview deployment — is a
+new origin. Confirm with:
+
+```bash
+SMOKE_ORIGIN=https://ops-web-lm3a.vercel.app deploy/scripts/smoke-test.sh https://ops.sds-max.uz
+```
+
+**Every visitor shares one rate limit, and the logs all show one address.**
+Nginx is not recovering the real address from Cloudflare. Check that
+`/etc/nginx/snippets/cloudflare-real-ip.conf` exists and is included, and that
+`TRUST_PROXY=true` — both halves are needed.
+
+**Cloudflare error 521 or 522.** Nothing is listening on the origin, or the
+router is not forwarding, or the firewall is dropping Cloudflare. `pm2 status`
+first, then `sudo nginx -t && sudo systemctl status nginx`.
+
+**Cloudflare error 526.** The origin certificate is not valid for Cloudflare's
+"Full (strict)" mode — usually it expired or the wrong file was pasted in.
+
 **Sign-in fails after a restore.** The restore may have landed in the wrong
 database. Run `verify-restore.mjs` against the URI the API is actually using.
 
@@ -473,3 +644,10 @@ Stated plainly, because assuming otherwise is how outages happen.
 - **Backups are not off-site** unless you copy them somewhere. The script writes
   to local disk.
 - **Docker is not provided.** See §1.
+- **The front end and the API deploy separately.** Nothing coordinates them, so
+  a release that changes the API contract can briefly meet an older bundle
+  cached in somebody's browser. `index.html` is served `no-cache`, which keeps
+  that window to one reload.
+- **A home server is a home server.** Power, the domestic connection and the
+  router are all single points of failure that no configuration here can
+  address. Cloudflare hides the address; it does not keep the machine up.

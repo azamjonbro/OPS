@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "create-owner": "tsx src/scripts/create-owner.ts",
+    "reset-password": "tsx src/scripts/reset-password.ts",
     "probe-transactions": "tsx src/scripts/probe-transactions.ts",
     "probe-agent": "tsx src/scripts/probe-agent.ts",
     "db:indexes": "tsx src/scripts/sync-indexes.ts",

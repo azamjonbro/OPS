@@ -20,6 +20,11 @@ BASE="${BASE%/}"
 
 USER="${SMOKE_USER:-}"
 PASSWORD="${SMOKE_PASSWORD:-}"
+# The origin the browser will actually call from. With the front end on Vercel
+# and the API on its own host, every request is cross-origin, so this is the
+# single most likely thing to be misconfigured — and it fails in a way that
+# looks like the API being down rather than like a CORS problem.
+ORIGIN="${SMOKE_ORIGIN:-}"
 
 PASSED=0
 FAILED=0
@@ -61,14 +66,55 @@ else
 fi
 
 # --- 3. Frontend ------------------------------------------------------------
+#
+# Two shapes of deployment are supported and told apart rather than assumed:
+# one host serving both the app and the API, or an API-only host with the front
+# end somewhere else (Vercel). Failing the frontend checks against an API-only
+# host would be reporting a problem that is not one.
 HTML="$(curl -s -m 15 "${BASE}/")"
-echo "${HTML}" | grep -qi '<div id="app"' && ok "the frontend is served" || bad "the frontend did not return the app shell"
 
-# A client-side route must return the shell rather than a 404, or a reload on
-# any page but the root breaks.
-[[ "$(status "${BASE}/reminders")" == "200" ]] \
-  && ok "SPA routing (a deep link returns the app)" \
-  || bad "a deep link did not return the app; check try_files in Nginx"
+if echo "${HTML}" | grep -qi '<div id="app"'; then
+  ok "the frontend is served from this host"
+
+  # A client-side route must return the shell rather than a 404, or a reload on
+  # any page but the root breaks.
+  [[ "$(status "${BASE}/reminders")" == "200" ]] \
+    && ok "SPA routing (a deep link returns the app)" \
+    || bad "a deep link did not return the app; check try_files in Nginx"
+else
+  skip "frontend checks (this host serves the API only; the app is elsewhere)"
+fi
+
+# --- 3b. Cross-origin access from the front end -----------------------------
+if [[ -n "${ORIGIN}" ]]; then
+  # An Authorization header is not CORS-safelisted, so the browser sends a
+  # preflight before every real request. If this fails, nothing in the
+  # application works and the browser console blames CORS rather than the API.
+  PREFLIGHT="$(curl -s -D - -o /dev/null -m 15 -X OPTIONS "${BASE}/api/v1/conversations" \
+    -H "Origin: ${ORIGIN}" \
+    -H 'Access-Control-Request-Method: GET' \
+    -H 'Access-Control-Request-Headers: authorization,content-type')"
+
+  if echo "${PREFLIGHT}" | grep -qi "access-control-allow-origin: ${ORIGIN}"; then
+    ok "the API allows ${ORIGIN} (preflight)"
+  else
+    bad "the API did not allow ${ORIGIN}; add it to CORS_ORIGINS and restart"
+  fi
+
+  echo "${PREFLIGHT}" | grep -qi 'access-control-allow-headers:.*authorization' \
+    && ok "the Authorization header is allowed cross-origin" \
+    || bad "the preflight did not allow the Authorization header"
+
+  # An origin that is not configured must not be allowed, or the allow-list is
+  # not doing anything.
+  curl -s -D - -o /dev/null -m 15 -X OPTIONS "${BASE}/api/v1/conversations" \
+    -H 'Origin: https://not-allowed.example' \
+    -H 'Access-Control-Request-Method: GET' | grep -qi 'access-control-allow-origin' \
+    && bad "an unconfigured origin was allowed; CORS_ORIGINS is too permissive" \
+    || ok "an unconfigured origin is refused"
+else
+  skip "cross-origin checks (set SMOKE_ORIGIN to the front end's URL)"
+fi
 
 # --- 4. Authentication is actually required ---------------------------------
 [[ "$(status "${BASE}/api/v1/conversations")" == "401" ]] \

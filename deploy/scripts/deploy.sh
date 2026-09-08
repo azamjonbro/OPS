@@ -28,7 +28,7 @@ PULL=1
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:4000/api/health/ready}"
 HEALTH_ATTEMPTS="${HEALTH_ATTEMPTS:-30}"
 PM2_NAME="${PM2_NAME:-hadiya-api}"
-WEB_ROOT="${WEB_ROOT:-/var/www/hadiya}"
+WEB_ROOT="${WEB_ROOT:-}"
 
 log() { echo "[$(date -u +%FT%TZ)] $*"; }
 fail() { echo "[$(date -u +%FT%TZ)] ERROR: $*" >&2; exit 1; }
@@ -62,13 +62,17 @@ log "building"
 npm run build --silent || fail "the build failed; nothing was restarted and ${PREVIOUS} is still running"
 
 # --- 4. Publish the frontend ------------------------------------------------
-if [[ -d "${WEB_ROOT}" ]]; then
+#
+# Only when this host serves it. In the Vercel deployment it does not: the front
+# end is built and published by Vercel from the same commit, on its own. Set
+# WEB_ROOT only if Nginx serves the app from this machine.
+if [[ -n "${WEB_ROOT:-}" && -d "${WEB_ROOT}" ]]; then
   log "publishing the frontend to ${WEB_ROOT}"
   # --delete removes files from the previous build, so a stale asset cannot be
   # served alongside a new index.html that does not reference it.
   rsync -a --delete apps/web/dist/ "${WEB_ROOT}/"
 else
-  log "no ${WEB_ROOT}; skipping the frontend (set WEB_ROOT if Nginx serves it elsewhere)"
+  log "this host serves the API only; the front end is deployed separately"
 fi
 
 # --- 5. Restart the API -----------------------------------------------------
@@ -102,7 +106,7 @@ if [[ "${HEALTHY}" != "1" ]]; then
   git -c advice.detachedHead=false checkout --quiet "${PREVIOUS}"
   npm ci --silent
   npm run build --silent
-  [[ -d "${WEB_ROOT}" ]] && rsync -a --delete apps/web/dist/ "${WEB_ROOT}/"
+  [[ -n "${WEB_ROOT:-}" && -d "${WEB_ROOT}" ]] && rsync -a --delete apps/web/dist/ "${WEB_ROOT}/"
   pm2 restart "${PM2_NAME}" --update-env >/dev/null 2>&1 || true
 
   for attempt in $(seq 1 "${HEALTH_ATTEMPTS}"); do
@@ -119,5 +123,5 @@ fi
 pm2 save >/dev/null 2>&1 || true
 
 log "deployed ${NEXT} (previous ${PREVIOUS})"
-log "run a smoke test:  deploy/scripts/smoke-test.sh https://your-host"
+log "run a smoke test:  SMOKE_ORIGIN=https://<app>.vercel.app deploy/scripts/smoke-test.sh https://ops.sds-max.uz"
 log "if a schema change needs indexes:  npm run db:indexes -w @hadiya/api"
