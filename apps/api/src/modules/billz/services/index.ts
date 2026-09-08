@@ -1,4 +1,5 @@
 import { config } from '../../../config/index.js';
+import { createLogger } from '../../../core/logger/logger.js';
 import { BILLZ_ENDPOINTS } from '../client/billz-endpoints.js';
 import { BillzError, isBillzError } from '../client/billz-error.js';
 import { getBillzHttpClient, type BillzHttpClient } from '../client/billz-http-client.js';
@@ -48,8 +49,31 @@ let cached: BillzServices | null = null;
  * returning a half-built object when no token is set, so a missing credential
  * fails at the boundary with one clear message.
  */
+/**
+ * Says so, once, when the deployment has left the scope open.
+ *
+ * One Billz account can hold several businesses, and an empty `BILLZ_SHOP_IDS`
+ * means every read covers all of them — which does not fail, it just answers a
+ * different question than the one asked: "today's takings" comes back with
+ * another shop's receipts in the total and nothing looks wrong. A deployment
+ * that means to read the whole company should still see this line, because then
+ * the log says which of the two it is.
+ */
+const warnIfUnscoped = (): void => {
+  const { configured, shopIds } = config.integrations.billz;
+
+  if (configured && shopIds.length === 0) {
+    createLogger('billz').warn(
+      'BILLZ_SHOP_IDS is empty: every Billz reading covers the whole company, including shops this deployment may not be reporting on. Set it to the shop ids this deployment owns.',
+    );
+  }
+};
+
 export const getBillzServices = (): BillzServices => {
-  cached ??= createBillzServices(getBillzHttpClient());
+  if (!cached) {
+    warnIfUnscoped();
+    cached = createBillzServices(getBillzHttpClient());
+  }
 
   return cached;
 };

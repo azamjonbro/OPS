@@ -5,7 +5,9 @@ import { RouterLink } from 'vue-router';
 
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import IntegrationControls from '@/components/settings/IntegrationControls.vue';
 import { useNavigation } from '@/composables/useNavigation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useToast } from '@/composables/useToast';
@@ -47,6 +49,86 @@ const timezoneOptions = computed(() => {
 
   return zones.map((zone) => ({ value: zone, label: zone }));
 });
+
+/**
+ * Sign-in details.
+ *
+ * Both changes prove the current password before they take effect. That is not
+ * ceremony: the login and the password are the only two things standing between
+ * an unattended till and somebody else's account, and a session left open would
+ * otherwise be enough to take the account over.
+ *
+ * The tokens carry the account's id rather than its name, so a rename does not
+ * end the session — the store is refreshed and the same session continues.
+ */
+const username = ref(auth.user?.username ?? '');
+const usernamePassword = ref('');
+const isSavingUsername = ref(false);
+
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+const isSavingPassword = ref(false);
+
+const usernameChanged = computed(
+  () => username.value.trim().toLowerCase() !== (auth.user?.username ?? '').toLowerCase(),
+);
+
+const passwordMismatch = computed(
+  () => confirmPassword.value.length > 0 && newPassword.value !== confirmPassword.value,
+);
+
+const saveUsername = async (): Promise<void> => {
+  if (isSavingUsername.value || !auth.user) {
+    return;
+  }
+
+  isSavingUsername.value = true;
+
+  try {
+    await api.post(`/v1/users/${auth.user.id}/username`, {
+      username: username.value.trim().toLowerCase(),
+      currentPassword: usernamePassword.value,
+    });
+    await auth.refreshUser();
+    usernamePassword.value = '';
+    username.value = auth.user?.username ?? username.value;
+    toast.success('Login saved. Use the new one next time you sign in.');
+  } catch (caught) {
+    toast.error(toErrorMessage(caught));
+  } finally {
+    isSavingUsername.value = false;
+  }
+};
+
+const savePassword = async (): Promise<void> => {
+  if (isSavingPassword.value || !auth.user) {
+    return;
+  }
+
+  if (newPassword.value !== confirmPassword.value) {
+    toast.error('The two new passwords do not match.');
+
+    return;
+  }
+
+  isSavingPassword.value = true;
+
+  try {
+    await api.post(`/v1/users/${auth.user.id}/password`, {
+      currentPassword: currentPassword.value,
+      newPassword: newPassword.value,
+    });
+    currentPassword.value = '';
+    newPassword.value = '';
+    confirmPassword.value = '';
+    toast.success('Password changed.');
+  } catch (caught) {
+    toast.error(toErrorMessage(caught));
+  } finally {
+    isSavingPassword.value = false;
+  }
+};
 
 const saveTimezone = async (): Promise<void> => {
   if (isSaving.value) {
@@ -152,6 +234,78 @@ const saveTimezone = async (): Promise<void> => {
     </BaseCard>
 
     <BaseCard
+      title="Sign-in details"
+      description="Your login and password. Both need the current password to change."
+    >
+      <form class="flex flex-col gap-3" @submit.prevent="saveUsername">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <BaseInput
+            v-model="username"
+            label="Login"
+            autocomplete="username"
+            hint="Letters, digits, dot, underscore and hyphen"
+            :maxlength="40"
+          />
+          <BaseInput
+            v-model="usernamePassword"
+            label="Current password"
+            type="password"
+            autocomplete="current-password"
+          />
+        </div>
+        <div>
+          <BaseButton
+            type="submit"
+            :loading="isSavingUsername"
+            :disabled="!usernameChanged || usernamePassword.length < 8"
+          >
+            Change login
+          </BaseButton>
+        </div>
+      </form>
+
+      <hr class="my-5 border-border-subtle" />
+
+      <form class="flex flex-col gap-3" @submit.prevent="savePassword">
+        <BaseInput
+          v-model="currentPassword"
+          label="Current password"
+          type="password"
+          autocomplete="current-password"
+        />
+        <div class="grid gap-3 sm:grid-cols-2">
+          <BaseInput
+            v-model="newPassword"
+            label="New password"
+            type="password"
+            autocomplete="new-password"
+            hint="At least 8 characters"
+          />
+          <BaseInput
+            v-model="confirmPassword"
+            label="Repeat the new password"
+            type="password"
+            autocomplete="new-password"
+            :error="passwordMismatch ? 'The two passwords do not match' : null"
+          />
+        </div>
+        <div>
+          <BaseButton
+            type="submit"
+            :loading="isSavingPassword"
+            :disabled="
+              currentPassword.length < 8 ||
+              newPassword.length < 8 ||
+              newPassword !== confirmPassword
+            "
+          >
+            Change password
+          </BaseButton>
+        </div>
+      </form>
+    </BaseCard>
+
+    <BaseCard
       title="Time zone"
       description="Reminders are scheduled against this, so it belongs to your account"
     >
@@ -161,6 +315,13 @@ const saveTimezone = async (): Promise<void> => {
         </div>
         <BaseButton :loading="isSaving" @click="saveTimezone">Save</BaseButton>
       </div>
+    </BaseCard>
+
+    <BaseCard
+      title="Connections"
+      description="iCloud Mail, Notion and anything else this account has connected"
+    >
+      <IntegrationControls />
     </BaseCard>
 
     <BaseCard title="Appearance" description="Stored in this browser only">

@@ -1,4 +1,5 @@
 import { config } from '../../../config/index.js';
+import { createLogger } from '../../../core/logger/logger.js';
 import { BILLZ_ENDPOINTS } from '../client/billz-endpoints.js';
 import { BillzError } from '../client/billz-error.js';
 import type { BillzHttpClient } from '../client/billz-http-client.js';
@@ -89,9 +90,47 @@ export class BillzSalesService {
       .filter((order) => order.deleted !== true)
       .map((order) => mapSale(order));
 
-    return { items, total: page.total || items.length };
+    // The scope is asked for *and* enforced. `shop_ids` in the request is what
+    // keeps it small; this is what makes it true. A report that widened because
+    // an upstream filter was renamed, ignored on one endpoint version or served
+    // from a cache would put another shop's receipts in this shop's takings,
+    // with a plausible total and nothing on screen to say so — so the verdict
+    // is taken from each receipt's own shop, which cannot be a filtering
+    // mistake.
+    const inScope =
+      shopIds.length === 0
+        ? items
+        : items.filter(
+            (sale) => sale.shopExternalId !== null && shopIds.includes(sale.shopExternalId),
+          );
+
+    // A receipt with no shop on it is excluded, because it cannot be shown to
+    // belong here — but never silently: under-reporting a day's takings is its
+    // own kind of wrong, and this is the line that makes it findable.
+    const unattributed = items.filter((sale) => sale.shopExternalId === null).length;
+
+    if (shopIds.length > 0 && unattributed > 0) {
+      createLogger('billz').warn(
+        { from: query.from, to: query.to, unattributed },
+        'Billz returned receipts with no shop id; they are excluded from a shop-scoped read',
+      );
+    }
+
+    // `count` is Billz's tally for the whole query; once rows have been dropped
+    // it no longer describes what came back.
+    return { items: inScope, total: inScope.length };
   }
 
+  /**
+   * One receipt by its Billz id.
+   *
+   * Billz will hand over any receipt in the company, so the scope has to be
+   * applied *after* the read: `/v2/order/{id}` takes no `shop_ids`. A receipt
+   * from a shop outside `BILLZ_SHOP_IDS` is reported as not found rather than
+   * as forbidden, because as far as this deployment is concerned it is not
+   * there — and saying "that belongs to another shop" would confirm the id
+   * exists to whoever guessed it.
+   */
   async getSale(externalId: string): Promise<BillzSale> {
     const response = await this.client.request<BillzOrderResponse>(
       BILLZ_ENDPOINTS.order(externalId),
@@ -104,7 +143,19 @@ export class BillzSalesService {
       });
     }
 
-    return mapSale(raw);
+    const sale = mapSale(raw);
+    const scope = config.integrations.billz.shopIds;
+
+    if (
+      scope.length > 0 &&
+      (sale.shopExternalId === null || !scope.includes(sale.shopExternalId))
+    ) {
+      throw new BillzError('not_found', `Billz has no order ${externalId}`, {
+        endpoint: BILLZ_ENDPOINTS.order(externalId),
+      });
+    }
+
+    return sale;
   }
 
   /**

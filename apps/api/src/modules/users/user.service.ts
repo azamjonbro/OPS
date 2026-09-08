@@ -251,6 +251,59 @@ export const setUserStatus = async (
 };
 
 /**
+ * Renaming a login.
+ *
+ * The same rule as a password change: your own account needs the current
+ * password, somebody else's needs the role that manages staff. The uniqueness
+ * check is here as well as on the index so the caller gets a 409 that names the
+ * username rather than a driver error.
+ */
+export const changeUsername = async (
+  actor: AuthenticatedUser,
+  id: string,
+  input: { username: string; currentPassword?: string | undefined },
+): Promise<UserDocument> => {
+  const isSelf = id === actor.id;
+
+  if (!isSelf) {
+    assertRole(actor, MANAGE_ROLE);
+  }
+
+  const user = await userRepository.findByIdWithSecret(id);
+
+  if (!user) {
+    throw ApiError.notFound('Employee not found');
+  }
+
+  assertVisible(actor, user);
+
+  if (isSelf) {
+    if (!input.currentPassword) {
+      throw ApiError.badRequest('The current password is required');
+    }
+
+    if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
+      throw ApiError.badRequest('The current password is incorrect');
+    }
+  } else {
+    assertMayAssignRole(actor, user.role);
+  }
+
+  // A no-op rename must not report the account's own login as taken.
+  if (input.username !== user.username && (await userRepository.usernameExists(input.username))) {
+    throw ApiError.conflict(`Username "${input.username}" is already taken`);
+  }
+
+  const updated = await userRepository.updateById(id, { username: input.username });
+
+  if (!updated) {
+    throw ApiError.notFound('Employee not found');
+  }
+
+  return stripSecret(updated);
+};
+
+/**
  * Users change their own password by proving the current one; an admin can
  * reset someone else's without it, which is what a forgotten password needs.
  */

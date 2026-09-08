@@ -35,6 +35,7 @@ const form = reactive({
   authMethod: 'none' as McpAuthMethod,
   authHeaderName: '',
   secret: '',
+  email: '',
 });
 
 /** Every dialog opening starts clean; a token must not survive a cancel. */
@@ -52,8 +53,15 @@ watch(open, (isOpen) => {
     authMethod: 'none',
     authHeaderName: '',
     secret: '',
+    email: '',
   });
 });
+
+/**
+ * The one provider that needs an address as well as a secret: an app-specific
+ * password says nothing about which mailbox it opens.
+ */
+const needsEmail = computed(() => chosen.value?.provider === 'icloud_mail');
 
 const needsSecret = computed(() => {
   if (!chosen.value) {
@@ -73,6 +81,10 @@ const canSubmit = computed(() => {
   }
 
   if (needsSecret.value && form.secret.trim().length === 0) {
+    return false;
+  }
+
+  if (needsEmail.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     return false;
   }
 
@@ -114,6 +126,7 @@ const submit = (): void => {
     ...(provider.authMethods.length > 0 ? { authMethod: form.authMethod } : {}),
     ...(form.authMethod === 'header' ? { authHeaderName: form.authHeaderName.trim() } : {}),
     ...(needsSecret.value ? { secret: form.secret } : {}),
+    ...(needsEmail.value ? { options: { email: form.email.trim().toLowerCase() } } : {}),
   });
 };
 
@@ -256,8 +269,22 @@ const AUTH_LABELS: Record<McpAuthMethod, string> = {
         />
       </label>
 
+      <label v-if="needsEmail" class="flex flex-col gap-1">
+        <span class="text-xs font-medium uppercase tracking-wide text-ink-500">Apple ID</span>
+        <input
+          v-model="form.email"
+          required
+          type="email"
+          autocomplete="email"
+          :class="fieldClasses"
+          placeholder="name@icloud.com"
+        />
+      </label>
+
       <label v-if="needsSecret" class="flex flex-col gap-1">
-        <span class="text-xs font-medium uppercase tracking-wide text-ink-500">Token</span>
+        <span class="text-xs font-medium uppercase tracking-wide text-ink-500">
+          {{ needsEmail ? 'App-specific password' : 'Token' }}
+        </span>
         <!--
           `type="password"`, autocomplete off: a token is not a password the
           browser should offer to remember, and it is never sent back to this
@@ -269,7 +296,7 @@ const AUTH_LABELS: Record<McpAuthMethod, string> = {
           type="password"
           autocomplete="off"
           :class="fieldClasses"
-          placeholder="••••••••"
+          :placeholder="needsEmail ? 'abcd-efgh-ijkl-mnop' : '••••••••'"
         />
         <span class="text-xs text-ink-500">
           Stored encrypted. Hadiya never shows it again and never sends it anywhere but the service

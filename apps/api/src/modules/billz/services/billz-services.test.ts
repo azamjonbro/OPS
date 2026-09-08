@@ -1,6 +1,7 @@
 import { pino } from 'pino';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { config } from '../../../config/index.js';
 import { BillzHttpClient } from '../client/billz-http-client.js';
 import {
   billzProductFixtures,
@@ -448,5 +449,173 @@ describe('expenses', () => {
   it('says plainly that Billz will not expose them to an API key', () => {
     // An empty list would read as "no expenses", which is a different claim.
     expect(() => services.finance.listExpenses()).toThrowError(/interactive user session/i);
+  });
+});
+
+/**
+ * The shop scope, which is the difference between "today's takings" and
+ * "today's takings across every business on this Billz account".
+ *
+ * One account here holds Store Hadiya and two Swiss Watch shops, and a report
+ * that quietly added the other two was the bug this exists to prevent. So the
+ * scope is checked at every door: the request Billz is sent, the rows that come
+ * back, a receipt fetched by id, and the shop directory the assistant reads to
+ * decide what a "branch" even is.
+ */
+describe('the configured shop scope', () => {
+  const HADIYA = 'shop-1';
+  const OTHER = 'shop-swiss';
+
+  /** Runs a case with `BILLZ_SHOP_IDS` set, and restores it afterwards. */
+  const withScope = async <TResult>(
+    shopIds: string[],
+    run: () => Promise<TResult>,
+  ): Promise<TResult> => {
+    const previous = config.integrations.billz.shopIds;
+
+    config.integrations.billz.shopIds = shopIds;
+
+    try {
+      return await run();
+    } finally {
+      config.integrations.billz.shopIds = previous;
+    }
+  };
+
+  /** Two receipts on one day, one from each business. */
+  const mixedDay = {
+    count: 2,
+    orders_sorted_by_date_list: [
+      {
+        date: '2026-09-08',
+        orders: [
+          {
+            id: 'hadiya-1',
+            order_type: 'SALE',
+            deleted: false,
+            order_detail: {
+              total_price: 24_000,
+              shop_id: HADIYA,
+              shop: { id: HADIYA, name: 'Store Hadiya' },
+              order_items: [],
+              order_payments: [],
+            },
+          },
+          {
+            id: 'swiss-1',
+            order_type: 'SALE',
+            deleted: false,
+            order_detail: {
+              total_price: 9_000_000,
+              shop_id: OTHER,
+              shop: { id: OTHER, name: 'Swiss Watch Toshkent' },
+              order_items: [],
+              order_payments: [],
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  it('asks Billz for the configured shops only', async () => {
+    const { services, double } = buildServices([{ body: mixedDay }]);
+
+    await withScope([HADIYA], () =>
+      services.sales.listSales({ from: '2026-09-08', to: '2026-09-08' }),
+    );
+
+    expect(double.callsTo('/v3/order-search')[0]?.url).toContain(`shop_ids=${HADIYA}`);
+  });
+
+  it('drops another shop’s receipt even when Billz returns it anyway', async () => {
+    const { services } = buildServices([{ body: mixedDay }]);
+
+    const { items, total } = await withScope([HADIYA], () =>
+      services.sales.listSales({ from: '2026-09-08', to: '2026-09-08' }),
+    );
+
+    // The filter Billz was sent is not the guarantee; this is.
+    expect(items.map((sale) => sale.externalId)).toEqual(['hadiya-1']);
+    // And the total describes what came back, not what Billz counted.
+    expect(total).toBe(1);
+  });
+
+  it('lets a caller narrow the scope but never widen it', async () => {
+    const { services, double } = buildServices([{ body: mixedDay }]);
+
+    await withScope([HADIYA], () =>
+      services.sales.listSales({ from: '2026-09-08', to: '2026-09-08', shopIds: [OTHER] }),
+    );
+
+    // Asking for a shop outside the scope leaves nothing to ask Billz for, so
+    // no shop filter is sent — and the row filter is what refuses the request.
+    const url = double.callsTo('/v3/order-search')[0]?.url ?? '';
+
+    expect(url).not.toContain(OTHER);
+  });
+
+  it('reports a receipt from another shop as not found', async () => {
+    const { services } = buildServices([
+      {
+        body: {
+          order: {
+            id: 'swiss-1',
+            order_type: 'SALE',
+            order_detail: { total_price: 9_000_000, shop_id: OTHER, shop: { id: OTHER } },
+          },
+        },
+      },
+    ]);
+
+    await expect(withScope([HADIYA], () => services.sales.getSale('swiss-1'))).rejects.toThrow(
+      /no order swiss-1/i,
+    );
+  });
+
+  it('hands back a receipt from the configured shop', async () => {
+    const { services } = buildServices([
+      {
+        body: {
+          order: {
+            id: 'hadiya-1',
+            order_type: 'SALE',
+            order_detail: { total_price: 24_000, shop_id: HADIYA, shop: { id: HADIYA } },
+          },
+        },
+      },
+    ]);
+
+    const sale = await withScope([HADIYA], () => services.sales.getSale('hadiya-1'));
+
+    expect(sale.externalId).toBe('hadiya-1');
+  });
+
+  it('lists only the shops in scope, so nothing else is offered as a branch', async () => {
+    const shops = {
+      count: 3,
+      shops: [
+        { id: HADIYA, name: 'Store Hadiya' },
+        { id: OTHER, name: 'Swiss Watch Toshkent' },
+        { id: 'shop-swiss-2', name: 'Swiss Watch Namangan' },
+      ],
+    };
+
+    const { services } = buildServices([{ body: shops }]);
+
+    const { items, total } = await withScope([HADIYA], () => services.directory.listShops());
+
+    expect(items.map((shop) => shop.name)).toEqual(['Store Hadiya']);
+    expect(total).toBe(1);
+  });
+
+  it('still reads the whole company when no scope is configured', async () => {
+    const { services } = buildServices([{ body: mixedDay }]);
+
+    const { items } = await withScope([], () =>
+      services.sales.listSales({ from: '2026-09-08', to: '2026-09-08' }),
+    );
+
+    expect(items).toHaveLength(2);
   });
 });

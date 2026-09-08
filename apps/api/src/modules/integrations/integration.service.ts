@@ -218,7 +218,8 @@ export const updateIntegration = async (
     input.transport !== undefined ||
     input.authMethod !== undefined ||
     input.authHeaderName !== undefined ||
-    input.secret !== undefined;
+    input.secret !== undefined ||
+    input.options !== undefined;
 
   const prepared = touchesConnection
     ? adapter.prepare({ ...input, name: input.name ?? existing.name }, existing)
