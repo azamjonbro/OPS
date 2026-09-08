@@ -97,7 +97,7 @@ export const TOOL_CATEGORIES = [
 export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
 
 /** Where a tool came from, kept on every call so provenance survives the turn. */
-export const TOOL_SOURCES = ['native', 'billz', 'notion', 'mcp'] as const;
+export const TOOL_SOURCES = ['native', 'billz', 'notion', 'icloud_mail', 'mcp'] as const;
 
 export type ToolSource = (typeof TOOL_SOURCES)[number];
 

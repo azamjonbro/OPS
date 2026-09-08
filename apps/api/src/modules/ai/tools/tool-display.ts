@@ -266,6 +266,17 @@ const LABELS: Record<string, ToolDisplayLabels> = {
     runningLabel: 'Reading the Notion page',
     doneLabel: 'Read the Notion page',
   },
+
+  'icloud_mail_search': {
+    displayName: 'Mail',
+    runningLabel: 'Searching the mailbox',
+    doneLabel: 'Searched the mailbox',
+  },
+  'icloud_mail_read': {
+    displayName: 'Message',
+    runningLabel: 'Reading the message',
+    doneLabel: 'Read the message',
+  },
 };
 
 /** `search_customers` becomes `Search customers`. */
