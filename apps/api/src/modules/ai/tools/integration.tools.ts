@@ -9,8 +9,10 @@ import {
   isMcpError,
   listUsableIntegrations,
   McpToolNotAllowedError,
+  readIcloudMessage,
   readNotionPage,
   recordBlockedCall,
+  searchIcloudMail,
   searchNotion,
   withSecret,
   type IntegrationDocument,
@@ -28,10 +30,10 @@ const log = createLogger('integration-tools');
  * means by the agent not knowing how Billz, Notion or MCP work: the knowledge
  * stops here, one layer below the model.
  *
- * Two kinds of tool are built. Notion's are written by hand, because Hadiya
- * knows what a Notion page is and can describe it to a model properly. MCP's
- * are generated from whatever the server advertised, because Hadiya does not
- * know and must not pretend to.
+ * Two kinds of tool are built. The native ones — Notion's, iCloud Mail's — are
+ * written by hand, because Hadiya knows what a Notion page and an email are and
+ * can describe them to a model properly. MCP's are generated from whatever the
+ * server advertised, because Hadiya does not know and must not pretend to.
  */
 
 /**
@@ -153,6 +155,148 @@ const notionTools = (integration: IntegrationDocument): RegisteredTool[] => {
         return {
           summary: asUntrustedData('Notion', `# ${page.title}\n${page.text}`),
           data: { title: page.title },
+        };
+      },
+    }),
+  ];
+};
+
+/* -------------------------------------------------------------------------- */
+/* iCloud Mail                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** How much of one message the model is given. */
+const MAIL_BODY_CHARACTERS = 6_000;
+
+/**
+ * A mailbox the assistant can read, and only read.
+ *
+ * Both tools are searches in the end: one over the mailbox, one over a single
+ * message. Nothing here can send, reply, move or delete, and that is a property
+ * of the client rather than a promise made in a description — it speaks only
+ * the read half of IMAP.
+ *
+ * The split between them is deliberate. A person asking "what did Amiran and I
+ * agree about the order" wants an answer drawn from two or three messages, not
+ * twenty; searching returns headers so the model can choose, and only the
+ * chosen message is read. That keeps a mailbox from arriving in a context
+ * window wholesale, which matters for cost, for the quality of the answer, and
+ * for how much of somebody's private correspondence any single question moves.
+ */
+const icloudMailTools = (integration: IntegrationDocument): RegisteredTool[] => {
+  const integrationId = String(integration._id);
+  const email = typeof integration.options?.email === 'string' ? integration.options.email : '';
+
+  const provenanceFor = (externalName: string): ToolProvenance => ({
+    source: 'icloud_mail',
+    integrationId,
+    integrationName: integration.name,
+    externalName,
+  });
+
+  const usePassword = <TResult>(
+    actor: AuthenticatedUser,
+    run: (password: string) => Promise<TResult>,
+  ): Promise<TResult> =>
+    withSecret({ integrationId, userId: actor.id, purpose: CREDENTIAL_PURPOSE.token }, run);
+
+  return [
+    defineTool({
+      name: 'icloud_mail_search',
+      description: `Search the person's own iCloud mailbox (${email}) and return the matching messages' sender, subject and date, newest first. This is the tool for anything about email: what someone wrote, what was agreed by mail, whether a message arrived. Give whichever of the fields you know; they narrow the search together.`,
+      schema: z.object({
+        from: z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .describe('Sender — a name or an address, or part of one'),
+        to: z.string().trim().max(120).optional().describe('Recipient — a name or an address'),
+        subject: z.string().trim().max(120).optional().describe('Words in the subject line'),
+        text: z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .describe('Words anywhere in the message, headers or body'),
+        since: z
+          .string()
+          .trim()
+          .max(10)
+          .optional()
+          .describe('Only messages on or after YYYY-MM-DD'),
+        before: z.string().trim().max(10).optional().describe('Only messages before YYYY-MM-DD'),
+        limit: z.number().int().min(1).max(25).default(10),
+      }),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      provenance: provenanceFor('search'),
+      execute: async (args, context) => {
+        const headers = await usePassword(context.actor, (password) =>
+          searchIcloudMail(
+            email,
+            password,
+            {
+              from: args.from,
+              to: args.to,
+              subject: args.subject,
+              text: args.text,
+              since: args.since,
+              before: args.before,
+            },
+            args.limit,
+          ),
+        );
+
+        if (headers.length === 0) {
+          return { summary: 'No message in the inbox matches that.' };
+        }
+
+        const lines = headers.map(
+          (header) =>
+            `- ${header.date} — from ${header.from} — ${header.subject} [id ${header.uid}]`,
+        );
+
+        return {
+          summary: asUntrustedData('iCloud Mail', lines.join('\n')),
+          data: { messages: headers },
+        };
+      },
+    }),
+    defineTool({
+      name: 'icloud_mail_read',
+      description:
+        'Read the text of one message from the mailbox. Call icloud_mail_search first to find its id; do not guess one.',
+      schema: z.object({
+        messageId: z.number().int().min(1).describe('The message id from icloud_mail_search'),
+      }),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      // The id comes from a search, exactly as a Notion page id does.
+      dependsOn: ['icloud_mail_search'],
+      provenance: provenanceFor('read'),
+      execute: async (args, context) => {
+        const message = await usePassword(context.actor, (password) =>
+          readIcloudMessage(email, password, args.messageId, MAIL_BODY_CHARACTERS),
+        );
+
+        const body = [
+          `From: ${message.from}`,
+          `To: ${message.to}`,
+          `Date: ${message.date}`,
+          `Subject: ${message.subject}`,
+          '',
+          message.text,
+          message.truncated ? '\n[the message is longer than this]' : '',
+        ]
+          .join('\n')
+          .trimEnd();
+
+        return {
+          summary: asUntrustedData('iCloud Mail', body),
+          data: { subject: message.subject, truncated: message.truncated },
         };
       },
     }),
@@ -300,8 +444,9 @@ const toRegisteredMcpTool = (
  *
  *  - `listUsableIntegrations` returns only this actor's, and only those both
  *    enabled and connected.
- *  - A Notion integration without a stored credential is skipped, so a
- *    disconnected one does not offer a tool that would fail on every call.
+ *  - A Notion or iCloud Mail integration without a stored credential is
+ *    skipped, so a disconnected one does not offer a tool that would fail on
+ *    every call.
  *  - Only `enabled` and `requires_confirmation` tools are built. `disabled` and
  *    `blocked` ones are never mentioned to the model at all — the strongest
  *    form of "the AI must not execute it" is that it never learns the tool
@@ -319,6 +464,14 @@ export const buildIntegrationTools = async (
     if (integration.provider === 'notion') {
       if (await hasSecret(String(integration._id), CREDENTIAL_PURPOSE.token)) {
         tools.push(...notionTools(integration));
+      }
+
+      continue;
+    }
+
+    if (integration.provider === 'icloud_mail') {
+      if (await hasSecret(String(integration._id), CREDENTIAL_PURPOSE.token)) {
+        tools.push(...icloudMailTools(integration));
       }
 
       continue;

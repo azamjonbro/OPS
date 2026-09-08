@@ -256,15 +256,26 @@ const LABELS: Record<string, ToolDisplayLabels> = {
     doneLabel: 'Image created',
   },
 
-  'notion_search': {
+  notion_search: {
     displayName: 'Notion',
     runningLabel: 'Searching Notion',
     doneLabel: 'Searched Notion',
   },
-  'notion_read_page': {
+  notion_read_page: {
     displayName: 'Notion page',
     runningLabel: 'Reading the Notion page',
     doneLabel: 'Read the Notion page',
+  },
+
+  icloud_mail_search: {
+    displayName: 'Mail',
+    runningLabel: 'Searching the mailbox',
+    doneLabel: 'Searched the mailbox',
+  },
+  icloud_mail_read: {
+    displayName: 'Message',
+    runningLabel: 'Reading the message',
+    doneLabel: 'Read the message',
   },
 };
 
