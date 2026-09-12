@@ -152,7 +152,9 @@ const toPromptMessage = (message: MessageDocument): AiPromptMessage => ({
         toolCalls: message.toolCalls.map((call) => ({
           callId: call.callId,
           name: call.name,
-          arguments: call.arguments,
+          // Messages saved before the schema kept empty objects have no
+          // `arguments` at all; the provider needs `{}`, not a missing field.
+          arguments: call.arguments ?? {},
         })),
       }
     : {}),

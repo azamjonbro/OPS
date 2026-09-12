@@ -102,7 +102,13 @@ const toAnthropicMessages = (
     }
 
     for (const call of message.toolCalls ?? []) {
-      blocks.push({ type: 'tool_use', id: call.callId, name: call.name, input: call.arguments });
+      blocks.push({
+        type: 'tool_use',
+        id: call.callId,
+        name: call.name,
+        // Same guard as the OpenAI mapper: `input` is required, even when empty.
+        input: call.arguments ?? {},
+      });
     }
 
     push(message.role === 'assistant' ? 'assistant' : 'user', blocks);

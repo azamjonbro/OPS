@@ -91,6 +91,31 @@ describe('messages', () => {
     return conversationId;
   };
 
+  it('keeps a tool call with no arguments as an empty object, not a missing field', async () => {
+    const { authorization } = await signIn();
+    const conversationId = await seed(authorization, 1);
+    const [first] = await MessageModel.find({ conversation: conversationId }).lean().exec();
+
+    await MessageModel.create({
+      conversation: conversationId,
+      user: first?.user,
+      role: 'assistant',
+      content: '',
+      toolCalls: [{ callId: 'call_1', name: 'get_memory', arguments: {}, status: 'succeeded' }],
+      toolCallId: null,
+      model: null,
+      usage: null,
+    });
+
+    // Mongoose minimises `{}` away by default, and a replayed transcript with
+    // the field missing is refused by the model provider.
+    const stored = await MessageModel.findOne({ conversation: conversationId, role: 'assistant' })
+      .lean()
+      .exec();
+    expect(stored?.toolCalls[0]).toMatchObject({ arguments: {} });
+    expect(Object.keys(stored?.toolCalls[0] ?? {})).toContain('arguments');
+  });
+
   it('stores and returns a transcript oldest-first within the page', async () => {
     const { authorization } = await signIn();
     const conversationId = await seed(authorization, 3);

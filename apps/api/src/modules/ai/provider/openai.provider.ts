@@ -93,7 +93,9 @@ const toOpenAiMessage = (message: AiPromptMessage): OpenAiMessage => {
       tool_calls: message.toolCalls.map((call) => ({
         id: call.callId,
         type: 'function',
-        function: { name: call.name, arguments: JSON.stringify(call.arguments) },
+        // `JSON.stringify(undefined)` is `undefined`, which drops the key and
+        // earns a 400; the API requires a string here even for no arguments.
+        function: { name: call.name, arguments: JSON.stringify(call.arguments ?? {}) },
       })),
     };
   }

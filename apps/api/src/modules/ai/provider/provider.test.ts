@@ -144,6 +144,37 @@ describe('OpenAI provider', () => {
     expect(call?.headers.authorization).toBe('Bearer sk-test-key-never-real');
   });
 
+  it('replays a stored tool call that has no arguments as "{}", never as a missing field', async () => {
+    // A message saved before the schema kept empty objects has no `arguments`
+    // at all; OpenAI answers 400 "missing required parameter" to the whole
+    // conversation from then on. This is what took the assistant down.
+    const { provider, double } = buildOpenAi([{ body: openAiTextResponse('ok') }]);
+
+    await provider.complete({
+      messages: [
+        { role: 'user', content: 'Nimani eslaysan?' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              callId: 'call_1',
+              name: 'get_memory',
+              arguments: undefined as unknown as Record<string, unknown>,
+            },
+          ],
+        },
+        { role: 'tool', content: 'nothing yet', toolCallId: 'call_1' },
+      ],
+      tools: TOOLS,
+    });
+
+    const messages = double.calls[0]?.body.messages as Array<Record<string, unknown>>;
+    expect(messages[1]?.tool_calls).toEqual([
+      { id: 'call_1', type: 'function', function: { name: 'get_memory', arguments: '{}' } },
+    ]);
+  });
+
   it('reads a tool call with its parsed arguments', async () => {
     const { provider } = buildOpenAi([
       { body: openAiToolResponse('get_sales_summary', { from: '2026-09-04', to: '2026-09-04' }) },

@@ -52,7 +52,12 @@ const toolCallSchema = new Schema<MessageToolCallSubdocument>(
     data: { type: Schema.Types.Mixed, default: null },
     durationMs: { type: Number, default: null },
   },
-  { _id: false },
+  // `minimize: false` because Mongoose otherwise drops an empty object on save,
+  // and a tool called with no arguments — `get_memory`, `list_reminders` — has
+  // exactly that. Replayed to a provider without the field, the turn is
+  // rejected (OpenAI: "missing required parameter ... function.arguments"),
+  // and every later message in the conversation fails with it.
+  { _id: false, minimize: false },
 );
 
 const usageSchema = new Schema<NonNullable<MessageDocument['usage']>>(
