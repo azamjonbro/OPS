@@ -94,7 +94,9 @@ describe('where signing in lands', () => {
     signedIn();
     const router = createAppRouter();
 
-    for (const gone of ['/products', '/sales', '/inventory', '/customers', '/expenses', '/pos']) {
+    // Expenses are absent from this list on purpose: Billz will not share
+    // them, so that ledger is Hadiya's own and has a screen.
+    for (const gone of ['/products', '/sales', '/inventory', '/customers', '/pos']) {
       await router.push(gone);
 
       expect(router.currentRoute.value.name).toBe('not-found');

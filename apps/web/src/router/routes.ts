@@ -54,6 +54,14 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Do‘kon holati', requiresAuth: true },
       },
       {
+        // The ledger Billz will not show us. Costs are written here, by hand
+        // or by the assistant, and the dashboard subtracts them from takings.
+        path: 'expenses',
+        name: 'expenses',
+        component: () => import('@/pages/ExpensesPage.vue'),
+        meta: { title: 'Xarajatlar', requiresAuth: true },
+      },
+      {
         // Signing in lands on the assistant, not on a menu of screens: the
         // first thing Hadiya should offer is a question box.
         path: '',

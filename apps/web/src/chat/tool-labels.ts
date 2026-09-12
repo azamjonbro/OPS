@@ -53,6 +53,12 @@ const LABELS: Record<string, ToolLabel> = {
     done: 'Read the payment methods',
   },
 
+  expenses_record: { running: 'Writing down the expense', done: 'Expense recorded' },
+  expenses_list: { running: 'Reading the expense ledger', done: 'Read the expense ledger' },
+  expenses_get_summary: { running: 'Totalling the expenses', done: 'Totalled the expenses' },
+  expenses_update: { running: 'Correcting the expense', done: 'Expense corrected' },
+  expenses_delete: { running: 'Removing the expense', done: 'Expense removed' },
+
   remember_information: { running: 'Saving what you told me', done: 'Remembered' },
   get_memory: { running: 'Recalling what I know', done: 'Checked what I remember' },
   forget_information: { running: 'Forgetting that', done: 'Forgotten' },

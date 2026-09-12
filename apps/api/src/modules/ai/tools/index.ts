@@ -4,6 +4,7 @@ import { createLogger } from '../../../core/logger/logger.js';
 import { createBillzTools } from './billz.tools.js';
 import { createAnalyticsTools } from '../../analytics/analytics.tools.js';
 import { ALERT_TOOLS } from '../../alerts/alert.tools.js';
+import { EXPENSE_TOOLS } from '../../expenses/expense.tools.js';
 import { FILE_TOOLS } from '../../files/file.tools.js';
 import { CONTENT_TOOLS } from './content.tools.js';
 import { IMAGE_TOOLS } from './image.tools.js';
@@ -33,6 +34,10 @@ import {
  * they read the same capability layer and turn it into figures, trends and
  * findings, so the assistant can say what changed rather than only what is.
  *
+ * The expense tools are the one place the assistant writes business figures
+ * rather than reads them, because Billz will not share its expense ledger and
+ * a cost nobody can record is a cost nobody can subtract.
+ *
  * Order matters only for how the list reads to a person; the model picks by
  * name and description, never by position.
  */
@@ -46,6 +51,7 @@ export const createToolRegistry = (): ToolRegistry => {
     ...IMAGE_TOOLS,
     ...createBillzTools(),
     ...createAnalyticsTools(),
+    ...EXPENSE_TOOLS,
     ...ALERT_TOOLS,
     ...FILE_TOOLS,
   ]) {

@@ -1,6 +1,7 @@
 import { sendSuccess } from '../../core/http/api-response.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import { requireActor } from '../../core/security/actor.js';
+import { summariseExpenses } from '../expenses/expense.service.js';
 import { getInventoryAnalysis, getSummary, getTopProducts } from './analytics.service.js';
 import type { dashboardQuerySchema } from './analytics.validators.js';
 import { resolvePeriod } from './period.js';
@@ -15,11 +16,12 @@ import { resolvePeriod } from './period.js';
  * the tiles arriving one after another, which reads as a slow product even when
  * the numbers are identical.
  *
- * What is *not* here is as deliberate. There is no gross-profit figure, because
- * no cost of goods reaches this deployment — Billz refuses the API token the
- * transaction endpoint it would come from. A screen that showed a margin
- * derived from revenue alone would be inventing one, so the tile stays absent
- * until an expense source exists.
+ * The expense ledger is read over the same window and taken off the net sales.
+ * That difference is deliberately not called a profit. A gross margin needs the
+ * cost of each unit sold, which Billz keeps behind an endpoint the API token
+ * is refused; what the ledger holds is whatever somebody wrote down, and the
+ * figure is named for exactly that so the screen cannot promise more than the
+ * data does.
  */
 export const dashboard: ValidatedHandler<{ query: typeof dashboardQuerySchema }> = async (
   req,
@@ -30,10 +32,11 @@ export const dashboard: ValidatedHandler<{ query: typeof dashboardQuerySchema }>
 
   const period = resolvePeriod({ key, timezone: actor.timezone, from, to });
 
-  const [summary, topProducts, inventory] = await Promise.all([
+  const [summary, topProducts, inventory, expenses] = await Promise.all([
     getSummary(actor, period, { compare: true }),
     getTopProducts(actor, period, topLimit),
     getInventoryAnalysis(actor, period, { lowStockThreshold, limit: topLimit }),
+    summariseExpenses(actor, period),
   ]);
 
   sendSuccess(req, res, {
@@ -46,6 +49,8 @@ export const dashboard: ValidatedHandler<{ query: typeof dashboardQuerySchema }>
     lowStock: inventory.lowStock,
     slowMoving: inventory.slowMoving,
     stock: { totalUnits: inventory.totalUnits, totalValue: inventory.totalValue },
+    expenses,
+    netAfterExpenses: summary.metrics.netSales - expenses.total,
     dataQuality: summary.dataQuality,
   });
 };

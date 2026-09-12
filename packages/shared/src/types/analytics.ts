@@ -3,6 +3,7 @@ import type {
   InsightSeverity,
   TrendDirection,
 } from '../constants/analytics.js';
+import type { ExpenseSummary } from './expense.js';
 
 /**
  * The shapes analytics answers in.
@@ -211,10 +212,13 @@ export interface AnalyticsStockRow {
  * all of it comes from one window of receipts: fetching that window once is the
  * difference between a screen that appears and a screen that fills in.
  *
- * There is no margin or profit figure here, and its absence is a fact about the
- * data rather than an omission. Cost of goods lives behind a Billz endpoint the
- * API token is refused (`/v1/gl-transaction`, 403), so any margin this could
- * report would be invented.
+ * There is still no gross margin here, and its absence is a fact about the
+ * data rather than an omission. A margin needs the cost of each unit sold, and
+ * that lives behind a Billz endpoint the API token is refused
+ * (`/v1/gl-transaction`, 403). What *is* here is what the shop recorded in its
+ * own expense ledger over the same days, and the takings with that spending
+ * taken off. That figure is neither gross nor net profit and is not named as
+ * either: it is the money left after the costs somebody wrote down.
  */
 export interface AnalyticsDashboard {
   period: AnalyticsPeriod;
@@ -226,6 +230,10 @@ export interface AnalyticsDashboard {
   lowStock: AnalyticsStockRow[];
   slowMoving: AnalyticsStockRow[];
   stock: { totalUnits: number; totalValue: number };
+  /** The expense ledger over the same window. */
+  expenses: ExpenseSummary;
+  /** Net sales minus recorded expenses. Exactly that, and nothing more. */
+  netAfterExpenses: number;
   dataQuality: AnalyticsDataQuality;
 }
 

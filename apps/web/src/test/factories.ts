@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   ChatResponse,
   Conversation,
+  Expense,
   Memory,
   Message,
   MessageToolCall,
@@ -62,6 +63,24 @@ export const makeUser = (overrides: Partial<User> = {}): User => ({
   branch: null,
   timezone: 'Asia/Tashkent',
   lastLoginAt: null,
+  ...timestamps(),
+  ...overrides,
+});
+
+export const makeExpense = (overrides: Partial<Expense> = {}): Expense => ({
+  id: objectId(),
+  branch: null,
+  category: 'rent',
+  // 3 000 000 so'm, in tiyin.
+  amount: 300_000_000,
+  currency: 'UZS',
+  date: '2026-09-05',
+  paymentMethod: 'cash',
+  vendor: null,
+  note: null,
+  createdBy: objectId(),
+  conversation: null,
+  deletedAt: null,
   ...timestamps(),
   ...overrides,
 });

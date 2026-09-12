@@ -8,10 +8,11 @@ import type { NavigationSection } from '@/types/navigation';
  * sidebar of its own full of conversations rather than modules.
  *
  * What is *not* here is as deliberate as what is. There are no screens for
- * products, sales, stock, customers or expenses. Billz owns all of that and the
+ * products, sales, stock or customers. Billz owns all of that and the
  * assistant reads it live, so a screen here would be a second, staler view of
  * somebody else's data — and a menu of twenty such screens would say the chat
- * is one feature among many.
+ * is one feature among many. Expenses are the exception because Billz refuses
+ * to share them: the ledger has to live somewhere, and this is where.
  *
  * So this is the back office and nothing more: what the assistant produced,
  * what it knows, what it is connected to, and the account it acts as.
@@ -29,6 +30,12 @@ export const settingsSections: NavigationSection[] = [
         module: 'reports',
         to: { name: 'dashboard' },
         icon: 'M4 19V9M10 19V5M16 19v-7M22 19H2',
+      },
+      {
+        label: 'Xarajatlar',
+        module: 'expenses',
+        to: { name: 'expenses' },
+        icon: 'M3 6h18v12H3zM3 10h18M7 15h3',
       },
     ],
   },

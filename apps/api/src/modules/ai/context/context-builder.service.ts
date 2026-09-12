@@ -94,6 +94,10 @@ export const buildSystemPrompt = (
     // Content work is where a model is most tempted to invent a product or a
     // price, and where the tools it needs are least obvious from the request.
     'For content work, base posts on real products and figures: read them with billz_get_products or billz_get_sales_summary first and pass what you found as businessContext. Never invent a product, a price or a discount.',
+    // Billz holds the takings and refuses to share the costs, so the ledger of
+    // what was spent lives in Hadiya. Without this line the model looks for
+    // expenses in Billz, finds none, and reports a shop with no costs.
+    'Expenses are recorded in Hadiya, not in Billz: when the user says they paid or spent something, record it with expenses_record, and answer questions about spending from expenses_get_summary. Takings minus recorded expenses is not a gross margin; say which it is.',
   ];
 
   if (config.app.businessName !== null) {

@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import type { AnalyticsDashboard, AnalyticsPeriodKey } from '@hadiya/shared';
+import {
+  EXPENSE_CATEGORY_LABELS,
+  formatMoney,
+  type AnalyticsDashboard,
+  type AnalyticsPeriodKey,
+} from '@hadiya/shared';
 import { computed, onMounted, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { analyticsService } from '@/services/analytics.service';
@@ -47,11 +53,9 @@ const load = async (): Promise<void> => {
 onMounted(load);
 watch(period, load);
 
-/** Whole sums only: a shop's takings in tiyin help nobody read a tile. */
+/** Figures arrive in tiyin; the tile shows so'm. */
 const money = (value: number): string =>
-  `${new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(Math.round(value))} ${
-    data.value?.currency ?? 'UZS'
-  }`;
+  formatMoney(value, { currency: data.value?.currency ?? 'UZS' });
 
 const count = (value: number): string => new Intl.NumberFormat('uz-UZ').format(value);
 
@@ -180,12 +184,44 @@ const topBrand = computed(() => data.value?.topProducts[0] ?? null);
       </BaseCard>
     </div>
 
+    <div v-if="data" class="grid gap-4 sm:grid-cols-2">
+      <BaseCard>
+        <p class="text-xs font-medium uppercase tracking-wide text-ink-500">Xarajatlar</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums text-ink-900">
+          {{ money(data.expenses.total) }}
+        </p>
+        <p class="mt-1 text-xs text-ink-500">
+          <RouterLink :to="{ name: 'expenses' }" class="underline-offset-2 hover:underline">
+            {{ count(data.expenses.count) }} ta yozuv
+          </RouterLink>
+          <template v-if="data.expenses.byCategory[0]">
+            · eng kattasi {{ EXPENSE_CATEGORY_LABELS[data.expenses.byCategory[0].category] }}
+          </template>
+        </p>
+      </BaseCard>
+
+      <BaseCard>
+        <p class="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Xarajatlardan keyin qolgan
+        </p>
+        <p
+          class="mt-1 text-2xl font-semibold tabular-nums"
+          :class="data.netAfterExpenses < 0 ? 'text-rose-700' : 'text-ink-900'"
+        >
+          {{ money(data.netAfterExpenses) }}
+        </p>
+        <!-- Not a profit figure: cost of goods sold is still unknown. -->
+        <p class="mt-1 text-xs text-ink-500">sof savdo minus yozilgan xarajatlar; foyda emas</p>
+      </BaseCard>
+    </div>
+
     <BaseCard v-if="data" title="Hali ulanmagan" description="Bu ko‘rsatkichlar uchun manba yo‘q">
       <ul class="flex flex-col gap-1 text-sm text-ink-500">
         <li>
-          <span class="font-medium text-ink-900">Yalpi foyda</span> — tannarx kerak. Billz API
-          kaliti <code class="rounded bg-border-subtle/40 px-1">/v1/gl-transaction</code> ga 403
-          qaytaradi.
+          <span class="font-medium text-ink-900">Yalpi foyda</span> — sotilgan tovar tannarxi kerak.
+          Billz API kaliti
+          <code class="rounded bg-border-subtle/40 px-1">/v1/gl-transaction</code> ga 403 qaytaradi;
+          yozilgan xarajatlar buning o‘rnini bosmaydi.
         </li>
         <li>
           <span class="font-medium text-ink-900">Marketing sarfi</span> — Meta reklama ulanmagan.

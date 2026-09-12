@@ -71,6 +71,31 @@ const LABELS: Record<string, ToolDisplayLabels> = {
     runningLabel: 'Checking what is low and what is not moving',
     doneLabel: 'Checked stock movement',
   },
+  expenses_record: {
+    displayName: 'Expense',
+    runningLabel: 'Writing down the expense',
+    doneLabel: 'Expense recorded',
+  },
+  expenses_list: {
+    displayName: 'Expenses',
+    runningLabel: 'Reading the expense ledger',
+    doneLabel: 'Read the expense ledger',
+  },
+  expenses_get_summary: {
+    displayName: 'Spending',
+    runningLabel: 'Totalling the expenses',
+    doneLabel: 'Totalled the expenses',
+  },
+  expenses_update: {
+    displayName: 'Expense',
+    runningLabel: 'Correcting the expense',
+    doneLabel: 'Expense corrected',
+  },
+  expenses_delete: {
+    displayName: 'Expense',
+    runningLabel: 'Removing the expense',
+    doneLabel: 'Expense removed',
+  },
   billz_get_sales_summary: {
     displayName: 'Sales figures',
     runningLabel: 'Reading the sales figures',

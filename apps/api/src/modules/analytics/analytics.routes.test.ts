@@ -118,10 +118,29 @@ describe('the dashboard endpoint', () => {
 
     const response = await request(app).get(url).set('Authorization', authorization);
 
-    // Billz refuses the API token its transaction endpoint, so there is no cost
-    // to subtract. The screen says so; it must never be handed a number.
+    // Billz refuses the API token its transaction endpoint, so there is no
+    // per-unit cost to subtract. The screen says so; it must never be handed a
+    // number called a margin.
     expect(response.body.data.metrics).not.toHaveProperty('grossProfit');
     expect(response.body.data).not.toHaveProperty('margin');
+  });
+
+  it('takes the recorded expenses off the net sales, and calls the result only that', async () => {
+    const { authorization } = await signInAs(app, 'manager', null);
+
+    await request(app)
+      .post('/api/v1/expenses')
+      .set('Authorization', authorization)
+      .send({ category: 'rent', amount: 500_000, date: '2026-09-06' });
+
+    const response = await request(app)
+      .get(`${url}?period=custom&from=2026-09-01&to=2026-09-30`)
+      .set('Authorization', authorization);
+
+    expect(response.status).toBe(HTTP_STATUS.OK);
+    expect(response.body.data.expenses.total).toBe(500_000);
+    expect(response.body.data.expenses.byCategory[0]).toMatchObject({ category: 'rent' });
+    expect(response.body.data.netAfterExpenses).toBe(1_200_000 - 500_000);
   });
 
   it('measures the period against the one before it', async () => {

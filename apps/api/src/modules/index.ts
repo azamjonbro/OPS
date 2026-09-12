@@ -6,6 +6,7 @@ import { branchRouter } from './branches/index.js';
 import { contentRouter } from './content/index.js';
 import { fileRouter } from './files/index.js';
 import { conversationRouter } from './conversations/index.js';
+import { expenseRouter } from './expenses/index.js';
 import { imageRouter } from './images/index.js';
 import { integrationRouter } from './integrations/index.js';
 import { memoryRouter } from './memory/index.js';
@@ -32,6 +33,12 @@ import type { ApiModule } from './module.types.js';
  * remembers, the reminders it sets, the content it writes, the images it draws,
  * and the accounts and branches that say who is asking.
  *
+ * Expenses are the one exception, and they came back for a reason. Billz keeps
+ * costs behind `/v1/gl-transaction`, which refuses the API token, so there is
+ * no live read to prefer over a local ledger — and without costs there is no
+ * answer to "qancha qoldi?". This is not a mirror of Billz; it is the ledger
+ * Billz will not show us.
+ *
  * Authentication is applied to the whole tree in `routes/index.ts`; a module
  * that needs more than a signed-in user enforces that in its service, where the
  * rule sits next to the logic it protects.
@@ -47,6 +54,7 @@ export const apiModules: ApiModule[] = [
   { name: 'reminders', basePath: '/reminders', router: reminderRouter },
   { name: 'notifications', basePath: '/notifications', router: notificationRouter },
   { name: 'alerts', basePath: '/alerts', router: alertRouter },
+  { name: 'expenses', basePath: '/expenses', router: expenseRouter },
   { name: 'reports', basePath: '/analytics', router: analyticsRouter },
   { name: 'assistant', basePath: '/ai', router: aiRouter },
   // Integrations are namespaced so a second one does not collide with a domain.
