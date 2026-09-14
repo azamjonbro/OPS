@@ -62,6 +62,15 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Xarajatlar', requiresAuth: true },
       },
       {
+        // What the assistant is told about in every conversation: documents
+        // with a category, kept apart from the attachments that come and go
+        // with one chat.
+        path: 'knowledge',
+        name: 'knowledge-base',
+        component: () => import('@/pages/KnowledgeBasePage.vue'),
+        meta: { title: 'Bilimlar bazasi', requiresAuth: true },
+      },
+      {
         // Signing in lands on the assistant, not on a menu of screens: the
         // first thing Hadiya should offer is a question box.
         path: '',

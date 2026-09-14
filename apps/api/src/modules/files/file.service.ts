@@ -6,6 +6,7 @@ import {
   type DocumentKind,
   type DocumentSearchHit,
   type DocumentSummary,
+  type FileCategory,
   type PaginatedResult,
 } from '@hadiya/shared';
 
@@ -67,6 +68,10 @@ export interface UploadInput {
   filename: string;
   contentType: string;
   data: Buffer;
+  /** Shown instead of the filename when given. */
+  title?: string | undefined;
+  /** Places the document in the knowledge base. */
+  category?: FileCategory | undefined;
 }
 
 /**
@@ -96,8 +101,9 @@ export const uploadFile = async (
 
   const created = await FileModel.create({
     user: toObjectId(actor.id),
-    displayName: validated.displayName,
+    displayName: input.title?.trim() || validated.displayName,
     kind: validated.kind,
+    category: input.category ?? null,
     contentType: DOCUMENT_STORAGE_CONTENT_TYPE[validated.kind],
     sizeBytes: input.data.byteLength,
     status: 'processing',
@@ -201,13 +207,24 @@ export const uploadFile = async (
 export interface ListFilesQuery {
   page: number;
   pageSize: number;
+  category?: FileCategory | undefined;
+  knowledgeBase?: boolean | undefined;
 }
 
 export const listFiles = async (
   actor: AuthenticatedUser,
   query: ListFilesQuery,
 ): Promise<PaginatedResult<FileDocument>> => {
-  const filter = ownedBy(actor, { status: { $ne: 'deleted' } });
+  const filter = ownedBy(actor, {
+    status: { $ne: 'deleted' },
+    ...(query.category !== undefined
+      ? { category: query.category }
+      : query.knowledgeBase === true
+        ? { category: { $ne: null } }
+        : query.knowledgeBase === false
+          ? { category: null }
+          : {}),
+  });
   const { page, pageSize, skip, limit } = resolvePagination(query);
 
   const [items, total] = await Promise.all([
@@ -229,6 +246,30 @@ export const listFiles = async (
 
   return { items, pagination: buildPaginationMeta({ page, pageSize }, total) };
 };
+
+/**
+ * The titles the assistant is told about on every turn.
+ *
+ * Only what a prompt line needs — no text, no tables — and only documents that
+ * are ready: a failed extraction has nothing to search, and naming it would
+ * invite the model to try. Bounded, because a prompt is paid for per turn and
+ * the person can always ask for the rest with files_list.
+ */
+export type KnowledgeBaseEntry = Pick<
+  FileDocument,
+  '_id' | 'displayName' | 'category' | 'kind' | 'summary'
+>;
+
+export const listKnowledgeBase = async (
+  actor: AuthenticatedUser,
+  limit: number,
+): Promise<KnowledgeBaseEntry[]> =>
+  FileModel.find(ownedBy(actor, { category: { $ne: null }, status: 'ready' }))
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select('displayName category kind summary')
+    .lean<KnowledgeBaseEntry[]>()
+    .exec();
 
 export const getFile = async (actor: AuthenticatedUser, id: string): Promise<FileDocument> => {
   const file = await FileModel.findOne(ownedBy(actor, { _id: id, status: { $ne: 'deleted' } }))

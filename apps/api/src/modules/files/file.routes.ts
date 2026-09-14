@@ -2,12 +2,11 @@ import { UPLOAD_RATE_LIMIT } from '@hadiya/shared';
 import { Router } from 'express';
 
 import { config } from '../../config/index.js';
-import { asyncHandler } from '../../core/http/async-handler.js';
 import { uploadDocument } from '../../core/http/upload.js';
 import { actorRateLimiter } from '../../core/middleware/rate-limit.js';
 import { validated } from '../../core/middleware/validate.js';
 import * as fileController from './file.controller.js';
-import { fileIdParamSchema, listFilesQuerySchema } from './file.validators.js';
+import { fileIdParamSchema, listFilesQuerySchema, uploadFieldsSchema } from './file.validators.js';
 
 /**
  * A person's own documents. Every query in the service is scoped to the actor,
@@ -28,7 +27,9 @@ fileRouter.post(
     message: 'Bir vaqtning o‘zida juda ko‘p fayl yuborildi. Biroz kuting.',
   }),
   uploadDocument(),
-  asyncHandler(fileController.upload),
+  // After multer, because that is what fills `req.body` from the multipart
+  // fields; before it, there is nothing to validate.
+  ...validated({ body: uploadFieldsSchema }, fileController.upload),
 );
 fileRouter.get('/', ...validated({ query: listFilesQuerySchema }, fileController.list));
 fileRouter.get('/:id', ...validated({ params: fileIdParamSchema }, fileController.detail));

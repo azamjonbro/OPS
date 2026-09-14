@@ -1,4 +1,4 @@
-import type { DocumentKind, FileStatus } from '../constants/files.js';
+import type { DocumentKind, FileCategory, FileStatus } from '../constants/files.js';
 import type { Entity } from './entity.js';
 
 /**
@@ -17,6 +17,11 @@ export interface BusinessFile extends Entity {
   contentType: string;
   sizeBytes: number;
   status: FileStatus;
+  /**
+   * Set for a document in the knowledge base; `null` for a chat attachment.
+   * The assistant is told about the former in every conversation.
+   */
+  category: FileCategory | null;
   /** Set when extraction failed, in words a person can act on. */
   failureReason: string | null;
   summary: DocumentSummary | null;

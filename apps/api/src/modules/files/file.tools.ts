@@ -1,4 +1,9 @@
-import { DOCUMENT_CHUNK, TABLE_QUERY_MAX_ROWS } from '@hadiya/shared';
+import {
+  DOCUMENT_CHUNK,
+  FILE_CATEGORIES,
+  TABLE_QUERY_MAX_ROWS,
+  type FileCategory,
+} from '@hadiya/shared';
 import { z } from 'zod';
 
 import type { RegisteredTool, ToolContext } from '../ai/tools/tool-registry.js';
@@ -54,11 +59,17 @@ const listTool: RegisteredTool = {
   ...base,
   name: 'files_list',
   description:
-    'Documents this user has uploaded, newest first, with their type, size and what was found in them (sheets, columns, page count). Start here when the user refers to "bu fayl" or "hisobot" without naming an id.',
-  schema: z.object({ limit: z.number().int().min(1).max(25).default(10) }),
+    'Documents this user has uploaded, newest first, with their type, size and what was found in them (sheets, columns, page count). Start here when the user refers to "bu fayl" or "hisobot" without naming an id. Knowledge-base documents carry a category; pass one to list only those.',
+  schema: z.object({
+    limit: z.number().int().min(1).max(25).default(10),
+    category: z
+      .enum(FILE_CATEGORIES)
+      .optional()
+      .describe('Only knowledge-base documents of this category'),
+  }),
   execute: async (raw, context: ToolContext) => {
-    const { limit } = raw as { limit: number };
-    const result = await listFiles(context.actor, { page: 1, pageSize: limit });
+    const { limit, category } = raw as { limit: number; category?: FileCategory };
+    const result = await listFiles(context.actor, { page: 1, pageSize: limit, category });
 
     if (result.items.length === 0) {
       return { summary: 'Bu foydalanuvchi hali fayl yuklamagan.', data: result };
@@ -78,7 +89,9 @@ const listTool: RegisteredTool = {
             ? `${file.summary.pageCount} page(s)`
             : `${file.summary?.textChars ?? 0} characters`;
 
-      return `${file.displayName} (${file.kind}, ${file.status}) — ${shape} [id ${String(file._id)}]`;
+      const tag = file.category ? `${file.category}: ` : '';
+
+      return `${tag}${file.displayName} (${file.kind}, ${file.status}) — ${shape} [id ${String(file._id)}]`;
     });
 
     // The *shape* of a document is metadata and safe to state plainly. Its

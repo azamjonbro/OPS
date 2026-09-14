@@ -1,4 +1,4 @@
-import type { BusinessFile, PaginatedResult } from '@hadiya/shared';
+import type { BusinessFile, FileCategory, PaginatedResult } from '@hadiya/shared';
 
 import { api, type RequestOptions } from './http';
 
@@ -16,11 +16,41 @@ import { api, type RequestOptions } from './http';
  */
 const UPLOAD_TIMEOUT_MS = 120_000;
 
+/**
+ * What travels beside the bytes. A chat attachment sends neither; a document
+ * for the knowledge base sends a category, and usually a title to be known by
+ * instead of its filename.
+ */
+export interface UploadFields {
+  title?: string;
+  category?: FileCategory;
+}
+
+export interface ListFilesParams {
+  page?: number;
+  pageSize?: number;
+  category?: FileCategory;
+  /** `true` for knowledge-base documents only; `false` for attachments only. */
+  knowledgeBase?: boolean;
+}
+
 export const fileService = {
-  upload: (file: File, options: RequestOptions = {}): Promise<BusinessFile> => {
+  upload: (
+    file: File,
+    fields: UploadFields = {},
+    options: RequestOptions = {},
+  ): Promise<BusinessFile> => {
     const form = new FormData();
 
     form.append('file', file, file.name);
+
+    if (fields.title) {
+      form.append('title', fields.title);
+    }
+
+    if (fields.category) {
+      form.append('category', fields.category);
+    }
 
     return api.post<BusinessFile>('/v1/files', form, {
       timeout: UPLOAD_TIMEOUT_MS,
@@ -31,8 +61,11 @@ export const fileService = {
     });
   },
 
-  list: (): Promise<PaginatedResult<BusinessFile>> =>
-    api.get<PaginatedResult<BusinessFile>>('/v1/files', { params: { pageSize: 20 } }),
+  list: (
+    params: ListFilesParams = { pageSize: 20 },
+    signal?: AbortSignal,
+  ): Promise<PaginatedResult<BusinessFile>> =>
+    api.get<PaginatedResult<BusinessFile>>('/v1/files', { params, signal }),
 
   remove: (id: string): Promise<{ deleted: boolean }> =>
     api.delete<{ deleted: boolean }>(`/v1/files/${id}`),

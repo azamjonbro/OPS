@@ -15,7 +15,8 @@ import type { NavigationSection } from '@/types/navigation';
  * to share them: the ledger has to live somewhere, and this is where.
  *
  * So this is the back office and nothing more: what the assistant produced,
- * what it knows, what it is connected to, and the account it acts as.
+ * what it has been given to know, what it is connected to, and the account it
+ * acts as.
  *
  * `minimumRole` mirrors the role each module's service actually requires, so
  * the menu offers only what the person can carry out. It is UX, not security:
@@ -65,6 +66,20 @@ export const settingsSections: NavigationSection[] = [
         module: 'notifications',
         to: { name: 'notifications' },
         icon: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+      },
+    ],
+  },
+  {
+    title: 'What the assistant knows',
+    items: [
+      {
+        // Standing reference material — rules, plans, how the system works —
+        // that the assistant is told about in every conversation. A chat
+        // attachment is not here: it belongs to the one thread it was sent in.
+        label: 'Bilimlar bazasi',
+        module: 'files',
+        to: { name: 'knowledge-base' },
+        icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z',
       },
     ],
   },

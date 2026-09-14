@@ -1,9 +1,11 @@
 import {
   DOCUMENT_KINDS,
+  FILE_CATEGORIES,
   FILE_STATUSES,
   type DocumentChunk,
   type DocumentKind,
   type DocumentSummary,
+  type FileCategory,
   type FileStatus,
 } from '@hadiya/shared';
 import { model, Schema, type Model, type Types } from 'mongoose';
@@ -31,6 +33,8 @@ export interface FileDocument {
   contentType: string;
   sizeBytes: number;
   status: FileStatus;
+  /** Knowledge-base documents carry one; a chat attachment has none. */
+  category: FileCategory | null;
   storageKey: string | null;
   failureReason: string | null;
   summary: DocumentSummary | null;
@@ -49,6 +53,7 @@ const fileSchema = createSchema<FileDocument>({
   contentType: { type: String, required: true, maxlength: 120 },
   sizeBytes: { type: Number, required: true, min: 0 },
   status: { type: String, required: true, enum: FILE_STATUSES, default: 'processing' },
+  category: { type: String, enum: [...FILE_CATEGORIES, null], default: null },
   storageKey: { type: String, default: null, maxlength: 200 },
   failureReason: { type: String, default: null, maxlength: 500 },
   summary: { type: Schema.Types.Mixed, default: null },
@@ -62,6 +67,9 @@ const fileSchema = createSchema<FileDocument>({
 
 // The list a person sees: their own files, newest first.
 fileSchema.index({ user: 1, createdAt: -1 });
+// The knowledge base: this person's categorised documents, newest first. It is
+// read on every assistant turn, so it has its own index rather than a scan.
+fileSchema.index({ user: 1, category: 1, status: 1, createdAt: -1 });
 // Retention sweeps.
 fileSchema.index({ status: 1, updatedAt: 1 });
 

@@ -1,12 +1,14 @@
-import type { Request, Response } from 'express';
-
 import { sendPaginated, sendSuccess } from '../../core/http/api-response.js';
 import { ApiError } from '../../core/http/api-error.js';
 import type { ValidatedHandler } from '../../core/middleware/validate.js';
 import { requireActor } from '../../core/security/actor.js';
 import type { FileDocument } from './file.model.js';
 import * as fileService from './file.service.js';
-import type { fileIdParamSchema, listFilesQuerySchema } from './file.validators.js';
+import type {
+  fileIdParamSchema,
+  listFilesQuerySchema,
+  uploadFieldsSchema,
+} from './file.validators.js';
 
 /**
  * A stored document as the API describes one.
@@ -32,9 +34,11 @@ const toFileView = (file: FileDocument) => ({
  *
  * The multipart body is parsed by the upload middleware, which has already
  * bounded the size. Everything about what the file *is* is decided in the
- * service, from the bytes — nothing here trusts the browser's word.
+ * service, from the bytes — nothing here trusts the browser's word. The two
+ * text fields beside the bytes are the person's own: what to call the document
+ * and whether it belongs in the knowledge base.
  */
-export const upload = async (req: Request, res: Response): Promise<void> => {
+export const upload: ValidatedHandler<{ body: typeof uploadFieldsSchema }> = async (req, res) => {
   const file = req.file;
 
   if (!file) {
@@ -45,6 +49,8 @@ export const upload = async (req: Request, res: Response): Promise<void> => {
     filename: file.originalname,
     contentType: file.mimetype,
     data: file.buffer,
+    title: req.validated.body.title,
+    category: req.validated.body.category,
   });
 
   sendSuccess(req, res, toFileView(created));

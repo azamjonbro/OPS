@@ -142,3 +142,40 @@ export const isDocumentKind = (value: string): value is DocumentKind =>
 export const DOCUMENT_ACCEPT_ATTRIBUTE = DOCUMENT_KINDS.flatMap((kind) =>
   DOCUMENT_EXTENSIONS[kind].map((extension) => `.${extension}`),
 ).join(',');
+
+/**
+ * What a document in the knowledge base is *for*.
+ *
+ * A file attached to one chat message has no category: it was brought to
+ * answer one question and is done. A file placed in the knowledge base has
+ * one, and that is the whole difference — it is standing reference material
+ * the assistant is told about in every conversation, not just the one it was
+ * uploaded into. The four kinds are the ones a shop owner actually keeps:
+ * things they read, rules they sell by, work they are planning, and how the
+ * system itself is meant to behave.
+ */
+export const FILE_CATEGORIES = ['knowledge', 'business', 'project', 'architecture'] as const;
+
+export type FileCategory = (typeof FILE_CATEGORIES)[number];
+
+/** Plain-language names, for a card or a select. */
+export const FILE_CATEGORY_LABELS: Readonly<Record<FileCategory, string>> = Object.freeze({
+  knowledge: 'Bilim',
+  business: 'Biznes qoidalari',
+  project: 'Loyiha',
+  architecture: 'Tizim arxitekturasi',
+});
+
+/** One sentence each, so the person picks the right shelf. */
+export const FILE_CATEGORY_DESCRIPTIONS: Readonly<Record<FileCategory, string>> = Object.freeze({
+  knowledge: 'Ma’lumotnomalar, hisobotlar, o‘qigan narsalaringiz',
+  business: 'Narx siyosati, chegirma qoidalari, ish tartibi',
+  project: 'Rejalar, texnik topshiriqlar, boshlangan ishlar',
+  architecture: 'Tizim qanday ishlashi kerakligi haqidagi hujjatlar',
+});
+
+/** A title stands in for the filename; this is how long one may be. */
+export const FILE_TITLE_MAX_LENGTH = 200;
+
+/** How many knowledge-base titles the assistant is told about per turn. */
+export const KNOWLEDGE_BASE_PROMPT_LIMIT = 20;
