@@ -50,6 +50,15 @@ export {
   type IcloudMailHeader,
   type IcloudMailMessage,
 } from './providers/icloud-mail-client.js';
+export {
+  listAmocrmPipelines,
+  readAmocrmLead,
+  searchAmocrmContacts,
+  searchAmocrmLeads,
+  type AmocrmAccountLocation,
+  type AmocrmPipeline,
+} from './providers/amocrm-client.js';
+export { amocrmLocationOf } from './providers/amocrm.provider.js';
 export { withOptionalSecret } from './providers/provider-secret.js';
 export { CREDENTIAL_PURPOSE, hasSecret, withSecret } from './credential.service.js';
 

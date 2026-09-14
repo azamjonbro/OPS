@@ -339,6 +339,13 @@ const envSchema = z
     NOTION_API_VERSION: z.string().min(4).default('2022-06-28'),
     NOTION_BASE_URL: z.preprocess(blankToUndefined, z.url().default('https://api.notion.com')),
     NOTION_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+
+    /**
+     * amoCRM has no deployment-wide setting at all: the account subdomain and
+     * the long-lived token are both the person's, stored per integration. Only
+     * how long a request may take lives here.
+     */
+    AMOCRM_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {

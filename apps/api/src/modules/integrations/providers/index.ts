@@ -1,6 +1,7 @@
 import type { IntegrationProvider, IntegrationProviderInfo } from '@hadiya/shared';
 
 import { ApiError } from '../../../core/http/api-error.js';
+import { amocrmProvider } from './amocrm.provider.js';
 import { billzProvider } from './billz.provider.js';
 import { icloudMailProvider } from './icloud-mail.provider.js';
 import { mcpProvider } from './mcp.provider.js';
@@ -22,6 +23,7 @@ const ADAPTERS: Record<IntegrationProvider, IntegrationProviderAdapter> = {
   billz: billzProvider,
   notion: notionProvider,
   icloud_mail: icloudMailProvider,
+  amocrm: amocrmProvider,
   custom_mcp: mcpProvider,
 };
 
@@ -52,6 +54,13 @@ export type { IntegrationProviderAdapter, ProviderSetupInput } from './provider.
 export { billzProvider } from './billz.provider.js';
 export { notionProvider } from './notion.provider.js';
 export { icloudMailProvider } from './icloud-mail.provider.js';
+export { amocrmProvider, amocrmLocationOf } from './amocrm.provider.js';
+export {
+  listAmocrmPipelines,
+  readAmocrmLead,
+  searchAmocrmContacts,
+  searchAmocrmLeads,
+} from './amocrm-client.js';
 export { mcpProvider } from './mcp.provider.js';
 export { getNotionIdentity, readNotionPage, searchNotion } from './notion-client.js';
 export { withOptionalSecret } from './provider-secret.js';

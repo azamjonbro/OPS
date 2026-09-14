@@ -45,6 +45,9 @@ const optionsSchema = z
   .object({
     /** iCloud Mail: the Apple ID the app-specific password belongs to. */
     email: z.string().trim().toLowerCase().max(160).optional(),
+    /** amoCRM: the account's subdomain, and which of amoCRM's domains it is on. */
+    subdomain: z.string().trim().toLowerCase().max(63).optional(),
+    domain: z.enum(['amocrm.ru', 'kommo.com']).optional(),
   })
   .strict();
 

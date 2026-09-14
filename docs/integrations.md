@@ -9,10 +9,11 @@ difference between them.
 
 A **native** integration is one Hadiya was taught. Somebody wrote a client,
 read the API's documentation, chose which operations are safe to expose, and
-wrote descriptions a model can act on. Billz and Notion are native. Hadiya
-knows what a Billz sale is and what a Notion page is, so it can promise things
-about them — that nothing writes to Billz, that a page's text is bounded before
-it reaches a context window.
+wrote descriptions a model can act on. Billz, Notion, iCloud Mail and amoCRM
+are native. Hadiya knows what a Billz sale, a Notion page, an email and a CRM
+lead are, so it can promise things about them — that nothing writes to Billz,
+that a page's text is bounded before it reaches a context window, that the CRM
+is read and never moved.
 
 An **MCP** integration is one the user brought. It is an address, a transport,
 maybe a token, and beyond that whatever the far side chooses to say about
@@ -29,16 +30,16 @@ because of the second kind.
                             │
                       Tool Registry         ordinary tools, one namespace
                             │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-     Billz               Notion            Custom MCP
-   (native, env       (native, per-user    (per-user token,
-    credential)          token)             user's server)
-        │                   │                   │
-  capability layer     REST client         MCP client
-                                                │
-                                        discovered tools,
-                                        validated & permissioned
+        ┌───────────┬───────┼──────────┬────────────────┐
+        │           │       │          │                │
+     Billz       Notion  iCloud Mail  amoCRM        Custom MCP
+   (native,    (native,  (native,    (native,      (per-user token,
+    env cred.)  token)    app pwd)    long-lived     user's server)
+        │           │       │          token)           │
+  capability     REST     IMAP        REST           MCP client
+     layer      client    client     client             │
+                                                discovered tools,
+                                                validated & permissioned
 ```
 
 The agent never learns that MCP exists. It asks the registry for tools and
@@ -393,6 +394,23 @@ by name.
 The model, the service, the routes, the tool registry, the agent and the
 frontend all need no changes.
 
+## amoCRM's credential
+
+amoCRM offers OAuth 2 and, for private integrations, a **long-lived token**.
+Hadiya takes the token. OAuth would mean a refresh token that has to be
+exchanged on a schedule, invalidated by a missed refresh, and re-authorised by
+a person in a browser when that happens — on a home server that restarts, that
+is an integration that stops working on a Sunday. A long-lived token is pasted
+once, stored encrypted like every other credential, and revoked by the person
+in amoCRM when they want it gone.
+
+The subdomain and which of amoCRM's domains the account is on (`amocrm.ru` or
+`kommo.com`) are stored as plain options: they identify the account and are not
+secret. The subdomain is held to letters, digits and hyphens and the domain to
+that list, so a request can only ever go to `https://<subdomain>.<domain>` — a
+client that accepted a full URL would let a caller point the server, bearer
+attached, at an address of their choosing.
+
 ## Environment
 
 | Variable                     | Default                  | Notes                                                                                                                       |
@@ -404,6 +422,7 @@ frontend all need no changes.
 | `NOTION_BASE_URL`            | `https://api.notion.com` |                                                                                                                             |
 | `NOTION_API_VERSION`         | `2022-06-28`             |                                                                                                                             |
 | `NOTION_TIMEOUT_MS`          | `15000`                  |                                                                                                                             |
+| `AMOCRM_TIMEOUT_MS`          | `15000`                  | The subdomain and long-lived token are per account, entered in the hub; nothing else about a CRM is in the environment.     |
 
 Generate a key with `openssl rand -base64 32`. Rotating it makes existing
 credentials unreadable — they are marked as sealed by a different key and each
@@ -427,5 +446,7 @@ with a prompt injection on demand.
 | `mcp.test.ts`                           | Metadata validation, risk classification, permissions, execution, limits, injection framing |
 | `mcp-agent.test.ts`                     | The agent using MCP tools, confirmation, what is and is not offered                         |
 | `notion.test.ts`                        | The native Notion path against a stubbed `fetch`                                            |
+| `icloud-mail.test.ts`                   | What iCloud Mail accepts and stores; no socket is opened                                    |
+| `amocrm.test.ts`                        | The native amoCRM path against a stubbed `fetch`: host, header, 204-as-empty, stage names   |
 | `core/security/secret-box.test.ts`      | Encryption properties                                                                       |
 | `web/src/pages/integration-hub.test.ts` | Hub, add flow, detail page, permission controls, states                                     |

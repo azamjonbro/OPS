@@ -18,6 +18,8 @@ export const PROVIDER_ICONS: Record<IntegrationProvider, string> = {
   notion: 'M5 3h9l5 5v13H5zM14 3v5h5M8 13h8M8 17h5',
   // An envelope.
   icloud_mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  // A funnel: the pipeline.
+  amocrm: 'M3 4h18l-7 8v6l-4 2v-8z',
   // A plug and socket.
   custom_mcp:
     'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
@@ -27,5 +29,6 @@ export const PROVIDER_TINTS: Record<IntegrationProvider, string> = {
   billz: 'bg-brand-50 text-brand-700',
   notion: 'bg-surface-muted text-ink-900',
   icloud_mail: 'bg-sky-50 text-sky-700',
+  amocrm: 'bg-brand-50 text-brand-700',
   custom_mcp: 'bg-surface-muted text-ink-500',
 };

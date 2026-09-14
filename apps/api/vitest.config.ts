@@ -122,6 +122,7 @@ export default defineConfig({
       // to stub `fetch` fails loudly instead of reaching Notion.
       NOTION_BASE_URL: 'https://api.notion.test',
       NOTION_TIMEOUT_MS: '2000',
+      AMOCRM_TIMEOUT_MS: '2000',
     },
   },
 });

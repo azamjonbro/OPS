@@ -119,6 +119,10 @@ export interface NotionConfig {
   timeoutMs: number;
 }
 
+export interface AmocrmConfig {
+  timeoutMs: number;
+}
+
 export interface AppConfig {
   app: {
     name: string;
@@ -180,6 +184,7 @@ export interface AppConfig {
   integrations: {
     billz: BillzConfig;
     notion: NotionConfig;
+    amocrm: AmocrmConfig;
     openai: IntegrationConfig & { apiKey: string | undefined };
     anthropic: IntegrationConfig & { apiKey: string | undefined };
     telegram: IntegrationConfig & { botToken: string | undefined };
@@ -339,6 +344,7 @@ export const buildConfig = (env: Env = loadEnv()): AppConfig => ({
       apiVersion: env.NOTION_API_VERSION,
       timeoutMs: env.NOTION_TIMEOUT_MS,
     },
+    amocrm: { timeoutMs: env.AMOCRM_TIMEOUT_MS },
     openai: { apiKey: env.OPENAI_API_KEY, configured: Boolean(env.OPENAI_API_KEY) },
     anthropic: { apiKey: env.ANTHROPIC_API_KEY, configured: Boolean(env.ANTHROPIC_API_KEY) },
     telegram: { botToken: env.TELEGRAM_BOT_TOKEN, configured: Boolean(env.TELEGRAM_BOT_TOKEN) },

@@ -3,18 +3,24 @@ import { z } from 'zod';
 
 import { createLogger } from '../../../core/logger/logger.js';
 import {
+  amocrmLocationOf,
   CREDENTIAL_PURPOSE,
   executeMcpTool,
   hasSecret,
   isMcpError,
+  listAmocrmPipelines,
   listUsableIntegrations,
   McpToolNotAllowedError,
+  readAmocrmLead,
   readIcloudMessage,
   readNotionPage,
   recordBlockedCall,
+  searchAmocrmContacts,
+  searchAmocrmLeads,
   searchIcloudMail,
   searchNotion,
   withSecret,
+  type AmocrmPipeline,
   type IntegrationDocument,
 } from '../../integrations/index.js';
 import type { RegisteredTool } from './tool-registry.js';
@@ -304,6 +310,269 @@ const icloudMailTools = (integration: IntegrationDocument): RegisteredTool[] => 
 };
 
 /* -------------------------------------------------------------------------- */
+/* amoCRM                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The sales pipeline, readable and nothing more.
+ *
+ * Four tools, and the shape of the set is the point. Pipelines come first
+ * because every other answer needs them: a lead carries a stage *id*, and
+ * "stage 46213511" is not an answer to "where does this deal stand". Leads are
+ * searched and then read one at a time — with their notes, since the notes are
+ * where the customer conversation lives — and contacts are looked up by name or
+ * number. Nothing creates, moves, assigns or deletes, which is a property of
+ * the client rather than of these descriptions.
+ */
+const amocrmTools = (integration: IntegrationDocument): RegisteredTool[] => {
+  const integrationId = String(integration._id);
+  const location = amocrmLocationOf(integration);
+
+  if (!location) {
+    // Saved without a subdomain — nothing here could succeed, and a tool that
+    // fails on every call is worse than one that does not exist.
+    return [];
+  }
+
+  const provenanceFor = (externalName: string): ToolProvenance => ({
+    source: 'amocrm',
+    integrationId,
+    integrationName: integration.name,
+    externalName,
+  });
+
+  const useToken = <TResult>(
+    actor: AuthenticatedUser,
+    run: (token: string) => Promise<TResult>,
+  ): Promise<TResult> =>
+    withSecret({ integrationId, userId: actor.id, purpose: CREDENTIAL_PURPOSE.token }, run);
+
+  /**
+   * Stage names, so a lead can be described in words.
+   *
+   * Read once per tool call rather than cached across turns: a pipeline is
+   * edited rarely but it is edited, and a stale name would misreport a deal
+   * without any error to notice.
+   */
+  const stageNames = (
+    pipelines: AmocrmPipeline[],
+  ): Map<number, { pipeline: string; stage: string; kind: string }> => {
+    const names = new Map<number, { pipeline: string; stage: string; kind: string }>();
+
+    for (const pipeline of pipelines) {
+      for (const stage of pipeline.stages) {
+        names.set(stage.id, { pipeline: pipeline.name, stage: stage.name, kind: stage.kind });
+      }
+    }
+
+    return names;
+  };
+
+  const describeLead = (
+    lead: Awaited<ReturnType<typeof searchAmocrmLeads>>[number],
+    names: ReturnType<typeof stageNames>,
+  ): string => {
+    const stage = lead.statusId === null ? null : names.get(lead.statusId);
+    const where = stage
+      ? `${stage.stage}${stage.kind === 'open' ? '' : ` (${stage.kind})`} in ${stage.pipeline}`
+      : 'unknown stage';
+    const contacts = lead.contactNames.length > 0 ? ` — ${lead.contactNames.join(', ')}` : '';
+    const updated = lead.updatedAt ? `, updated ${lead.updatedAt.slice(0, 10)}` : '';
+
+    return `- [id ${lead.id}] ${lead.name}: ${lead.price} — ${where}${contacts}${updated}`;
+  };
+
+  return [
+    defineTool({
+      name: 'amocrm_pipelines',
+      description:
+        'List the sales pipelines in amoCRM and the stages in each, with their ids. Call this before filtering leads by stage, and use it to turn a stage id into a name.',
+      schema: z.object({}),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      provenance: provenanceFor('pipelines'),
+      execute: async (_args, context) => {
+        const pipelines = await useToken(context.actor, (token) =>
+          listAmocrmPipelines(location, token),
+        );
+
+        if (pipelines.length === 0) {
+          return { summary: 'amoCRM has no pipelines.' };
+        }
+
+        const lines = pipelines.map(
+          (pipeline) =>
+            `${pipeline.name}${pipeline.isMain ? ' (main)' : ''} [pipeline ${pipeline.id}]\n` +
+            pipeline.stages
+              .map(
+                (stage) =>
+                  `  - ${stage.name} [stage ${stage.id}]${stage.kind === 'open' ? '' : ` (${stage.kind})`}`,
+              )
+              .join('\n'),
+        );
+
+        return {
+          summary: asUntrustedData('amoCRM', lines.join('\n')),
+          data: { pipelines },
+        };
+      },
+    }),
+    defineTool({
+      name: 'amocrm_search_leads',
+      description:
+        'Find deals (leads) in amoCRM by text, or list the deals sitting in one stage of a pipeline. Use it for "where does the deal with X stand", "what is in negotiation", "how many deals came in this week". Returns at most one page; for a stage, call amocrm_pipelines first to get its id.',
+      schema: z.object({
+        query: z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .describe('Free text: a customer, company or deal name, or a phone number'),
+        pipelineId: z.number().int().positive().optional(),
+        statusId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('A stage id from amocrm_pipelines'),
+        createdFrom: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe('Only deals created on or after this date (YYYY-MM-DD)'),
+        createdTo: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe('Only deals created on or before this date (YYYY-MM-DD)'),
+        limit: z.number().int().min(1).max(100).default(20),
+      }),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      provenance: provenanceFor('search_leads'),
+      execute: async (args, context) => {
+        const toSeconds = (date: string | undefined, endOfDay: boolean): number | undefined =>
+          date === undefined
+            ? undefined
+            : Math.floor(
+                new Date(`${date}T${endOfDay ? '23:59:59' : '00:00:00'}Z`).getTime() / 1_000,
+              );
+
+        const { leads, pipelines } = await useToken(context.actor, async (token) => ({
+          leads: await searchAmocrmLeads(location, token, {
+            query: args.query,
+            pipelineId: args.pipelineId,
+            statusId: args.statusId,
+            createdFrom: toSeconds(args.createdFrom, false),
+            createdTo: toSeconds(args.createdTo, true),
+            limit: args.limit,
+          }),
+          pipelines: await listAmocrmPipelines(location, token),
+        }));
+
+        if (leads.length === 0) {
+          return { summary: 'amoCRM has no deals matching that.' };
+        }
+
+        const names = stageNames(pipelines);
+        const total = leads.reduce((sum, lead) => sum + lead.price, 0);
+        const lines = leads.map((lead) => describeLead(lead, names));
+        const footer =
+          leads.length === args.limit
+            ? `\n(${leads.length} shown — the limit; there may be more.)`
+            : `\n(${leads.length} deals, ${total} in total)`;
+
+        return {
+          summary: asUntrustedData('amoCRM', lines.join('\n') + footer),
+          data: { count: leads.length, total, leads },
+        };
+      },
+    }),
+    defineTool({
+      name: 'amocrm_read_lead',
+      description:
+        'Read one amoCRM deal in full: its stage, value, contacts and the latest notes. Call amocrm_search_leads first to find its id; do not guess one.',
+      schema: z.object({
+        leadId: z.number().int().positive().describe('The deal id from amocrm_search_leads'),
+      }),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      dependsOn: ['amocrm_search_leads'],
+      provenance: provenanceFor('read_lead'),
+      execute: async (args, context) => {
+        const result = await useToken(context.actor, async (token) => {
+          const detail = await readAmocrmLead(location, token, args.leadId);
+
+          return detail
+            ? { ...detail, pipelines: await listAmocrmPipelines(location, token) }
+            : null;
+        });
+
+        if (!result) {
+          return { summary: `amoCRM has no deal ${args.leadId}.` };
+        }
+
+        const names = stageNames(result.pipelines);
+        const notes =
+          result.notes.length === 0
+            ? 'No notes.'
+            : result.notes
+                .map(
+                  (note) =>
+                    `  - ${note.createdAt ? note.createdAt.slice(0, 10) : '?'}: ${note.text}`,
+                )
+                .join('\n');
+
+        return {
+          summary: asUntrustedData(
+            'amoCRM',
+            `${describeLead(result.lead, names)}\n  created ${result.lead.createdAt?.slice(0, 10) ?? '?'}` +
+              `${result.lead.closedAt ? `, closed ${result.lead.closedAt.slice(0, 10)}` : ''}\nNotes:\n${notes}`,
+          ),
+          data: { lead: result.lead, notes: result.notes },
+        };
+      },
+    }),
+    defineTool({
+      name: 'amocrm_search_contacts',
+      description:
+        'Look up a customer in amoCRM by name, phone or email and get their contact details. Use it when the person asks for someone\u2019s number or wants to know whether a customer is in the CRM at all.',
+      schema: z.object({
+        query: z.string().trim().min(1).max(120).describe('A name, phone number or email'),
+        limit: z.number().int().min(1).max(20).default(5),
+      }),
+      mutates: false,
+      category: 'integration',
+      risk: 'read',
+      provenance: provenanceFor('search_contacts'),
+      execute: async (args, context) => {
+        const contacts = await useToken(context.actor, (token) =>
+          searchAmocrmContacts(location, token, { query: args.query, limit: args.limit }),
+        );
+
+        if (contacts.length === 0) {
+          return { summary: `amoCRM has no contact matching "${args.query}".` };
+        }
+
+        const lines = contacts.map((contact) => {
+          const channels = [...contact.phones, ...contact.emails].join(', ');
+
+          return `- [id ${contact.id}] ${contact.name}${channels ? `: ${channels}` : ''}`;
+        });
+
+        return {
+          summary: asUntrustedData('amoCRM', lines.join('\n')),
+          data: { contacts },
+        };
+      },
+    }),
+  ];
+};
+
+/* -------------------------------------------------------------------------- */
 /* MCP                                                                        */
 /* -------------------------------------------------------------------------- */
 
@@ -444,7 +713,7 @@ const toRegisteredMcpTool = (
  *
  *  - `listUsableIntegrations` returns only this actor's, and only those both
  *    enabled and connected.
- *  - A Notion or iCloud Mail integration without a stored credential is
+ *  - A Notion, iCloud Mail or amoCRM integration without a stored credential is
  *    skipped, so a disconnected one does not offer a tool that would fail on
  *    every call.
  *  - Only `enabled` and `requires_confirmation` tools are built. `disabled` and
@@ -472,6 +741,14 @@ export const buildIntegrationTools = async (
     if (integration.provider === 'icloud_mail') {
       if (await hasSecret(String(integration._id), CREDENTIAL_PURPOSE.token)) {
         tools.push(...icloudMailTools(integration));
+      }
+
+      continue;
+    }
+
+    if (integration.provider === 'amocrm') {
+      if (await hasSecret(String(integration._id), CREDENTIAL_PURPOSE.token)) {
+        tools.push(...amocrmTools(integration));
       }
 
       continue;

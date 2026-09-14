@@ -302,6 +302,27 @@ const LABELS: Record<string, ToolDisplayLabels> = {
     runningLabel: 'Reading the message',
     doneLabel: 'Read the message',
   },
+
+  amocrm_pipelines: {
+    displayName: 'amoCRM',
+    runningLabel: 'Reading the pipelines',
+    doneLabel: 'Read the pipelines',
+  },
+  amocrm_search_leads: {
+    displayName: 'amoCRM',
+    runningLabel: 'Searching the deals',
+    doneLabel: 'Searched the deals',
+  },
+  amocrm_read_lead: {
+    displayName: 'amoCRM',
+    runningLabel: 'Reading the deal',
+    doneLabel: 'Read the deal',
+  },
+  amocrm_search_contacts: {
+    displayName: 'amoCRM',
+    runningLabel: 'Looking up the contact',
+    doneLabel: 'Looked up the contact',
+  },
 };
 
 /** `search_customers` becomes `Search customers`. */

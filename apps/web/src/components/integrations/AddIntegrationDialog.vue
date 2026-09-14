@@ -36,6 +36,8 @@ const form = reactive({
   authHeaderName: '',
   secret: '',
   email: '',
+  subdomain: '',
+  domain: 'amocrm.ru' as 'amocrm.ru' | 'kommo.com',
 });
 
 /** Every dialog opening starts clean; a token must not survive a cancel. */
@@ -54,6 +56,8 @@ watch(open, (isOpen) => {
     authHeaderName: '',
     secret: '',
     email: '',
+    subdomain: '',
+    domain: 'amocrm.ru',
   });
 });
 
@@ -62,6 +66,9 @@ watch(open, (isOpen) => {
  * password says nothing about which mailbox it opens.
  */
 const needsEmail = computed(() => chosen.value?.provider === 'icloud_mail');
+
+/** amoCRM lives at `{subdomain}.amocrm.ru`; a token alone does not say where. */
+const needsSubdomain = computed(() => chosen.value?.provider === 'amocrm');
 
 const needsSecret = computed(() => {
   if (!chosen.value) {
@@ -85,6 +92,10 @@ const canSubmit = computed(() => {
   }
 
   if (needsEmail.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    return false;
+  }
+
+  if (needsSubdomain.value && !/^[a-z0-9][a-z0-9-]{1,62}$/i.test(form.subdomain.trim())) {
     return false;
   }
 
@@ -127,6 +138,9 @@ const submit = (): void => {
     ...(form.authMethod === 'header' ? { authHeaderName: form.authHeaderName.trim() } : {}),
     ...(needsSecret.value ? { secret: form.secret } : {}),
     ...(needsEmail.value ? { options: { email: form.email.trim().toLowerCase() } } : {}),
+    ...(needsSubdomain.value
+      ? { options: { subdomain: form.subdomain.trim().toLowerCase(), domain: form.domain } }
+      : {}),
   });
 };
 
@@ -281,9 +295,31 @@ const AUTH_LABELS: Record<McpAuthMethod, string> = {
         />
       </label>
 
+      <div v-if="needsSubdomain" class="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-wide text-ink-500">Subdomain</span>
+          <input
+            v-model="form.subdomain"
+            required
+            type="text"
+            autocomplete="off"
+            :class="fieldClasses"
+            placeholder="mycompany"
+          />
+          <span class="text-xs text-ink-500">The part of your address before .amocrm.ru</span>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-wide text-ink-500">Domain</span>
+          <select v-model="form.domain" :class="fieldClasses">
+            <option value="amocrm.ru">amocrm.ru</option>
+            <option value="kommo.com">kommo.com</option>
+          </select>
+        </label>
+      </div>
+
       <label v-if="needsSecret" class="flex flex-col gap-1">
         <span class="text-xs font-medium uppercase tracking-wide text-ink-500">
-          {{ needsEmail ? 'App-specific password' : 'Token' }}
+          {{ needsEmail ? 'App-specific password' : needsSubdomain ? 'Long-lived token' : 'Token' }}
         </span>
         <!--
           `type="password"`, autocomplete off: a token is not a password the

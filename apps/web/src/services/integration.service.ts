@@ -79,8 +79,11 @@ export interface CreateIntegrationPayload {
   authMethod?: McpAuthMethod;
   authHeaderName?: string | null;
   secret?: string;
-  /** Non-sensitive provider settings; iCloud Mail's Apple ID lives here. */
-  options?: { email?: string };
+  /**
+   * Non-sensitive provider settings: iCloud Mail's Apple ID, amoCRM's account
+   * subdomain and which of its domains the account is on.
+   */
+  options?: { email?: string; subdomain?: string; domain?: 'amocrm.ru' | 'kommo.com' };
 }
 
 export type UpdateIntegrationPayload = Partial<Omit<CreateIntegrationPayload, 'provider'>> & {

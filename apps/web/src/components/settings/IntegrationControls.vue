@@ -205,7 +205,13 @@ const saveCredential = async (item: Integration): Promise<void> => {
         />
         <BaseInput
           v-model="form.secret"
-          :label="needsEmail(item) ? 'App-specific password' : 'Token'"
+          :label="
+            needsEmail(item)
+              ? 'App-specific password'
+              : item.provider === 'amocrm'
+                ? 'Long-lived token'
+                : 'Token'
+          "
           type="password"
           autocomplete="off"
           hint="Stored encrypted. It is never shown again — it can be replaced, not read."
