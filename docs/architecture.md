@@ -313,6 +313,14 @@ messages and a short list of relevant memories, then trims from the oldest end t
 budget, dropping a tool result together with the turn that asked for it so the model never sees an
 answer to a question it cannot see. The system prompt is outside the trimmable window.
 
+**The master instructions are the owner's text, verbatim.** The system prompt opens with
+`jarvis-master-prompt.ts` — Jarvis's identity, the business-isolation rule, which source is
+authoritative for what, and the confirmation policy — exactly as written, and general to every
+business Jarvis runs. Nothing about a deployment is edited into it; `buildSystemPrompt` appends an
+`ABOUT THIS DEPLOYMENT` section instead, holding what is true only here: who is speaking, the time,
+the tools that exist, and the business this instance is scoped to. `master-prompt.test.ts` holds the
+model to that order.
+
 **Retrieval is a seam.** `MemoryRetriever` is an interface; today's implementation scores keyword
 overlap, memory type and recency, and needs no extra infrastructure. Preferences and standing
 instructions keep a floor score so "always answer briefly" survives a question it shares no words
